@@ -12,3 +12,15 @@ export interface LoginRequest {
     username?: string;
     password: string;
 }
+
+export interface PasswordChangeRequest {
+    currentPassword: string;
+    newPassword: string;
+}
+
+export interface ProfileUpdateRequest {
+    username?: string;
+    bio?: string;
+    phoneNumber?: number;
+    gender?: string;
+}
