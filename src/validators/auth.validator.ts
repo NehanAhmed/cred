@@ -1,4 +1,4 @@
-import z from "zod";
+import * as z from "zod";
 
 export const registerSchema = z.object({
   username: z.string().min(3).max(30),
