@@ -5,6 +5,7 @@
   <img src="https://img.shields.io/badge/Zod-4.4.3-3068B7?logo=zod&logoColor=white" alt="Zod">
   <img src="https://img.shields.io/badge/JWT-9.0.3-000000?logo=jsonwebtokens&logoColor=white" alt="JWT">
   <img src="https://img.shields.io/badge/bcryptjs-3.0.3-3178C6?logo=npm&logoColor=white" alt="bcryptjs">
+  <img src="https://img.shields.io/badge/Nodemailer-9.0.0-30B980?logo=npm&logoColor=white" alt="Nodemailer">
   <img src="https://img.shields.io/badge/pnpm-10.33.2-F69220?logo=pnpm&logoColor=white" alt="pnpm">
   <img src="https://img.shields.io/badge/license-MIT-brightgreen" alt="MIT License">
 </p>
@@ -24,7 +25,7 @@
 
 This is a **drop-in authentication service** that handles the hardest part of any application — auth — so you don't have to rebuild it every time. Designed as a pluggable backend for personal projects, side hustles, and MVPs, it mirrors the architecture of services like Clerk but stays fully self-contained and customizable.
 
-Every decision — from httpOnly JWT cookies to Zod validation to rate limiting — prioritizes security and developer experience without unnecessary complexity.
+Every decision — from httpOnly JWT cookies to Zod validation to rate limiting to Ethereal email — prioritizes security and developer experience without unnecessary complexity.
 
 ---
 
@@ -40,6 +41,7 @@ Every decision — from httpOnly JWT cookies to Zod validation to rate limiting 
 | **Validation** | Zod 4 (schema-based request validation) |
 | **Rate Limiting** | express-rate-limit |
 | **Cookies** | cookie-parser (httpOnly, sameSite) |
+| **Email (Dev)** | Nodemailer + Ethereal (fake SMTP) |
 | **Package Manager** | pnpm 10 |
 
 ---
@@ -66,6 +68,16 @@ Every decision — from httpOnly JWT cookies to Zod validation to rate limiting 
 | Global auth rate ceiling (20 req / 15 min) | ✅ |
 | Password strength enforcement (uppercase + digit) | ✅ |
 
+### Email & Verification
+
+| Feature | Status |
+|---|---|
+| Email verification with token-based confirmation | ✅ |
+| Forgot password flow (email with reset link) | ✅ |
+| Reset password with secure token | ✅ |
+| Dev email via Ethereal (preview URLs in console) | ✅ |
+| Production SMTP ready (env config) | ✅ |
+
 ### User Management
 
 | Feature | Status |
@@ -88,20 +100,19 @@ src/
   middlewares/             Auth guard, validation middleware
   validators/              Zod schemas
   models/                  Mongoose User model
-  helpers/                 Success/error response helpers
+  helpers/                 Response + email helpers
+  templates/               HTML email templates
   types/                   TypeScript types + global augmentations
 ```
 
 ### How Auth Works
 
-1. **Register** — password is hashed with bcrypt, user document is created in MongoDB. No session is created — the client must log in.
-2. **Login** — credentials are validated against the database. On success, a JWT is signed with the user's `id`, `email`, and `username`, then stored in an **httpOnly cookie** (`sameSite: strict`, `secure` in production).
-3. **Authenticated requests** — the `authMiddleware` reads the JWT from `req.cookies.token`, verifies it, and attaches the decoded payload to `req.user`. Your routes can access it directly.
-4. **Logout** — the cookie is cleared server-side.
-
-### Why httpOnly Cookies?
-
-httpOnly cookies are **not accessible to JavaScript** in the browser, making them immune to XSS-based token theft. Combined with `sameSite: strict` and the `secure` flag, this is the most secure session storage strategy for SPAs without additional infrastructure.
+1. **Register** — password is hashed with bcrypt, user document is created in MongoDB. A verification token is generated, hashed (SHA-256), and stored in the database. The raw token is emailed to the user. Login is blocked until the email is verified.
+2. **Email Verification** — user clicks the link in their email. The backend hashes the token, matches it against the database, marks the user as verified, and redirects to the frontend login page.
+3. **Login** — credentials are validated against the database. If the email isn't verified, a `403` is returned. On success, a JWT is signed with the user's `id`, `email`, and `username`, then stored in an **httpOnly cookie** (`sameSite: strict`, `secure` in production).
+4. **Authenticated requests** — the `authMiddleware` reads the JWT from `req.cookies.token`, verifies it, and attaches the decoded payload to `req.user`.
+5. **Password Reset** — user enters their email on the "forgot password" form. If the email exists, a reset token is generated, hashed, stored, and emailed. The user clicks the link, enters a new password, and the backend updates it.
+6. **Logout** — the cookie is cleared server-side.
 
 ---
 
@@ -116,6 +127,9 @@ All routes are prefixed with `/api`.
 | `POST` | `/api/auth` | No | Register a new user |
 | `POST` | `/api/auth/login` | No | Log in and receive JWT cookie |
 | `POST` | `/api/auth/logout` | Yes | Clear JWT cookie |
+| `GET` | `/api/auth/verify-email/:token` | No | Verify email (redirects to frontend) |
+| `POST` | `/api/auth/forgot-password` | No | Send password reset email |
+| `POST` | `/api/auth/reset-password/:token` | No | Reset password with token |
 
 ### Profile (`/api/profile`)
 
@@ -130,14 +144,7 @@ All routes are prefixed with `/api`.
 
 ## Roadmap
 
-### Tier 3 — Communication (planned)
-
-| Feature | Description |
-|---|---|
-| **Email verification** | Verify email after registration with token-based confirmation |
-| **Password reset** | Forgot/reset flow with email delivery of reset token |
-
-### Tier 4 — Advanced (exploring)
+### Planned
 
 | Feature | Description |
 |---|---|
