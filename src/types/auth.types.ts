@@ -12,3 +12,11 @@ export interface LoginRequest {
     username?: string;
     password: string;
 }
+
+export interface PasswordForgotRequest {
+    email: string;
+}
+
+export interface PasswordResetRequest {
+    password: string;
+}

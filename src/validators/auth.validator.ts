@@ -14,3 +14,11 @@ export const loginSchema = z.object({
   username: z.string().optional(),
   password: z.string().min(1),
 }).refine(d => d.email || d.username, { message: "Email or username is required" });
+
+export const passwordForgotSchema = z.object({
+  email: z.email(),
+});
+
+export const passwordResetSchema = z.object({
+  password: z.string().min(8).regex(/[A-Z]/).regex(/\d/),
+});
