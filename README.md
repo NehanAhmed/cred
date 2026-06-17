@@ -142,6 +142,33 @@ All routes are prefixed with `/api`.
 
 ---
 
+## Testing
+
+The project includes **61 tests** across **3 test suites** covering all 10 API endpoints.
+
+| Suite | File | Tests |
+|---|---|---|
+| Auth (register, login, logout, verify-email) | `src/__tests__/routes/auth.test.ts` | 24 |
+| Auth email (forgot-password, reset-password) | `src/__tests__/routes/auth-email.test.ts` | 11 |
+| Profile (get, update, delete, change-password) | `src/__tests__/routes/profile.test.ts` | 26 |
+
+```bash
+# Run all tests
+pnpm test
+
+# Run with coverage report
+pnpm test:coverage
+```
+
+### How tests work
+
+- **Database**: Each test suite spins up a fresh in-memory MongoDB via `mongodb-memory-server`. Collections are wiped after every test so state never leaks.
+- **HTTP**: Requests are sent via **supertest** against a lightweight Express app that mirrors production routes without rate limiters (to avoid test blocking).
+- **Email**: `nodemailer` is mocked — no Ethereal accounts are created during tests. Use `jest.fn()` assertions to verify email helpers are called correctly.
+- **Auth tokens**: JWTs are generated directly with `jsonwebtoken` when a valid token is needed, and raw invalid strings are used for 401 assertions.
+
+---
+
 ## Roadmap
 
 ### Planned
