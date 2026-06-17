@@ -3,7 +3,7 @@ export interface RegisterRequest {
     email: string;
     password: string;
     bio?: string;
-    phoneNumber?: number;
+    phoneNumber?: string;
     gender: string;
 }
 
@@ -29,6 +29,6 @@ export interface PasswordChangeRequest {
 export interface ProfileUpdateRequest {
     username?: string;
     bio?: string;
-    phoneNumber?: number;
+    phoneNumber?: string;
     gender?: string;
 }

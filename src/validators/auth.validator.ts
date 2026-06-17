@@ -1,14 +1,5 @@
 import * as z from "zod";
 
-export const registerSchema = z.object({
-  username: z.string().min(3).max(30),
-  email: z.email(),
-  password: z.string().min(8).regex(/[A-Z]/).regex(/\d/),
-  bio: z.string().optional(),
-  phoneNumber: z.number().optional(),
-  gender: z.enum(["male", "female", "other"]).optional(),
-});
-
 export const loginSchema = z.object({
   email: z.email().optional(),
   username: z.string().optional(),
@@ -26,8 +17,17 @@ export const passwordResetSchema = z.object({
 export const profileSchema = z.object({
   username: z.string().min(3).max(30).optional(),
   bio: z.string().min(3).max(200).optional(),
-  phoneNumber: z.number().min(10).max(15).optional(),
+  phoneNumber: z.string().min(10).max(15).optional(),
   gender: z.enum(["male", "female", "other"]).nullish(),
+})
+
+export const registerSchema = z.object({
+  username: z.string().min(3).max(30),
+  email: z.email(),
+  password: z.string().min(8).regex(/[A-Z]/).regex(/\d/),
+  bio: z.string().optional(),
+  phoneNumber: z.string().optional(),
+  gender: z.enum(["male", "female", "other"]).optional(),
 })
 
 export const passwordChangeSchema = z.object({

@@ -113,10 +113,10 @@ export const forgotPassword = async (req: Request, res: Response) => {
         }
         const token = crypto.randomBytes(32).toString('hex');
         const hashToken = crypto.createHash('sha256').update(token).digest('hex');
-        await sendPasswordReset(user.email, token);
         user.resetPasswordToken = hashToken;
         user.resetPasswordExpires = new Date(Date.now() + 3600000);
         await user.save();
+        await sendPasswordReset(user.email, token);
         return sendSuccess(res, null, "If an account exists, a password reset link has been sent", 200)
     }
     catch (error) {

@@ -7,7 +7,7 @@ import { rateLimit } from 'express-rate-limit';
 
 const profileUpdateLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 10,
+    max: 50,
     message: 'Too many profile update attempts, please try again later.'
 });
 
