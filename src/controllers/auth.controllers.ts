@@ -61,7 +61,8 @@ const login = async (req: Request<{}, {}, LoginRequest>, res: Response) => {
             sameSite: 'strict',
             maxAge: 24 * 60 * 60 * 1000
         })
-        return sendSuccess(res, { user }, "User logged in successfully", 200)
+        const { password: _, ...userWithoutPassword } = user.toObject()
+        return sendSuccess(res, { user: userWithoutPassword }, "User logged in successfully", 200)
     }
     catch (error) {
         console.log("An error Occured", error);
@@ -83,26 +84,23 @@ const logout = async (req: Request, res: Response) => {
 export const verifyEmail = async (req: Request<{ token: string }>, res: Response) => {
     try {
         const { token } = req.params;
-        if (!token) {
-            return sendError(res, "Token is required", 400)
-        }
         const hashToken = crypto.createHash('sha256').update(token).digest('hex');
         const user = await userModel.findOne({
             verificationToken: hashToken,
             verificationTokenExpires: { $gt: new Date() }
         });
         if (!user) {
-            return sendError(res, "Invalid or expired token", 400)
+            return res.redirect(`${process.env.CLIENT_URL}/login?verified=false`)
         }
         user.isVerified = true;
         user.verificationToken = null;
         user.verificationTokenExpires = null;
         await user.save();
-        return sendSuccess(res, null, "Email verified successfully", 200)
+        return res.redirect(`${process.env.CLIENT_URL}/login?verified=true`)
     }
     catch (error) {
         console.log("An error Occured", error);
-        return sendError(res, "Something went wrong", 500)
+        return res.redirect(`${process.env.CLIENT_URL}/login?verified=false`)
     }
 }
 
@@ -131,9 +129,6 @@ export const resetPassword = async (req: Request<{ token: string }, {}, { passwo
     try {
         const { token } = req.params;
         const { password } = req.body;
-        if (!token || !password) {
-            return sendError(res, "Token and password are required", 400)
-        }
         const hashToken = crypto.createHash('sha256').update(token).digest('hex');
         const user = await userModel.findOne({
             resetPasswordToken: hashToken,
