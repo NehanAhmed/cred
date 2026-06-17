@@ -7,6 +7,8 @@ pnpm install
 pnpm dev          # ts-node-dev --respawn --transpile-only src/index.ts
 pnpm build        # tsc -> dist/
 pnpm start        # node dist/index.js
+pnpm test         # jest (61 tests across 3 suites)
+pnpm test:coverage# jest --coverage
 ```
 
 Package manager is **pnpm** (v10.33.2). Lockfile: `pnpm-lock.yaml`.
@@ -89,5 +91,7 @@ Auth uses **httpOnly cookies** (`token`). `secure` flag depends on `NODE_ENV ===
 - `req.user` is globally typed via `src/types/types.d.ts` as `Express.Request.user` (type `any`).
 - Dev email uses Ethereal (auto-creates test account, logs preview URL to console).
 - Passwords are excluded from all API responses (destructured via `toObject()`).
-- No test framework, no linter, no formatter, no CI configured.
+- Tests use **Jest** + **ts-jest** + **supertest** + **mongodb-memory-server** (61 tests, 3 suites).
+- Run with `pnpm test` or `pnpm test:coverage`.
+- No linter, no formatter, no CI configured.
 - Multer is in dependencies but unused.
