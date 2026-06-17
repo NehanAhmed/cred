@@ -9,7 +9,8 @@ export const getProfile = async (req: Request, res: Response) => {
         if(!user){
             return sendError(res, 'User not found', 404);
         }
-        return sendSuccess(res, user, 'Profile fetched successfully', 200);
+        const { password: _, ...userWithoutPassword } = user.toObject()
+        return sendSuccess(res, userWithoutPassword, 'Profile fetched successfully', 200);
     } catch (error) {
         console.log(error);
         return sendError(res, 'Internal server error', 500);
@@ -30,7 +31,8 @@ export const updatePassword = async(req:Request<{}, {}, PasswordChangeRequest>, 
         const newHashedPassword: string = await bcrypt.hash(newPassword, 10);
         await userModel.updateOne({ _id: req.user.id }, { password: newHashedPassword });
 
-        return sendSuccess(res, user, 'Password updated successfully', 200);
+        const { password: _, ...userWithoutPassword } = user.toObject()
+        return sendSuccess(res, userWithoutPassword, 'Password updated successfully', 200);
     } catch (error) {
         console.log(error);
         return sendError(res, 'Internal server error', 500);
@@ -49,7 +51,8 @@ export const updateProfile = async(req:Request<{}, {}, ProfileUpdateRequest>, re
         if(phoneNumber) user.phoneNumber = phoneNumber;
         if(gender) user.gender = gender;
         await user.save();
-        return sendSuccess(res, user, 'Profile updated successfully', 200);
+        const { password: _, ...userWithoutPassword } = user.toObject()
+        return sendSuccess(res, userWithoutPassword, 'Profile updated successfully', 200);
     } catch (error) {
         console.log(error);
         return sendError(res, 'Internal server error', 500);

@@ -22,3 +22,15 @@ export const passwordForgotSchema = z.object({
 export const passwordResetSchema = z.object({
   password: z.string().min(8).regex(/[A-Z]/).regex(/\d/),
 });
+
+export const profileSchema = z.object({
+  username: z.string().min(3).max(30).optional(),
+  bio: z.string().min(3).max(200).optional(),
+  phoneNumber: z.number().min(10).max(15).optional(),
+  gender: z.enum(["male", "female", "other"]).nullish(),
+})
+
+export const passwordChangeSchema = z.object({
+  currentPassword: z.string(),
+  newPassword: z.string().min(8).regex(/[A-Z]/).regex(/\d/),
+})

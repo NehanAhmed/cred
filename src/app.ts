@@ -1,9 +1,9 @@
 import express from 'express'
 import rateLimit from 'express-rate-limit'
 import authRoutes from './routes/auth.routes'
+import profileRoutes from './routes/profile.routes'
 import {config} from 'dotenv'
 import cookieParser from 'cookie-parser'
-import profileRoutes from './routes/profile.routes'
 config()
 const app = express()
 
@@ -16,7 +16,7 @@ const authLimiter = rateLimit({
 const profileLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 50,
-    message: 'Too many profile attempts, please try again later.'
+    message: 'Too many profile requests, please try again later.'
 });
 
 app.use(express.json())
