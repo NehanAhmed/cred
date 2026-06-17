@@ -13,14 +13,10 @@ export interface LoginRequest {
     password: string;
 }
 
-export interface PasswordChangeRequest {
-    currentPassword: string;
-    newPassword: string;
+export interface PasswordForgotRequest {
+    email: string;
 }
 
-export interface ProfileUpdateRequest {
-    username?: string;
-    bio?: string;
-    phoneNumber?: number;
-    gender?: string;
+export interface PasswordResetRequest {
+    password: string;
 }
