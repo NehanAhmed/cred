@@ -1,4 +1,4 @@
-# Authentication API — API Reference
+# Cred API — API Reference
 
 **Version:** 1.0.0  
 **Base URL:** `http://localhost:3000/api`  
@@ -34,7 +34,7 @@
 
 ## Overview
 
-This is a **drop-in authentication API** built with Express 5, Mongoose 9, and TypeScript 6. All authentication is handled via **httpOnly JWT cookies** — no bearer tokens, no `Authorization` headers. The API is stateless beyond the MongoDB user store; session state lives entirely in the signed JWT.
+**Cred** is a drop-in authentication API built with Express 5, Mongoose 9, and TypeScript 6. All authentication is handled via **httpOnly JWT cookies** — no bearer tokens, no `Authorization` headers. The API is stateless beyond the MongoDB user store; session state lives entirely in the signed JWT.
 
 ### Key Design Decisions
 

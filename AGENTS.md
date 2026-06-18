@@ -1,4 +1,4 @@
-# AGENTS.md — Authentication API
+# AGENTS.md — Cred
 
 ## Quick start
 

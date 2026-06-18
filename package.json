@@ -1,7 +1,7 @@
 {
-  "name": "authentication",
+  "name": "cred",
   "version": "1.0.0",
-  "description": "",
+  "description": "A drop-in authentication API for personal projects",
   "main": "index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
@@ -13,8 +13,8 @@
     "format:check": "prettier --check \"src/**/*.ts\""
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Nehan Ahmed",
+  "license": "MIT",
   "packageManager": "pnpm@10.33.2",
   "dependencies": {
     "bcryptjs": "^3.0.3",
