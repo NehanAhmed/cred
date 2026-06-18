@@ -1,34 +1,34 @@
 export interface RegisterRequest {
-    username: string;
-    email: string;
-    password: string;
-    bio?: string;
-    phoneNumber?: string;
-    gender: string;
+  username: string;
+  email: string;
+  password: string;
+  bio?: string;
+  phoneNumber?: string;
+  gender: string;
 }
 
 export interface LoginRequest {
-    email?: string;
-    username?: string;
-    password: string;
+  email?: string;
+  username?: string;
+  password: string;
 }
 
 export interface PasswordForgotRequest {
-    email: string;
+  email: string;
 }
 
 export interface PasswordResetRequest {
-    password: string;
+  password: string;
 }
 
 export interface PasswordChangeRequest {
-    currentPassword: string;
-    newPassword: string;
+  currentPassword: string;
+  newPassword: string;
 }
 
 export interface ProfileUpdateRequest {
-    username?: string;
-    bio?: string;
-    phoneNumber?: string;
-    gender?: string;
+  username?: string;
+  bio?: string;
+  phoneNumber?: string;
+  gender?: string;
 }
