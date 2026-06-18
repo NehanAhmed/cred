@@ -1,5 +1,6 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
+import cors from 'cors';
 import authControllers from '../../controllers/auth.controllers';
 import {
   getProfile,
@@ -23,6 +24,10 @@ export const createTestApp = () => {
 
   app.use(express.json());
   app.use(cookieParser());
+  app.use(cors({
+    origin: process.env.CORS_ORIGIN,
+    credentials: true
+  }));
 
   app.post('/api/auth', validate(registerSchema), authControllers.register);
   app.post('/api/auth/login', validate(loginSchema), authControllers.login);

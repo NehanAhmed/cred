@@ -33,7 +33,7 @@ const register = async (req: Request<{}, {}, RegisterRequest>, res: Response) =>
     await sendEmailVerification(user.email, rawToken);
     return sendSuccess(res, {}, 'User registered successfully. Verify Your Email First.', 201);
   } catch (error) {
-    return sendError(res, 'Something went wrong', 500);
+    return sendError(res, 'Internal server error', 500);
   }
 };
 
@@ -68,7 +68,7 @@ const login = async (req: Request<{}, {}, LoginRequest>, res: Response) => {
     return sendSuccess(res, { user: userWithoutPassword }, 'User logged in successfully', 200);
   } catch (error) {
     console.log('An error Occured', error);
-    return sendError(res, 'Something went wrong', 500);
+    return sendError(res, 'Internal server error', 500);
   }
 };
 
@@ -78,7 +78,7 @@ const logout = async (req: Request, res: Response) => {
     return sendSuccess(res, null, 'User logged out successfully', 200);
   } catch (error) {
     console.log('An error Occured', error);
-    return sendError(res, 'Something went wrong', 500);
+    return sendError(res, 'Internal server error', 500);
   }
 };
 
@@ -125,7 +125,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
     return sendSuccess(res, null, 'If an account exists, a password reset link has been sent', 200);
   } catch (error) {
     console.log('An error Occured', error);
-    return sendError(res, 'Something went wrong', 500);
+    return sendError(res, 'Internal server error', 500);
   }
 };
 
@@ -152,7 +152,7 @@ export const resetPassword = async (
     return sendSuccess(res, null, 'Password reset successfully', 200);
   } catch (error) {
     console.log('An error Occured', error);
-    return sendError(res, 'Something went wrong', 500);
+    return sendError(res, 'Internal server error', 500);
   }
 };
 
