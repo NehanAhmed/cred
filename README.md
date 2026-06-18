@@ -12,10 +12,11 @@
 
 ---
 
-<h1 align="center">Authentication API</h1>
+<h1 align="center">Cred</h1>
 
 <p align="center">
-  A production-ready, reusable authentication backend — think <strong>Clerk for your personal projects</strong>.<br>
+  <strong>Cred</strong> — a production-ready authentication API.<br>
+  Think <strong>Clerk for your personal projects</strong>.<br>
   Built with TypeScript, Express 5, Mongoose 9, and a security-first mindset.
 </p>
 
@@ -23,7 +24,7 @@
 
 ## About
 
-This is a **drop-in authentication service** that handles the hardest part of any application — auth — so you don't have to rebuild it every time. Designed as a pluggable backend for personal projects, side hustles, and MVPs, it mirrors the architecture of services like Clerk but stays fully self-contained and customizable.
+**Cred** is a drop-in authentication service that handles the hardest part of any application — auth — so you don't have to rebuild it every time. Designed as a pluggable backend for personal projects, side hustles, and MVPs, it mirrors the architecture of services like Clerk but stays fully self-contained and customizable.
 
 Every decision — from httpOnly JWT cookies to Zod validation to rate limiting to Ethereal email — prioritizes security and developer experience without unnecessary complexity.
 
