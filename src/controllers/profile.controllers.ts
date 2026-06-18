@@ -49,10 +49,10 @@ export const updateProfile = async (req: Request<{}, {}, ProfileUpdateRequest>, 
     if (!user) {
       return sendError(res, 'User not found', 404);
     }
-    if (username) user.username = username;
-    if (bio) user.bio = bio;
-    if (phoneNumber) user.phoneNumber = phoneNumber;
-    if (gender) user.gender = gender;
+    if (username !== undefined) user.username = username;
+    if (bio !== undefined ) user.bio = bio;
+    if (phoneNumber !== undefined ) user.phoneNumber = phoneNumber;
+    if (gender !== undefined ) user.gender = gender;
     await user.save();
     const { password: _, ...userWithoutPassword } = user.toObject();
     return sendSuccess(res, userWithoutPassword, 'Profile updated successfully', 200);

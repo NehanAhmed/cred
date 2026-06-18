@@ -137,6 +137,7 @@ describe('PUT /api/profile/me', () => {
       expect(res.status).toBe(400);
       expect(res.body.errors).toBeDefined();
     });
+    
   });
 
   it('returns 401 without a token', async () => {

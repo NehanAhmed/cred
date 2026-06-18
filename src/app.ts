@@ -4,8 +4,10 @@ import authRoutes from './routes/auth.routes';
 import profileRoutes from './routes/profile.routes';
 import { config } from 'dotenv';
 import cookieParser from 'cookie-parser';
+import cors from 'cors';
 config();
 const app = express();
+
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -21,6 +23,10 @@ const profileLimiter = rateLimit({
 
 app.use(express.json());
 app.use(cookieParser());
+app.use(cors({
+  origin: process.env.CORS_ORIGIN,
+  credentials: true
+}));
 
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/profile', profileLimiter, profileRoutes);
