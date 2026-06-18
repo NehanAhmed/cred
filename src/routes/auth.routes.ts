@@ -1,35 +1,45 @@
-import express from 'express'
-import rateLimit from 'express-rate-limit'
-import controllers from '../controllers/auth.controllers'
-import { authMiddleware } from '../middlewares/auth.middleware'
-import { validate } from '../middlewares/validate.middleware'
-import { registerSchema, loginSchema, passwordForgotSchema, passwordResetSchema } from '../validators/auth.validator'
+import express from 'express';
+import rateLimit from 'express-rate-limit';
+import controllers from '../controllers/auth.controllers';
+import { authMiddleware } from '../middlewares/auth.middleware';
+import { validate } from '../middlewares/validate.middleware';
+import {
+  registerSchema,
+  loginSchema,
+  passwordForgotSchema,
+  passwordResetSchema
+} from '../validators/auth.validator';
 
-const router = express.Router()
+const router = express.Router();
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
-  message: 'Too many login attempts, please try again in 15 minutes.',
-})
+  message: 'Too many login attempts, please try again in 15 minutes.'
+});
 
 const registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 3,
-  message: 'Too many registration attempts, please try again in 60 minutes.',
-})
+  message: 'Too many registration attempts, please try again in 60 minutes.'
+});
 
 const forgotLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 3,
-  message: 'Too many password reset attempts, please try again in 60 minutes.',
-})
+  message: 'Too many password reset attempts, please try again in 60 minutes.'
+});
 
-router.post('/', registerLimiter, validate(registerSchema), controllers.register)
-router.post('/login', loginLimiter, validate(loginSchema), controllers.login)
-router.post('/logout', authMiddleware, controllers.logout)
-router.get('/verify-email/:token', controllers.verifyEmail)
-router.post('/forgot-password', forgotLimiter, validate(passwordForgotSchema), controllers.forgotPassword)
-router.post('/reset-password/:token', validate(passwordResetSchema), controllers.resetPassword)
+router.post('/', registerLimiter, validate(registerSchema), controllers.register);
+router.post('/login', loginLimiter, validate(loginSchema), controllers.login);
+router.post('/logout', authMiddleware, controllers.logout);
+router.get('/verify-email/:token', controllers.verifyEmail);
+router.post(
+  '/forgot-password',
+  forgotLimiter,
+  validate(passwordForgotSchema),
+  controllers.forgotPassword
+);
+router.post('/reset-password/:token', validate(passwordResetSchema), controllers.resetPassword);
 
 export default router;
