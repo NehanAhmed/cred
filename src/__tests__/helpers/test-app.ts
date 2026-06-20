@@ -1,7 +1,14 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
-import authControllers from '../../controllers/auth.controllers';
+import {
+  register,
+  login,
+  logout,
+  verifyEmail,
+  forgotPassword,
+  resetPassword,
+} from '../../controllers/auth.controllers';
 import {
   getProfile,
   updateProfile,
@@ -29,20 +36,12 @@ export const createTestApp = () => {
     credentials: true
   }));
 
-  app.post('/api/auth', validate(registerSchema), authControllers.register);
-  app.post('/api/auth/login', validate(loginSchema), authControllers.login);
-  app.post('/api/auth/logout', authMiddleware, authControllers.logout);
-  app.get('/api/auth/verify-email/:token', authControllers.verifyEmail);
-  app.post(
-    '/api/auth/forgot-password',
-    validate(passwordForgotSchema),
-    authControllers.forgotPassword
-  );
-  app.post(
-    '/api/auth/reset-password/:token',
-    validate(passwordResetSchema),
-    authControllers.resetPassword
-  );
+  app.post('/api/auth', validate(registerSchema), register);
+  app.post('/api/auth/login', validate(loginSchema), login);
+  app.post('/api/auth/logout', authMiddleware, logout);
+  app.get('/api/auth/verify-email/:token', verifyEmail);
+  app.post('/api/auth/forgot-password', validate(passwordForgotSchema), forgotPassword);
+  app.post('/api/auth/reset-password/:token', validate(passwordResetSchema), resetPassword);
 
   app.get('/api/profile/me', authMiddleware, getProfile);
   app.put('/api/profile/me', authMiddleware, validate(profileSchema), updateProfile);

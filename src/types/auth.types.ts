@@ -4,20 +4,12 @@ export interface RegisterRequest {
   password: string;
   bio?: string;
   phoneNumber?: string;
-  gender: string;
+  gender?: 'male' | 'female' | 'other';
 }
 
 export interface LoginRequest {
   email?: string;
   username?: string;
-  password: string;
-}
-
-export interface PasswordForgotRequest {
-  email: string;
-}
-
-export interface PasswordResetRequest {
   password: string;
 }
 
@@ -30,5 +22,5 @@ export interface ProfileUpdateRequest {
   username?: string;
   bio?: string;
   phoneNumber?: string;
-  gender?: string;
+  gender?: 'male' | 'female' | 'other';
 }

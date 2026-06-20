@@ -218,7 +218,7 @@ describe('POST /api/profile/me/change-password', () => {
     expect(res.body.message).toBe('Password updated successfully');
 
     const user = await userModel.findById(userId);
-    const isMatch = await bcrypt.compare(newPassword, user!.password);
+    const isMatch = await bcrypt.compare(newPassword, user!.password!);
     expect(isMatch).toBe(true);
   });
 
