@@ -1,6 +1,14 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import controllers from '../controllers/auth.controllers';
+import {
+  register,
+  login,
+  logout,
+  refresh,
+  verifyEmail,
+  forgotPassword,
+  resetPassword,
+} from '../controllers/auth.controllers';
 import { authMiddleware } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import {
@@ -30,16 +38,18 @@ const forgotLimiter = rateLimit({
   message: 'Too many password reset attempts, please try again in 60 minutes.'
 });
 
-router.post('/', registerLimiter, validate(registerSchema), controllers.register);
-router.post('/login', loginLimiter, validate(loginSchema), controllers.login);
-router.post('/logout', authMiddleware, controllers.logout);
-router.get('/verify-email/:token', controllers.verifyEmail);
-router.post(
-  '/forgot-password',
-  forgotLimiter,
-  validate(passwordForgotSchema),
-  controllers.forgotPassword
-);
-router.post('/reset-password/:token', validate(passwordResetSchema), controllers.resetPassword);
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: 'Too many refresh attempts, please try again in 15 minutes.'
+});
+
+router.post('/', registerLimiter, validate(registerSchema), register);
+router.post('/login', loginLimiter, validate(loginSchema), login);
+router.post('/logout', authMiddleware, logout);
+router.post('/refresh', refreshLimiter, refresh);
+router.get('/verify-email/:token', verifyEmail);
+router.post('/forgot-password', forgotLimiter, validate(passwordForgotSchema), forgotPassword);
+router.post('/reset-password/:token', validate(passwordResetSchema), resetPassword);
 
 export default router;

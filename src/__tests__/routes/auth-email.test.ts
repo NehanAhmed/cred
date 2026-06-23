@@ -105,7 +105,7 @@ describe('POST /api/auth/reset-password/:token', () => {
     expect(user!.resetPasswordToken).toBeNull();
     expect(user!.resetPasswordExpires).toBeNull();
 
-    const isMatch = await bcrypt.compare(newPassword, user!.password);
+    const isMatch = await bcrypt.compare(newPassword, user!.password!);
     expect(isMatch).toBe(true);
   });
 

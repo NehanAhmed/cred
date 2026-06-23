@@ -38,10 +38,11 @@ Every decision — from httpOnly JWT cookies to Zod validation to rate limiting 
 | **Language** | TypeScript 6 (strict mode, ES2022, CommonJS) |
 | **Web Framework** | Express 5 |
 | **Database** | MongoDB via Mongoose 9 |
-| **Auth** | bcryptjs (hashing) + jsonwebtoken (JWT) |
+| **Auth** | bcryptjs (hashing) + jsonwebtoken (JWT) + Passport (OAuth) |
+| **OAuth** | passport-google-oauth20, passport-github2 |
 | **Validation** | Zod 4 (schema-based request validation) |
 | **Rate Limiting** | express-rate-limit |
-| **Cookies** | cookie-parser (httpOnly, sameSite) |
+| **Security** | helmet (headers), cookie-parser (httpOnly, sameSite) |
 | **Email (Dev)** | Nodemailer + Ethereal (fake SMTP) |
 | **Package Manager** | pnpm 10 |
 
@@ -59,15 +60,28 @@ Every decision — from httpOnly JWT cookies to Zod validation to rate limiting 
 | JWT stored in secure httpOnly cookie | ✅ |
 | SameSite strict mode, secure flag in production | ✅ |
 
+### OAuth
+
+| Feature | Status |
+|---|---|
+| Google OAuth (login + account linking) | ✅ |
+| GitHub OAuth (login + account linking) | ✅ |
+| Auto-link OAuth to existing email accounts | ✅ |
+| Unique username generation on collision | ✅ |
+
 ### Security
 
 | Feature | Status |
 |---|---|
 | bcrypt password hashing (salt rounds: 10) | ✅ |
 | Zod input validation with typed schemas | ✅ |
-| Rate limiting per endpoint (register, login, profile) | ✅ |
+| Rate limiting per endpoint (register, login, OAuth, profile) | ✅ |
 | Global auth rate ceiling (20 req / 15 min) | ✅ |
 | Password strength enforcement (uppercase + digit) | ✅ |
+| Helmet security headers | ✅ |
+| Request body size limit (10kb) | ✅ |
+| Generic login errors (no user enumeration) | ✅ |
+| Startup env var validation | ✅ |
 
 ### Email & Verification
 
@@ -110,10 +124,11 @@ src/
 
 1. **Register** — password is hashed with bcrypt, user document is created in MongoDB. A verification token is generated, hashed (SHA-256), and stored in the database. The raw token is emailed to the user. Login is blocked until the email is verified.
 2. **Email Verification** — user clicks the link in their email. The backend hashes the token, matches it against the database, marks the user as verified, and redirects to the frontend login page.
-3. **Login** — credentials are validated against the database. If the email isn't verified, a `403` is returned. On success, a JWT is signed with the user's `id`, `email`, and `username`, then stored in an **httpOnly cookie** (`sameSite: strict`, `secure` in production).
-4. **Authenticated requests** — the `authMiddleware` reads the JWT from `req.cookies.token`, verifies it, and attaches the decoded payload to `req.user`.
-5. **Password Reset** — user enters their email on the "forgot password" form. If the email exists, a reset token is generated, hashed, stored, and emailed. The user clicks the link, enters a new password, and the backend updates it.
-6. **Logout** — the cookie is cleared server-side.
+3. **Login (email/password)** — credentials are validated against the database. If the email isn't verified, a `401` is returned. On success, a JWT is signed with the user's `id`, `email`, and `username`, then stored in an **httpOnly cookie** (`sameSite: strict`, `secure` in production).
+4. **OAuth Login (Google / GitHub)** — user clicks "Sign in with Google/GitHub". Passport redirects to the provider, which calls back with a profile. The backend finds or creates the user (auto-linking if the email matches an existing account), signs a JWT, sets an httpOnly cookie (`sameSite: lax` required for the redirect flow), and redirects to `CLIENT_URL/auth/callback`.
+5. **Authenticated requests** — the `authMiddleware` reads the JWT from `req.cookies.token`, verifies it, and attaches the decoded payload to `req.user`.
+6. **Password Reset** — user enters their email on the "forgot password" form. If the email exists, a reset token is generated, hashed, stored, and emailed. The user clicks the link, enters a new password, and the backend updates it.
+7. **Logout** — the cookie is cleared server-side.
 
 ---
 
@@ -131,6 +146,10 @@ All routes are prefixed with `/api`.
 | `GET` | `/api/auth/verify-email/:token` | No | Verify email (redirects to frontend) |
 | `POST` | `/api/auth/forgot-password` | No | Send password reset email |
 | `POST` | `/api/auth/reset-password/:token` | No | Reset password with token |
+| `GET` | `/api/auth/google` | No | Initiate Google OAuth |
+| `GET` | `/api/auth/google/callback` | No | Google OAuth callback |
+| `GET` | `/api/auth/github` | No | Initiate GitHub OAuth |
+| `GET` | `/api/auth/github/callback` | No | GitHub OAuth callback |
 
 ### Profile (`/api/profile`)
 
@@ -178,7 +197,6 @@ pnpm test:coverage
 |---|---|
 | **Refresh tokens** | Rotate access tokens silently for long-lived sessions |
 | **Role-based access control** | `user` / `admin` roles with middleware guards |
-| **OAuth / social login** | Google, GitHub authentication strategies |
 | **Multi-factor authentication** | TOTP-based 2FA with recovery codes |
 | **Account lockout** | Temporary lock after N failed login attempts |
 | **Session logging** | Audit log of IP, user agent, and login timestamps |
