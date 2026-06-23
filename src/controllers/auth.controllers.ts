@@ -225,7 +225,26 @@ export const verifyEmail = async (req: Request<{ token: string }>, res: Response
 
 export const forgotPassword = async (req: Request, res: Response) => {
   try {
-    const { email } = req.body;
+    const { email: rawEmail } = req.body;
+    if (typeof rawEmail !== 'string') {
+      return sendSuccess(
+        res,
+        null,
+        'If an account exists, a password reset link has been sent',
+        200
+      );
+    }
+
+    const email = rawEmail.trim().toLowerCase();
+    if (!email) {
+      return sendSuccess(
+        res,
+        null,
+        'If an account exists, a password reset link has been sent',
+        200
+      );
+    }
+
     const user = await userModel.findOne({ email });
 
     if (!user) {
