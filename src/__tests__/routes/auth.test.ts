@@ -3,6 +3,8 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import userModel from '../../models/user.models';
+import refreshTokenModel from '../../models/refreshToken.models';
+import { hashToken } from '../../helpers/token.helpers';
 import { createTestApp } from '../helpers/test-app';
 import { setupTestDB } from '../helpers/db';
 
@@ -28,7 +30,7 @@ describe('POST /api/auth — Register', () => {
     const res = await request.post('/api/auth').send(validUser);
     expect(res.status).toBe(201);
     expect(res.body.success).toBe(true);
-    expect(res.body.message).toBe('User registered successfully. Verify Your Email First.');
+    expect(res.body.message).toBe('User registered successfully. Verify your email first.');
     expect(res.body.data).toEqual({});
 
     const user = await userModel.findOne({ email: validUser.email });
@@ -193,7 +195,7 @@ describe('POST /api/auth/login — Login', () => {
     });
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(res.body.message).toBe('User logged in successfully');
+    expect(res.body.message).toBe('Logged in successfully');
     expect(res.body.data.user).toBeDefined();
     expect(res.body.data.user.username).toBe('testuser');
     expect(res.body.data.user.password).toBeUndefined();
@@ -212,14 +214,14 @@ describe('POST /api/auth/login — Login', () => {
     expect(res.body.success).toBe(true);
   });
 
-  it('returns 404 for non-existent user', async () => {
+  it('returns 401 for non-existent user', async () => {
     const res = await request.post('/api/auth/login').send({
       email: 'ghost@example.com',
       password: 'Password123'
     });
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(401);
     expect(res.body.success).toBe(false);
-    expect(res.body.message).toBe('User not found');
+    expect(res.body.message).toBe('Invalid credentials');
   });
 
   it('returns 401 when email is not verified', async () => {
@@ -247,7 +249,7 @@ describe('POST /api/auth/login — Login', () => {
     });
     expect(res.status).toBe(401);
     expect(res.body.success).toBe(false);
-    expect(res.body.message).toBe('Invalid password');
+    expect(res.body.message).toBe('Invalid credentials');
   });
 
   describe('validation errors', () => {
@@ -277,7 +279,7 @@ describe('POST /api/auth/logout — Logout', () => {
       isVerified: true
     });
     const token = jwt.sign(
-      { id: user._id, email: user.email, username: user.username },
+      { id: user._id, email: user.email, username: user.username, tokenType: 'access' },
       process.env.JWT_SECRET!
     );
 
@@ -285,7 +287,7 @@ describe('POST /api/auth/logout — Logout', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(res.body.message).toBe('User logged out successfully');
+    expect(res.body.message).toBe('Logged out successfully');
   });
 
   it('returns 401 when no cookie is sent', async () => {

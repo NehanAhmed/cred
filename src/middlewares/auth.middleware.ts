@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import { sendError } from '../helpers/api.helpers';
 import jwt from 'jsonwebtoken';
+import { JWTPayload } from '../types/jwt.types';
 
 export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
   const token = req.cookies.token;
@@ -9,7 +10,12 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { id: string; email: string; username: string; iat?: number; exp?: number };
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JWTPayload;
+
+    if (decoded.tokenType !== 'access') {
+      return sendError(res, 'Invalid token', 401);
+    }
+
     req.user = {
       id: decoded.id,
       email: decoded.email,

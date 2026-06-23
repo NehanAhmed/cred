@@ -19,23 +19,30 @@ Package manager is **pnpm** (v10.33.2). Lockfile: `pnpm-lock.yaml`.
 - Auth: `bcryptjs`, `jsonwebtoken`, `cookie-parser`, `dotenv`
 - Validation: `zod` 4
 - Rate limiting: `express-rate-limit`
-- Email: `nodemailer` + Ethereal (dev)
+- Email: `nodemailer` + Ethereal (dev) or SMTP (prod)
+- OAuth: `passport`, `passport-google-oauth20`, `passport-github2`
+- Security: `helmet`
 
 ## Architecture
 
 ```
 src/
-  index.ts                 — entrypoint: calls connectDB(), starts Express
-  app.ts                   — Express app setup (cors-less), mounts /api/auth + /api/profile
+  index.ts                 — entrypoint: awaits connectDB(), starts Express
+  app.ts                   — Express app setup, mounts /api/auth + /api/profile
   db/db.ts                 — mongoose.connect(MONGO_URI)
   models/user.models.ts    — User schema (username, email, password, bio, phoneNumber, gender,
                              isVerified, verificationToken, verificationTokenExpires,
-                             resetPasswordToken, resetPasswordExpires)
+                             resetPasswordToken, resetPasswordExpires,
+                             googleId, githubId, provider, avatar)
+  services/
+    passport.ts            — Passport strategies for Google + GitHub OAuth
   routes/
     auth.routes.ts         — register, login, logout, verify-email, forgot-password, reset-password
+    oauth.routes.ts        — google, google/callback, github, github/callback
     profile.routes.ts      — get/update profile, change password, delete account
   controllers/
     auth.controllers.ts
+    oauth.controllers.ts
     profile.controllers.ts
   middlewares/
     auth.middleware.ts      — JWT verify from req.cookies.token
@@ -43,7 +50,7 @@ src/
   validators/auth.validator.ts  — Zod schemas for all request bodies
   helpers/
     api.helpers.ts          — sendSuccess / sendError helper
-    email.helpers.ts        — Nodemailer (Ethereal dev), sendVerification, sendReset
+    email.helpers.ts        — Nodemailer (Ethereal dev or SMTP prod)
   templates/email.templates.ts  — HTML email templates
   types/                    — auth.types.ts, api.types.ts, types.d.ts (global Express.Request.user)
 ```
@@ -60,6 +67,10 @@ src/
 | GET    | /api/auth/verify-email/:token | No      | Verify email, redirects to CLIENT_URL |
 | POST   | /api/auth/forgot-password | No          | Sends password reset email |
 | POST   | /api/auth/reset-password/:token | No     | Reset password with token from email |
+| GET    | /api/auth/google        | No            | Initiate Google OAuth |
+| GET    | /api/auth/google/callback | No          | Google OAuth callback |
+| GET    | /api/auth/github        | No            | Initiate GitHub OAuth |
+| GET    | /api/auth/github/callback | No          | GitHub OAuth callback |
 
 ### `/api/profile`
 
@@ -74,24 +85,26 @@ Auth uses **httpOnly cookies** (`token`). `secure` flag depends on `NODE_ENV ===
 
 ## Environment
 
-`.env` requires: `PORT`, `MONGO_URI`, `JWT_SECRET`, `CLIENT_URL`, `BACKEND_URL`.
+`.env` requires: `PORT`, `MONGO_URI`, `JWT_SECRET`, `CLIENT_URL`, `BACKEND_URL`, `CORS_ORIGIN`.
 
 ## Rate limiting
 
-| Limiter       | Window | Max | Endpoint |
-|---------------|--------|-----|----------|
-| authLimiter   | 15 min | 20  | All /api/auth |
-| loginLimiter  | 15 min | 5   | POST /api/auth/login |
-| registerLimiter | 60 min | 3 | POST /api/auth |
-| forgotLimiter | 60 min | 3  | POST /api/auth/forgot-password |
-| profileLimiter | 15 min | 50 | All /api/profile |
+| Limiter           | Window | Max | Endpoint |
+|-------------------|--------|-----|----------|
+| authLimiter       | 15 min | 20  | All /api/auth |
+| oauthLimiter      | 15 min | 10  | All OAuth routes |
+| loginLimiter      | 15 min | 5   | POST /api/auth/login |
+| registerLimiter   | 60 min | 3   | POST /api/auth |
+| forgotLimiter     | 60 min | 3   | POST /api/auth/forgot-password |
+| profileLimiter    | 15 min | 50  | All /api/profile |
+| profileUpdateLimiter | 15 min | 50 | PUT /api/profile/me, POST /me/change-password |
 
 ## Notable facts
 
-- `req.user` is globally typed via `src/types/types.d.ts` as `Express.Request.user` (type `any`).
+- `req.user` is globally typed via `src/types/types.d.ts`.
 - Dev email uses Ethereal (auto-creates test account, logs preview URL to console).
+- Production SMTP is configured via `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`.
 - Passwords are excluded from all API responses (destructured via `toObject()`).
 - Tests use **Jest** + **ts-jest** + **supertest** + **mongodb-memory-server** (61 tests, 3 suites).
 - Run with `pnpm test` or `pnpm test:coverage`.
 - No linter, no formatter, no CI configured.
-- Multer is in dependencies but unused.
