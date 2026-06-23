@@ -1,11 +1,41 @@
 import userModel from '../models/user.models';
+import refreshTokenModel from '../models/refreshToken.models';
 import { Request, Response } from 'express';
 import { LoginRequest, RegisterRequest } from '../types/auth.types';
 import { sendError, sendSuccess } from '../helpers/api.helpers';
+import { generateAccessToken, generateRefreshTokenData, hashToken } from '../helpers/token.helpers';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { sendEmailVerification, sendPasswordReset } from '../helpers/email.helpers';
+
+const REFRESH_TOKEN_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+
+const setAuthCookies = (
+  res: Response,
+  accessToken: string,
+  rawRefreshToken: string,
+  sameSite: 'strict' | 'lax'
+) => {
+  res.cookie('token', accessToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite,
+    maxAge: 15 * 60 * 1000,
+  });
+
+  res.cookie('refreshToken', rawRefreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite,
+    path: '/api/auth',
+    maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE,
+  });
+};
+
+const clearAuthCookies = (res: Response) => {
+  res.clearCookie('token');
+  res.clearCookie('refreshToken', { path: '/api/auth' });
+};
 
 export const register = async (req: Request<{}, {}, RegisterRequest>, res: Response) => {
   try {
@@ -70,18 +100,17 @@ export const login = async (req: Request<{}, {}, LoginRequest>, res: Response) =
       return sendError(res, 'Invalid credentials', 401);
     }
 
-    const token = jwt.sign(
-      { id: user._id, email: user.email, username: user.username },
-      process.env.JWT_SECRET!,
-      { expiresIn: '1d' }
-    );
+    const accessToken = generateAccessToken(user);
+    const rtData = generateRefreshTokenData();
 
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 24 * 60 * 60 * 1000,
+    await refreshTokenModel.create({
+      token: rtData.hashedToken,
+      user: user._id,
+      family: rtData.family,
+      expiresAt: rtData.expiresAt,
     });
+
+    setAuthCookies(res, accessToken, rtData.rawToken, 'strict');
 
     const { password: _, ...userWithoutPassword } = user.toObject();
     return sendSuccess(res, { user: userWithoutPassword }, 'Logged in successfully', 200);
@@ -93,10 +122,77 @@ export const login = async (req: Request<{}, {}, LoginRequest>, res: Response) =
 
 export const logout = async (req: Request, res: Response) => {
   try {
-    res.clearCookie('token');
+    const rawToken = req.cookies.refreshToken;
+    if (rawToken) {
+      const hashed = hashToken(rawToken);
+      await refreshTokenModel.deleteOne({ token: hashed });
+    }
+
+    clearAuthCookies(res);
     return sendSuccess(res, null, 'Logged out successfully', 200);
   } catch (error) {
     console.error('Logout error:', error);
+    return sendError(res, 'Internal server error', 500);
+  }
+};
+
+export const refresh = async (req: Request, res: Response) => {
+  try {
+    const rawToken = req.cookies.refreshToken;
+    if (!rawToken) {
+      return sendError(res, 'Refresh token not found', 401);
+    }
+
+    const hashed = hashToken(rawToken);
+    const storedToken = await refreshTokenModel.findOne({ token: hashed });
+
+    if (!storedToken) {
+      clearAuthCookies(res);
+      return sendError(res, 'Invalid refresh token', 401);
+    }
+
+    if (storedToken.expiresAt < new Date()) {
+      await storedToken.deleteOne();
+      clearAuthCookies(res);
+      return sendError(res, 'Refresh token expired', 401);
+    }
+
+    const user = await userModel.findById(storedToken.user);
+    if (!user) {
+      await storedToken.deleteOne();
+      clearAuthCookies(res);
+      return sendError(res, 'User not found', 401);
+    }
+
+    const reused = await refreshTokenModel.findOne({
+      user: storedToken.user,
+      family: storedToken.family,
+      _id: { $ne: storedToken._id },
+    });
+
+    if (reused) {
+      await refreshTokenModel.deleteMany({ user: storedToken.user, family: storedToken.family });
+      clearAuthCookies(res);
+      return sendError(res, 'Refresh token reuse detected. All sessions revoked.', 401);
+    }
+
+    await storedToken.deleteOne();
+
+    const rtData = generateRefreshTokenData();
+
+    await refreshTokenModel.create({
+      token: rtData.hashedToken,
+      user: user._id,
+      family: rtData.family,
+      expiresAt: rtData.expiresAt,
+    });
+
+    const accessToken = generateAccessToken(user);
+    setAuthCookies(res, accessToken, rtData.rawToken, 'strict');
+
+    return sendSuccess(res, null, 'Token refreshed successfully', 200);
+  } catch (error) {
+    console.error('Refresh token error:', error);
     return sendError(res, 'Internal server error', 500);
   }
 };

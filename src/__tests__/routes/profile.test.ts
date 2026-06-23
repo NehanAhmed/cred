@@ -29,7 +29,7 @@ beforeEach(async () => {
 
   userId = user._id.toString();
   authToken = jwt.sign(
-    { id: userId, email: user.email, username: user.username },
+    { id: userId, email: user.email, username: user.username, tokenType: 'access' },
     process.env.JWT_SECRET!
   );
 });

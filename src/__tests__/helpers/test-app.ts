@@ -5,6 +5,7 @@ import {
   register,
   login,
   logout,
+  refresh,
   verifyEmail,
   forgotPassword,
   resetPassword,
@@ -39,6 +40,7 @@ export const createTestApp = () => {
   app.post('/api/auth', validate(registerSchema), register);
   app.post('/api/auth/login', validate(loginSchema), login);
   app.post('/api/auth/logout', authMiddleware, logout);
+  app.post('/api/auth/refresh', refresh);
   app.get('/api/auth/verify-email/:token', verifyEmail);
   app.post('/api/auth/forgot-password', validate(passwordForgotSchema), forgotPassword);
   app.post('/api/auth/reset-password/:token', validate(passwordResetSchema), resetPassword);

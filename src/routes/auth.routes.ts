@@ -4,6 +4,7 @@ import {
   register,
   login,
   logout,
+  refresh,
   verifyEmail,
   forgotPassword,
   resetPassword,
@@ -37,9 +38,16 @@ const forgotLimiter = rateLimit({
   message: 'Too many password reset attempts, please try again in 60 minutes.'
 });
 
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: 'Too many refresh attempts, please try again in 15 minutes.'
+});
+
 router.post('/', registerLimiter, validate(registerSchema), register);
 router.post('/login', loginLimiter, validate(loginSchema), login);
 router.post('/logout', authMiddleware, logout);
+router.post('/refresh', refreshLimiter, refresh);
 router.get('/verify-email/:token', verifyEmail);
 router.post('/forgot-password', forgotLimiter, validate(passwordForgotSchema), forgotPassword);
 router.post('/reset-password/:token', validate(passwordResetSchema), resetPassword);

@@ -3,6 +3,8 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import userModel from '../../models/user.models';
+import refreshTokenModel from '../../models/refreshToken.models';
+import { hashToken } from '../../helpers/token.helpers';
 import { createTestApp } from '../helpers/test-app';
 import { setupTestDB } from '../helpers/db';
 
@@ -277,7 +279,7 @@ describe('POST /api/auth/logout — Logout', () => {
       isVerified: true
     });
     const token = jwt.sign(
-      { id: user._id, email: user.email, username: user.username },
+      { id: user._id, email: user.email, username: user.username, tokenType: 'access' },
       process.env.JWT_SECRET!
     );
 
