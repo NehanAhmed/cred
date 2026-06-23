@@ -1,6 +1,7 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import {
   register,
   login,
@@ -30,12 +31,20 @@ import {
 export const createTestApp = () => {
   const app = express();
 
+  const authRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
   app.use(express.json());
   app.use(cookieParser());
   app.use(cors({
     origin: process.env.CORS_ORIGIN,
     credentials: true
   }));
+  app.use('/api/auth', authRateLimiter);
 
   app.post('/api/auth', validate(registerSchema), register);
   app.post('/api/auth/login', validate(loginSchema), login);
