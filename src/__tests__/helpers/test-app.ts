@@ -38,6 +38,13 @@ export const createTestApp = () => {
     legacyHeaders: false,
   });
 
+  const profileRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
   app.use(express.json());
   app.use(cookieParser());
   app.use(cors({
@@ -45,6 +52,7 @@ export const createTestApp = () => {
     credentials: true
   }));
   app.use('/api/auth', authRateLimiter);
+  app.use('/api/profile', profileRateLimiter);
 
   app.post('/api/auth', validate(registerSchema), register);
   app.post('/api/auth/login', validate(loginSchema), login);
