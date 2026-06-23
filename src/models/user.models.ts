@@ -51,11 +51,9 @@ const userSchema = new mongoose.Schema(
     },
     googleId: {
       type: String,
-      default: null,
     },
     githubId: {
       type: String,
-      default: null,
     },
     provider: {
       type: String,
@@ -72,8 +70,8 @@ const userSchema = new mongoose.Schema(
 
 userSchema.index({ verificationToken: 1, verificationTokenExpires: 1 });
 userSchema.index({ resetPasswordToken: 1, resetPasswordExpires: 1 });
-userSchema.index({ googleId: 1 });
-userSchema.index({ githubId: 1 });
+userSchema.index({ googleId: 1 }, { unique: true, sparse: true });
+userSchema.index({ githubId: 1 }, { unique: true, sparse: true });
 
 userSchema.pre('save', async function () {
   if (this.provider === 'local' && !this.password) {

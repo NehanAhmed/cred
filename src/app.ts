@@ -55,7 +55,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/auth', oauthLimiter, oauthRoutes);
+app.use('/api/auth', oauthRoutes);
 app.use('/api/profile', profileLimiter, profileRoutes);
 
 export default app;

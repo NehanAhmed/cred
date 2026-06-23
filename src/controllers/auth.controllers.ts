@@ -286,8 +286,7 @@ export const resetPassword = async (
       return sendError(res, 'Invalid or expired token', 400);
     }
 
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(password, salt);
+    user.password = await bcrypt.hash(password, 10);
     user.resetPasswordToken = null;
     user.resetPasswordExpires = null;
     await user.save();

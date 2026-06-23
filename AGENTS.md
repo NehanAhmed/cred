@@ -97,7 +97,7 @@ Auth uses **httpOnly cookies** (`token`). `secure` flag depends on `NODE_ENV ===
 | registerLimiter   | 60 min | 3   | POST /api/auth |
 | forgotLimiter     | 60 min | 3   | POST /api/auth/forgot-password |
 | profileLimiter    | 15 min | 50  | All /api/profile |
-| profileUpdateLimiter | 15 min | 50 | PUT /api/profile/me, POST /me/change-password |
+| profileUpdateLimiter | 15 min | 50 | PUT /api/profile/me, POST /api/profile/me/change-password |
 
 ## Notable facts
 

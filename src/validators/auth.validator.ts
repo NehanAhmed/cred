@@ -2,7 +2,7 @@ import * as z from 'zod';
 
 const bioSchema = z.string().min(3).max(200).optional();
 const phoneSchema = z.string().min(10).max(15).optional();
-const genderSchema = z.enum(['male', 'female', 'other']).nullish();
+const genderSchema = z.enum(['male', 'female', 'other']).optional();
 
 export const loginSchema = z
   .object({
