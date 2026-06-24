@@ -38,6 +38,20 @@ export const createTestApp = () => {
     legacyHeaders: false,
   });
 
+  const passwordChangeRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  const profileRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
   app.use(express.json());
   app.use(cookieParser());
   app.use(cors({
@@ -45,6 +59,7 @@ export const createTestApp = () => {
     credentials: true
   }));
   app.use('/api/auth', authRateLimiter);
+  app.use('/api/profile', profileRateLimiter);
 
   app.post('/api/auth', validate(registerSchema), register);
   app.post('/api/auth/login', validate(loginSchema), login);
@@ -52,6 +67,7 @@ export const createTestApp = () => {
   app.post('/api/auth/refresh', refresh);
   app.get('/api/auth/verify-email/:token', verifyEmail);
   app.post('/api/auth/forgot-password', validate(passwordForgotSchema), forgotPassword);
+    passwordChangeRateLimiter,
   app.post('/api/auth/reset-password/:token', validate(passwordResetSchema), resetPassword);
 
   app.get('/api/profile/me', authMiddleware, getProfile);
