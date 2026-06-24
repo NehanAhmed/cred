@@ -68,7 +68,8 @@ export const updateProfile = async (req: Request<{}, {}, ProfileUpdateRequest>, 
     return sendSuccess(res, userWithoutPassword, 'Profile updated successfully', 200);
   } catch (error: any) {
     if (error?.code === 11000) {
-      return sendError(res, 'Username is already taken', 400);
+      const field = Object.keys(error.keyPattern ?? {})[0] || 'field';
+      return sendError(res, `${field} is already taken`, 400);
     }
     console.error('Update profile error:', error);
     return sendError(res, 'Internal server error', 500);

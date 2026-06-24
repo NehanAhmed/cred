@@ -96,11 +96,7 @@ passport.use(
       done: VerifyCallback
     ) => {
       try {
-        const email =
-          profile.emails?.[0]?.value ||
-          (profile.username
-            ? `${profile.username}@github.oauth`
-            : undefined);
+        const email = profile.emails?.[0]?.value;
 
         const user = await findOrCreateOAuthUser(
           'github',

@@ -3,33 +3,39 @@ import { emailVerification, passwordReset } from '../templates/email.templates';
 
 let transporter: nodemailer.Transporter | null = null;
 let fromAddress: string;
+let initPromise: Promise<nodemailer.Transporter> | null = null;
 
 const getTransporter = async () => {
   if (transporter) return transporter;
+  if (initPromise) return initPromise;
 
-  if (process.env.SMTP_HOST) {
-    transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT) || 587,
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
-    fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER!;
-  } else {
-    const testAccount = await nodemailer.createTestAccount();
-    fromAddress = testAccount.user;
-    transporter = nodemailer.createTransport({
-      host: 'smtp.ethereal.email',
-      port: 587,
-      secure: false,
-      auth: { user: testAccount.user, pass: testAccount.pass },
-    });
-  }
+  initPromise = (async () => {
+    if (process.env.SMTP_HOST) {
+      transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: Number(process.env.SMTP_PORT) || 587,
+        secure: process.env.SMTP_SECURE === 'true',
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      });
+      fromAddress = process.env.SMTP_FROM || process.env.SMTP_USER!;
+    } else {
+      const testAccount = await nodemailer.createTestAccount();
+      fromAddress = testAccount.user;
+      transporter = nodemailer.createTransport({
+        host: 'smtp.ethereal.email',
+        port: 587,
+        secure: false,
+        auth: { user: testAccount.user, pass: testAccount.pass },
+      });
+    }
 
-  return transporter;
+    return transporter;
+  })();
+
+  return initPromise;
 };
 
 const sendMail = async (to: string, subject: string, html: string) => {

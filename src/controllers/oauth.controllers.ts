@@ -11,6 +11,10 @@ interface OAuthUser {
 
 export const oauthCallback = async (req: Request, res: Response) => {
   try {
+    if (!req.user) {
+      return res.redirect(`${process.env.CLIENT_URL}/login?error=oauth_failed`);
+    }
+
     const user = req.user as unknown as OAuthUser;
 
     const accessToken = generateAccessToken(user);
