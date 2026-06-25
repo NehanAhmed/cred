@@ -41,7 +41,7 @@ const createOAuthTestApp = () => {
     const state = 'test-oauth-state';
     res.cookie('oauth_state', state, {
       httpOnly: true,
-      secure: false,
+      secure: true,
       sameSite: 'lax' as const,
       maxAge: 10 * 60 * 1000,
     });
@@ -63,7 +63,7 @@ const createOAuthTestApp = () => {
     const state = 'test-oauth-state';
     res.cookie('oauth_state', state, {
       httpOnly: true,
-      secure: false,
+      secure: true,
       sameSite: 'lax' as const,
       maxAge: 10 * 60 * 1000,
     });
