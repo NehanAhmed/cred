@@ -6,7 +6,7 @@ const router = express.Router();
 
 const healthLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
-  max: 30,
+  limit: 30,
   message: 'Too many health check requests, please try again later.',
 });
 

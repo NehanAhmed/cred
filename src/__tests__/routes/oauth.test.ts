@@ -11,7 +11,7 @@ import { setupTestDB } from '../helpers/db';
 
 setupTestDB();
 
-const CLIENT_URL = process.env.CLIENT_URL!;
+const CLIENT_URL = 'http://localhost:5173';
 
 type AuthBehavior =
   | { type: 'success'; user: Record<string, unknown> }
