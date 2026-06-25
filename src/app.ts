@@ -5,6 +5,7 @@ import passport from './services/passport';
 import authRoutes from './routes/auth.routes';
 import profileRoutes from './routes/profile.routes';
 import oauthRoutes from './routes/oauth.routes';
+import healthRoutes from './routes/health.routes';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import { config } from 'dotenv';
@@ -50,9 +51,7 @@ app.use(
 
 app.use(passport.initialize());
 
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+app.use('/api/health', healthRoutes);
 
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/auth', oauthRoutes);

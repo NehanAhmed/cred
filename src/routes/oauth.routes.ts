@@ -14,7 +14,7 @@ const oauthLimiter = rateLimit({
 
 router.use(oauthLimiter);
 
-const validateOAuthState = (req: Request, res: Response, next: NextFunction) => {
+export const validateOAuthState = (req: Request, res: Response, next: NextFunction) => {
   const cookieState = req.cookies?.oauth_state;
   const queryState = req.query.state as string | undefined;
 
