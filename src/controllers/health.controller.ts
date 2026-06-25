@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { sendSuccess, sendError } from '../helpers/api.helpers';
 
+const PING_TIMEOUT_MS = 3000;
 const startTime = Date.now();
 
 const DB_STATES: Record<number, string> = {
@@ -21,8 +22,18 @@ export const healthCheck = async (_req: Request, res: Response) => {
 
     if (isConnected && mongoose.connection.db) {
       const pingStart = Date.now();
-      await mongoose.connection.db.admin().command({ ping: 1 });
-      dbLatency = Date.now() - pingStart;
+      try {
+        await Promise.race([
+          mongoose.connection.db.admin().command({ ping: 1 }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('ping timeout')), PING_TIMEOUT_MS)
+          ),
+        ]);
+        dbLatency = Date.now() - pingStart;
+      } catch {
+        dbStatus = 'slow';
+        dbLatency = null;
+      }
     }
 
     const healthData = {
@@ -36,13 +47,18 @@ export const healthCheck = async (_req: Request, res: Response) => {
       database: {
         status: dbStatus,
         latency: dbLatency,
-        state: DB_STATES[dbState] ?? 'unknown',
+        state: dbStatus,
       },
       timestamp: new Date().toISOString(),
     };
 
     if (!isConnected) {
-      return sendSuccess(res, healthData, 'Service is degraded — database not connected', 503);
+      return res.status(503).json({
+        success: false,
+        message: 'Service is degraded — database not connected',
+        error: 'Service is degraded — database not connected',
+        data: healthData,
+      });
     }
 
     return sendSuccess(res, healthData, 'Service is healthy', 200);
