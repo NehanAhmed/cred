@@ -11,7 +11,7 @@ import { setupTestDB } from '../helpers/db';
 
 setupTestDB();
 
-const CLIENT_URL = process.env.CLIENT_URL!;
+const CLIENT_URL = 'http://localhost:5173';
 
 type AuthBehavior =
   | { type: 'success'; user: Record<string, unknown> }
@@ -41,7 +41,7 @@ const createOAuthTestApp = () => {
     const state = 'test-oauth-state';
     res.cookie('oauth_state', state, {
       httpOnly: true,
-      secure: false,
+      secure: true,
       sameSite: 'lax' as const,
       maxAge: 10 * 60 * 1000,
     });
@@ -63,7 +63,7 @@ const createOAuthTestApp = () => {
     const state = 'test-oauth-state';
     res.cookie('oauth_state', state, {
       httpOnly: true,
-      secure: false,
+      secure: true,
       sameSite: 'lax' as const,
       maxAge: 10 * 60 * 1000,
     });
