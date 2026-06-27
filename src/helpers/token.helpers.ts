@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import { Response } from 'express';
 import { JWTPayload } from '../types/jwt.types';
 import { Types } from 'mongoose';
 
@@ -32,4 +33,33 @@ export const generateRefreshTokenData = (): RefreshTokenData => {
 
 export const hashToken = (token: string): string => {
   return crypto.createHash('sha256').update(token).digest('hex');
+};
+
+const REFRESH_TOKEN_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+
+export const setAuthCookies = (
+  res: Response,
+  accessToken: string,
+  rawRefreshToken: string,
+  sameSite: 'strict' | 'lax'
+) => {
+  res.cookie('token', accessToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite,
+    maxAge: 15 * 60 * 1000,
+  });
+
+  res.cookie('refreshToken', rawRefreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite,
+    path: '/api/auth',
+    maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE,
+  });
+};
+
+export const clearAuthCookies = (res: Response) => {
+  res.clearCookie('token');
+  res.clearCookie('refreshToken', { path: '/api/auth' });
 };

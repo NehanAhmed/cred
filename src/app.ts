@@ -13,7 +13,7 @@ import { config } from 'dotenv';
 
 config();
 
-const requiredEnvVars = ['MONGO_URI', 'JWT_SECRET', 'CLIENT_URL', 'BACKEND_URL', 'CORS_ORIGIN'];
+const requiredEnvVars = ['MONGO_URI', 'JWT_SECRET', 'CLIENT_URL', 'BACKEND_URL', 'CORS_ORIGIN', 'NODE_ENV'];
 for (const key of requiredEnvVars) {
   if (!process.env[key]) {
     throw new Error(`Missing required environment variable: ${key}`);
@@ -22,22 +22,22 @@ for (const key of requiredEnvVars) {
 
 const app = express();
 
+app.set('trust proxy', 1);
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: 'Too many authentication attempts, please try again later.',
 });
 
 const profileLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 50,
+  limit: 50,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: 'Too many profile requests, please try again later.',
-});
-
-const oauthLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: 'Too many OAuth attempts, please try again later.',
 });
 
 app.use(helmet());
@@ -55,8 +55,8 @@ app.use(passport.initialize());
 app.use('/api/health', healthRoutes);
 
 app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/auth', oauthRoutes);
+app.use('/api/auth', authLimiter, oauthRoutes);
 app.use('/api/profile', profileLimiter, profileRoutes);
-app.use('/api/profile', auditRoutes);
+app.use('/api/profile', profileLimiter, auditRoutes);
 
 export default app;

@@ -15,8 +15,10 @@ import {
   getProfile,
   updateProfile,
   deleteAccount,
-  updatePassword
+  updatePassword,
 } from '../../controllers/profile.controllers';
+import { getAuditLogs } from '../../controllers/audit.controllers';
+import { healthCheck } from '../../controllers/health.controller';
 import { authMiddleware } from '../../middlewares/auth.middleware';
 import { validate } from '../../middlewares/validate.middleware';
 import {
@@ -25,7 +27,7 @@ import {
   passwordForgotSchema,
   passwordResetSchema,
   profileSchema,
-  passwordChangeSchema
+  passwordChangeSchema,
 } from '../../validators/auth.validator';
 
 export const createTestApp = () => {
@@ -33,24 +35,26 @@ export const createTestApp = () => {
 
   const authRateLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100,
+    limit: 100,
     standardHeaders: true,
     legacyHeaders: false,
   });
 
   const profileRateLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100,
+    limit: 100,
     standardHeaders: true,
     legacyHeaders: false,
   });
 
   app.use(express.json());
   app.use(cookieParser());
-  app.use(cors({
-    origin: process.env.CORS_ORIGIN,
-    credentials: true
-  }));
+  app.use(
+    cors({
+      origin: process.env.CORS_ORIGIN,
+      credentials: true,
+    })
+  );
   app.use('/api/auth', authRateLimiter);
   app.use('/api/profile', profileRateLimiter);
 
@@ -65,12 +69,10 @@ export const createTestApp = () => {
   app.get('/api/profile/me', authMiddleware, getProfile);
   app.put('/api/profile/me', authMiddleware, validate(profileSchema), updateProfile);
   app.delete('/api/profile/me', authMiddleware, deleteAccount);
-  app.post(
-    '/api/profile/me/change-password',
-    authMiddleware,
-    validate(passwordChangeSchema),
-    updatePassword
-  );
+  app.post('/api/profile/me/change-password', authMiddleware, validate(passwordChangeSchema), updatePassword);
+  app.get('/api/profile/me/audit-logs', authMiddleware, getAuditLogs);
+
+  app.get('/api/health', healthCheck);
 
   return app;
 };
