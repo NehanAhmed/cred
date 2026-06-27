@@ -3,6 +3,7 @@ import userModel from '../models/user.models';
 import { Request, Response } from 'express';
 import { PasswordChangeRequest, ProfileUpdateRequest } from '../types/auth.types';
 import bcrypt from 'bcryptjs';
+import { logAuditEvent } from '../helpers/audit.helpers';
 
 export const getProfile = async (req: Request, res: Response) => {
   try {
@@ -26,20 +27,52 @@ export const updatePassword = async (
     const { currentPassword, newPassword } = req.body;
     const user = await userModel.findById(req.user?.id);
     if (!user) {
+      await logAuditEvent({
+        userId: req.user.id,
+        action: 'password_change',
+        status: 'failure',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { reason: 'User not found' },
+      });
       return sendError(res, 'User not found', 404);
     }
 
     if (user.provider !== 'local') {
+      await logAuditEvent({
+        userId: user._id.toString(),
+        action: 'password_change',
+        status: 'failure',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { reason: 'Social login account', provider: user.provider },
+      });
       return sendError(res, 'Cannot change password for social login accounts', 400);
     }
 
     const isPasswordValid = await bcrypt.compare(currentPassword, user.password || '');
     if (!isPasswordValid) {
+      await logAuditEvent({
+        userId: user._id.toString(),
+        action: 'password_change',
+        status: 'failure',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { reason: 'Incorrect current password' },
+      });
       return sendError(res, 'Current password is incorrect', 400);
     }
 
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
+
+    await logAuditEvent({
+      userId: user._id.toString(),
+      action: 'password_change',
+      status: 'success',
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
 
     const { password: _, ...userWithoutPassword } = user.toObject();
     return sendSuccess(res, userWithoutPassword, 'Password updated successfully', 200);
@@ -54,6 +87,14 @@ export const updateProfile = async (req: Request<{}, {}, ProfileUpdateRequest>, 
     const { username, bio, phoneNumber, gender } = req.body;
     const user = await userModel.findById(req.user?.id);
     if (!user) {
+      await logAuditEvent({
+        userId: req.user.id,
+        action: 'profile_update',
+        status: 'failure',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { reason: 'User not found' },
+      });
       return sendError(res, 'User not found', 404);
     }
 
@@ -64,11 +105,27 @@ export const updateProfile = async (req: Request<{}, {}, ProfileUpdateRequest>, 
 
     await user.save();
 
+    await logAuditEvent({
+      userId: user._id.toString(),
+      action: 'profile_update',
+      status: 'success',
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
     const { password: _, ...userWithoutPassword } = user.toObject();
     return sendSuccess(res, userWithoutPassword, 'Profile updated successfully', 200);
   } catch (error: any) {
     if (error?.code === 11000) {
       const field = Object.keys(error.keyPattern ?? {})[0] || 'field';
+      await logAuditEvent({
+        userId: req.user.id,
+        action: 'profile_update',
+        status: 'failure',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { reason: `${field} is already taken` },
+      });
       return sendError(res, `${field} is already taken`, 400);
     }
     console.error('Update profile error:', error);
@@ -82,6 +139,15 @@ export const deleteAccount = async (req: Request, res: Response) => {
     if (!user) {
       return sendError(res, 'User not found', 404);
     }
+
+    await logAuditEvent({
+      userId: user._id.toString(),
+      action: 'account_deletion',
+      status: 'success',
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
     await user.deleteOne();
     return sendSuccess(res, null, 'Account deleted successfully', 200);
   } catch (error) {

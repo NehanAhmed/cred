@@ -138,7 +138,7 @@ pnpm test:coverage     # with coverage report
 | Rate limiting per endpoint | ✅ Done |
 | Health check endpoint | ✅ Done |
 | Account lockout after failed attempts | ✅ Done |
-| Session audit logging | 🔜 Planned |
+| Session audit logging | ✅ Done |
 
 ## License
 
