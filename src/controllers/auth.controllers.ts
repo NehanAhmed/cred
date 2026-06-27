@@ -154,9 +154,16 @@ export const login = async (req: Request<{}, {}, LoginRequest>, res: Response) =
 
     const isPasswordValid = await bcrypt.compare(password, user.password!);
     if (!isPasswordValid) {
-      user.loginAttempts += 1;
-      if (user.loginAttempts >= MAX_LOGIN_ATTEMPTS) {
-        user.lockoutUntil = new Date(Date.now() + LOCK_DURATION_MS);
+      await userModel.updateOne(
+        { _id: user._id },
+        { $inc: { loginAttempts: 1 } }
+      );
+      const updated = await userModel.findById(user._id, 'loginAttempts lockoutUntil');
+      if (updated!.loginAttempts >= MAX_LOGIN_ATTEMPTS) {
+        await userModel.updateOne(
+          { _id: user._id, lockoutUntil: null },
+          { $set: { lockoutUntil: new Date(Date.now() + LOCK_DURATION_MS) } }
+        );
       }
       await user.save();
       await logAuditEvent({
