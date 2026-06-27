@@ -137,9 +137,7 @@ pnpm test:coverage     # with coverage report
 | Password reset flow | ✅ Done |
 | Rate limiting per endpoint | ✅ Done |
 | Health check endpoint | ✅ Done |
-| Role-based access control (user / admin) | 🔜 Planned |
-| Multi-factor authentication (TOTP) | 🔜 Planned |
-| Account lockout after failed attempts | 🔜 Planned |
+| Account lockout after failed attempts | ✅ Done |
 | Session audit logging | 🔜 Planned |
 
 ## License

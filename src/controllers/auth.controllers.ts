@@ -9,7 +9,8 @@ import crypto from 'crypto';
 import { sendEmailVerification, sendPasswordReset } from '../helpers/email.helpers';
 
 const REFRESH_TOKEN_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
-
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCK_DURATION_MS = 15 * 60 * 1000;
 const setAuthCookies = (
   res: Response,
   accessToken: string,
@@ -86,7 +87,9 @@ export const login = async (req: Request<{}, {}, LoginRequest>, res: Response) =
     if (!user) {
       return sendError(res, 'Invalid credentials', 401);
     }
-
+    if (user.lockoutUntil && user.lockoutUntil > new Date()) {
+      return sendError(res, 'Account locked due to too many failed login attempts. Please try again later.', 401);
+    }
     if (user.provider !== 'local') {
       return sendError(res, `This account uses ${user.provider} login. Please sign in with ${user.provider}.`, 400);
     }
@@ -97,8 +100,16 @@ export const login = async (req: Request<{}, {}, LoginRequest>, res: Response) =
 
     const isPasswordValid = await bcrypt.compare(password, user.password!);
     if (!isPasswordValid) {
+      user.loginAttempts += 1;
+      if (user.loginAttempts >= MAX_LOGIN_ATTEMPTS) {
+        user.lockoutUntil = new Date(Date.now() + LOCK_DURATION_MS);
+      }
+      await user.save();
       return sendError(res, 'Invalid credentials', 401);
     }
+    user.loginAttempts = 0;
+    user.lockoutUntil = null;
+    await user.save();
 
     const accessToken = generateAccessToken(user);
     const rtData = generateRefreshTokenData();
