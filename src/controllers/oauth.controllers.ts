@@ -2,15 +2,8 @@ import { Request, Response } from 'express';
 import { Types } from 'mongoose';
 import refreshTokenModel from '../models/refreshToken.models';
 import userModel from '../models/user.models';
-import { generateAccessToken, generateRefreshTokenData } from '../helpers/token.helpers';
+import { generateAccessToken, generateRefreshTokenData, setAuthCookies } from '../helpers/token.helpers';
 import { logAuditEvent } from '../helpers/audit.helpers';
-
-interface OAuthUser {
-  _id: Types.ObjectId;
-  email: string;
-  username: string;
-  provider: 'google' | 'github';
-}
 
 export const oauthCallback = async (req: Request, res: Response) => {
   try {
@@ -25,47 +18,44 @@ export const oauthCallback = async (req: Request, res: Response) => {
       return res.redirect(`${process.env.CLIENT_URL}/login?error=oauth_failed`);
     }
 
-    const user = req.user as unknown as OAuthUser;
+    const userId = req.user._id ?? req.user.id;
+    if (!userId) {
+      await logAuditEvent({
+        action: 'oauth_login',
+        status: 'failure',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { reason: 'Invalid user object from OAuth provider' },
+      });
+      return res.redirect(`${process.env.CLIENT_URL}/login?error=oauth_failed`);
+    }
 
-    if (Types.ObjectId.isValid(user._id.toString())) {
-      await userModel.findByIdAndUpdate(user._id, {
+    if (Types.ObjectId.isValid(userId.toString())) {
+      await userModel.findByIdAndUpdate(userId, {
         lastLogin: new Date(),
         lastIp: req.ip,
       });
     }
 
-    const accessToken = generateAccessToken(user);
+    const accessToken = generateAccessToken({ _id: userId, email: req.user.email, username: req.user.username });
     const rtData = generateRefreshTokenData();
 
     await refreshTokenModel.create({
       token: rtData.hashedToken,
-      user: user._id,
+      user: userId,
       family: rtData.family,
       expiresAt: rtData.expiresAt,
     });
 
-    res.cookie('token', accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 15 * 60 * 1000,
-    });
-
-    res.cookie('refreshToken', rtData.rawToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/api/auth',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    setAuthCookies(res, accessToken, rtData.rawToken, 'lax');
 
     await logAuditEvent({
-      userId: user._id.toString(),
+      userId: userId.toString(),
       action: 'oauth_login',
       status: 'success',
       ip: req.ip,
       userAgent: req.headers['user-agent'],
-      provider: user.provider,
+      provider: req.user.provider,
     });
 
     res.redirect(`${process.env.CLIENT_URL}/auth/callback`);

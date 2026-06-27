@@ -17,10 +17,14 @@
   - [POST /api/auth — Register](#post-apiauth--register)
   - [POST /api/auth/login — Login](#post-apiauthlogin--login)
   - [POST /api/auth/logout — Logout](#post-apiauthlogout--logout)
+  - [POST /api/auth/refresh — Refresh Token](#post-apiauthrefresh--refresh-token)
   - [GET /api/auth/verify-email/:token — Verify Email](#get-apiauthverify-emailtoken--verify-email)
   - [POST /api/auth/forgot-password — Forgot Password](#post-apiauthforgot-password--forgot-password)
   - [POST /api/auth/reset-password/:token — Reset Password](#post-apiauthreset-passwordtoken--reset-password)
+  - [OAuth Endpoints](#oauth-endpoints)
 - [Profile Endpoints](#profile-endpoints)
+- [Health Endpoint](#health-endpoint)
+- [Session Audit Logging](#session-audit-logging)
   - [GET /api/profile/me — Get Profile](#get-apiprofileme--get-profile)
   - [PUT /api/profile/me — Update Profile](#put-apiprofileme--update-profile)
   - [DELETE /api/profile/me — Delete Account](#delete-apiprofileme--delete-account)
@@ -141,13 +145,19 @@ Each issue conforms to the [Zod `ZodIssue`](https://zod.dev/ERROR_HANDLING) spec
 The API uses **layered rate limiting**. Each request to a protected route passes through a global rate limiter and then a route-specific limiter. The tighter limit governs.
 
 | Limiter | Window | Max Requests | Applies To | Defined In |
-|---|---|---|---|---|
-| `authLimiter` | 15 min | 20 | All `POST /api/auth/*` | `src/app.ts:10` |
-| `loginLimiter` | 15 min | 5 | `POST /api/auth/login` | `src/routes/auth.routes.ts:10` |
-| `registerLimiter` | 60 min | 3 | `POST /api/auth` | `src/routes/auth.routes.ts:16` |
-| `forgotLimiter` | 60 min | 3 | `POST /api/auth/forgot-password` | `src/routes/auth.routes.ts:22` |
-| `profileLimiter` | 15 min | 50 | All `GET\|PUT\|DELETE\|POST /api/profile/me*` | `src/app.ts:16` |
-| `profileUpdateLimiter` | 15 min | 50 | `PUT /api/profile/me` and `POST /api/profile/me/change-password` | `src/routes/profile.routes.ts:8` |
+|---|---|---|---|---|---|
+| `authLimiter` | 15 min | 20 | All `/api/auth/*` | `src/app.ts:27` |
+| `loginLimiter` | 15 min | 5 | `POST /api/auth/login` | `src/routes/auth.routes.ts:23` |
+| `registerLimiter` | 60 min | 3 | `POST /api/auth` | `src/routes/auth.routes.ts:31` |
+| `forgotLimiter` | 60 min | 3 | `POST /api/auth/forgot-password` | `src/routes/auth.routes.ts:39` |
+| `refreshLimiter` | 15 min | 10 | `POST /api/auth/refresh` | `src/routes/auth.routes.ts:47` |
+| `verifyEmailLimiter` | 15 min | 10 | `GET /api/auth/verify-email/:token` | `src/routes/auth.routes.ts:55` |
+| `resetPasswordLimiter` | 15 min | 5 | `POST /api/auth/reset-password/:token` | `src/routes/auth.routes.ts:63` |
+| `logoutLimiter` | 15 min | 20 | `POST /api/auth/logout` | `src/routes/auth.routes.ts:71` |
+| `oauthLimiter` | 15 min | 10 | All OAuth routes (`/api/auth/google*`, `/api/auth/github*`) | `src/routes/oauth.routes.ts:9` |
+| `profileLimiter` | 15 min | 50 | All `/api/profile/me*` | `src/app.ts:35` |
+| `profileUpdateLimiter` | 15 min | 50 | `PUT /api/profile/me` and `POST /api/profile/me/change-password` | `src/routes/profile.routes.ts:13` |
+| `healthLimiter` | 1 min | 30 | `GET /api/health` | `src/routes/health.routes.ts:7` |
 
 **Rate limit response** (HTTP 429):
 
@@ -173,6 +183,8 @@ The API uses **layered rate limiting**. Each request to a protected route passes
 
 ### Cookie Configuration
 
+#### Access Token (`token`)
+
 | Property | Value |
 |---|---|
 | Name | `token` |
@@ -180,6 +192,19 @@ The API uses **layered rate limiting**. Each request to a protected route passes
 | `secure` | `true` when `NODE_ENV === 'production'`, else `false` |
 | `sameSite` | `"strict"` |
 | `maxAge` | `86400000` ms (24 hours) |
+
+#### Refresh Token (`refreshToken`)
+
+| Property | Value |
+|---|---|
+| Name | `refreshToken` |
+| `httpOnly` | `true` |
+| `secure` | `true` when `NODE_ENV === 'production'`, else `false` |
+| `sameSite` | `"strict"` |
+| `path` | `/api/auth/refresh` |
+| `maxAge` | `604800000` ms (7 days) |
+
+The refresh token cookie is scoped to `/api/auth/refresh` so it is only sent on refresh requests. It stores a SHA-256 hash of the raw token. Tokens are rotated on each use — old tokens are deleted atomically via `findOneAndDelete` and a new token in the same family is created. Replay of a consumed token returns `401`. Expired tokens are also rejected with `401`.
 
 ### JWT Payload
 
@@ -419,6 +444,66 @@ curl -X POST http://localhost:3000/api/auth/logout \
 
 ---
 
+### POST /api/auth/refresh — Refresh Token
+
+Exchange a valid refresh token for a new access token and a rotated refresh token. The old refresh token is atomically consumed (deleted); a new one in the same family is issued.
+
+```
+POST /api/auth/refresh
+```
+
+**Auth required:** No (uses `refreshToken` cookie instead of `token` cookie)  
+**Rate limiting:** Global (20/15min) + Refresh-specific (10/15min)  
+**Middleware chain:** `authLimiter` → `refreshLimiter` → `controllers.refresh`
+
+#### Request Body
+
+None.
+
+#### Example
+
+```bash
+curl -X POST http://localhost:3000/api/auth/refresh \
+  -H "Cookie: refreshToken=<raw-token>"
+```
+
+#### Success Response
+
+**HTTP 200** — also sets new `token` (access) and `refreshToken` cookies
+
+```json
+{
+  "success": true,
+  "message": "Token refreshed successfully",
+  "data": {
+    "user": {
+      "_id": "664f1a2b3c4d5e6f7a8b9c0d",
+      "username": "johndoe",
+      "email": "john@example.com"
+    }
+  }
+}
+```
+
+#### Error Responses
+
+| Status | Body |
+|---|---|
+| `401` | `{ "success": false, "message": "Refresh token not found", "error": "..." }` |
+| `401` | `{ "success": false, "message": "Invalid refresh token", "error": "..." }` |
+| `401` | `{ "success": false, "message": "Refresh token expired", "error": "..." }` |
+| `429` | Rate limited |
+| `500` | `{ "success": false, "message": "Something went wrong", "error": "..." }` |
+
+#### Notes
+
+- The refresh token cookie must be present and valid. It is **not** the `token` cookie.
+- Refresh token rotation is atomic — concurrent reuse of the same token is safe (only one request succeeds; the rest see `"Invalid refresh token"`).
+- Expired tokens are explicitly rejected with a distinct error message.
+- The new `token` cookie is set (24h expiry) along with the rotated `refreshToken` cookie (7 days).
+
+---
+
 ### GET /api/auth/verify-email/:token — Verify Email
 
 Verify a user's email address. This is the **only endpoint that returns a redirect** rather than JSON. Users arrive here via the link in their verification email.
@@ -586,6 +671,128 @@ curl -X POST http://localhost:3000/api/auth/reset-password/a1b2c3d4e5f6... \
 - The raw token from the URL is SHA-256 hashed before the database lookup.
 - After a successful reset, the `resetPasswordToken` and `resetPasswordExpires` fields are nullified.
 - Multiple resets with the same token are not possible — the token is a one-time use.
+
+---
+
+## OAuth Endpoints
+
+OAuth authentication is handled via Passport.js with Google and GitHub strategies. The flow follows the standard OAuth 2.0 Authorization Code grant.
+
+### How It Works
+
+1. Frontend redirects the user to `/api/auth/google` or `/api/auth/github`.
+2. The user authorizes on the provider's consent screen.
+3. The provider redirects back to your callback URL with an authorization code.
+4. The server exchanges the code for an access token, fetches the user's profile, and creates or links an account.
+5. The server sets the JWT cookies and redirects to `{CLIENT_URL}/auth/callback`.
+
+### State Parameter (CSRF Protection)
+
+A cryptographically random `oauth_state` value is generated on each OAuth initiation, stored as an httpOnly cookie (`oauth_state`), and verified on callback. A mismatch results in a redirect to `{CLIENT_URL}/login?error=oauth_state_mismatch`.
+
+---
+
+### GET /api/auth/google — Initiate Google OAuth
+
+Redirects the user to Google's consent screen.
+
+```
+GET /api/auth/google
+```
+
+**Auth required:** No  
+**Rate limiting:** Global (20/15min) + OAuth-specific (10/15min)
+
+#### Example
+
+```bash
+# Open in browser — this initiates a redirect
+http://localhost:3000/api/auth/google
+```
+
+#### Success Behavior
+
+Redirects to Google's OAuth consent screen.
+
+#### Error Behavior
+
+If rate limited — standard `429` JSON response.
+
+---
+
+### GET /api/auth/google/callback — Google OAuth Callback
+
+Handles the callback from Google after user authorization.
+
+```
+GET /api/auth/google/callback?code=<authorization-code>&state=<state>
+```
+
+**Auth required:** No  
+**Rate limiting:** Global (20/15min) + OAuth-specific (10/15min)
+
+#### Query Parameters
+
+| Param | Type | Description |
+|---|---|---|
+| `code` | `string` | Authorization code from Google |
+| `state` | `string` | State parameter for CSRF validation (must match cookie) |
+
+#### Success Behavior
+
+Redirects to `{CLIENT_URL}/auth/callback` with JWT cookies set.
+
+#### Error Behavior
+
+- State mismatch → redirects to `{CLIENT_URL}/login?error=oauth_state_mismatch`
+- Google auth failure → redirects to `{CLIENT_URL}/login?error=google_auth_failed`
+- Server error → redirects to `{CLIENT_URL}/login?error=oauth_failed`
+
+---
+
+### GET /api/auth/github — Initiate GitHub OAuth
+
+Redirects the user to GitHub's authorization screen.
+
+```
+GET /api/auth/github
+```
+
+**Auth required:** No  
+**Rate limiting:** Global (20/15min) + OAuth-specific (10/15min)
+
+#### Example
+
+```bash
+http://localhost:3000/api/auth/github
+```
+
+#### Success Behavior
+
+Redirects to GitHub's authorization screen.
+
+---
+
+### GET /api/auth/github/callback — GitHub OAuth Callback
+
+Handles the callback from GitHub after user authorization.
+
+```
+GET /api/auth/github/callback?code=<authorization-code>&state=<state>
+```
+
+**Auth required:** No  
+**Rate limiting:** Global (20/15min) + OAuth-specific (10/15min)
+
+#### Success Behavior
+
+Redirects to `{CLIENT_URL}/auth/callback` with JWT cookies set.
+
+#### Error Behavior
+
+- State mismatch → redirects to `{CLIENT_URL}/login?error=oauth_state_mismatch`
+- GitHub auth failure → redirects to `{CLIENT_URL}/login?error=github_auth_failed`
+- Server error → redirects to `{CLIENT_URL}/login?error=oauth_failed`
 
 ---
 
@@ -850,6 +1057,168 @@ curl -X POST http://localhost:3000/api/profile/me/change-password \
 
 ---
 
+## Health Endpoint
+
+### GET /api/health — Health Check
+
+Returns the application and database health status. Useful for monitoring and load balancer health probes.
+
+```
+GET /api/health
+```
+
+**Auth required:** No  
+**Rate limiting:** Health-specific (30 per minute)
+
+**Middleware chain:** `healthLimiter` → `controllers.healthCheck`
+
+#### Example
+
+```bash
+curl http://localhost:3000/api/health
+```
+
+#### Success Response
+
+**HTTP 200** (database connected)
+
+```json
+{
+  "success": true,
+  "message": "Service is healthy",
+  "data": {
+    "name": "cred",
+    "version": "1.0.0",
+    "environment": "development",
+    "uptime": 3600,
+    "memory": { "rss": 123456, "heapTotal": 65432, "heapUsed": 43210 },
+    "nodeVersion": "v22.0.0",
+    "platform": "linux",
+    "database": {
+      "status": "connected",
+      "latency": 2
+    },
+    "timestamp": "2026-06-27T12:00:00.000Z"
+  }
+}
+```
+
+#### Degraded Response
+
+**HTTP 503** (database disconnected)
+
+```json
+{
+  "success": false,
+  "message": "Service is degraded — database not connected",
+  "error": "Service is degraded — database not connected",
+  "data": {
+    "name": "cred",
+    "version": "1.0.0",
+    "database": { "status": "disconnected", "latency": null },
+    ...
+  }
+}
+```
+
+#### Error Response
+
+**HTTP 500**
+
+```json
+{
+  "success": false,
+  "message": "Health check failed",
+  "error": "Health check failed",
+  "data": { ... }
+}
+```
+
+#### Notes
+
+- The `data` object is always included, even on error responses, so clients can always parse uptime/version.
+- `database.latency` is the ping round-trip in milliseconds (null when slow or disconnected).
+- If the ping exceeds 3 seconds, the database status is reported as `"slow"`.
+
+---
+
+## Session Audit Logging
+
+Every authentication event (login, logout, refresh, OAuth, password operations, account deletion) is recorded as an audit log entry. Audit logs are visible to the authenticated user.
+
+### GET /api/profile/me/audit-logs — Get Audit Logs
+
+Returns paginated audit log entries for the current user.
+
+```
+GET /api/profile/me/audit-logs
+```
+
+**Auth required:** Yes  
+**Rate limiting:** Profile (50/15min)
+
+**Middleware chain:** `profileLimiter` → `authMiddleware` → `controllers.getAuditLogs`
+
+#### Query Parameters
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `page` | `number` | `1` | Page number (min 1) |
+| `limit` | `number` | `20` | Items per page (1–100) |
+
+#### Example
+
+```bash
+curl http://localhost:3000/api/profile/me/audit-logs?page=1&limit=10 \
+  -H "Cookie: token=<your-jwt>"
+```
+
+#### Success Response
+
+**HTTP 200**
+
+```json
+{
+  "success": true,
+  "message": "Audit logs fetched successfully",
+  "data": {
+    "logs": [
+      {
+        "_id": "664f1a2b...",
+        "user": "664f1a2b...",
+        "action": "login",
+        "status": "success",
+        "ip": "::1",
+        "userAgent": "curl/8.0",
+        "metadata": {},
+        "createdAt": "2026-06-27T12:00:00.000Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "total": 42,
+      "totalPages": 5
+    }
+  }
+}
+```
+
+#### Error Responses
+
+| Status | Body |
+|---|---|
+| `401` | Unauthorized / Invalid token |
+| `500` | `{ "success": false, "message": "Internal server error", "error": "..." }` |
+
+#### Notes
+
+- Logs are sorted newest-first.
+- Tracked actions: `login`, `logout`, `refresh`, `register`, `password_reset`, `password_change`, `account_deletion`, `oauth_login`, `oauth_account_linked`.
+- Audit logging is fire-and-forget — a logging failure never breaks the request.
+
+---
+
 ## Data Models
 
 ### User
@@ -898,6 +1267,10 @@ Every possible error message grouped by endpoint.
 | `POST /api/auth/logout` | 401 | `"Unauthorized"` |
 | `POST /api/auth/logout` | 401 | `"Invalid token"` |
 | `POST /api/auth/logout` | 500 | `"Something went wrong"` |
+| `POST /api/auth/refresh` | 401 | `"Refresh token not found"` |
+| `POST /api/auth/refresh` | 401 | `"Invalid refresh token"` |
+| `POST /api/auth/refresh` | 401 | `"Refresh token expired"` |
+| `POST /api/auth/refresh` | 500 | `"Something went wrong"` |
 | `POST /api/auth/forgot-password` | 500 | `"Something went wrong"` |
 | `POST /api/auth/reset-password/:token` | 400 | `"Invalid or expired token"` |
 | `POST /api/auth/reset-password/:token` | 500 | `"Something went wrong"` |
@@ -910,6 +1283,9 @@ Every possible error message grouped by endpoint.
 | `POST /api/profile/me/change-password` | 400 | `"Current password is incorrect"` |
 | `POST /api/profile/me/change-password` | 404 | `"User not found"` |
 | `POST /api/profile/me/change-password` | 500 | `"Internal server error"` |
+| `GET /api/profile/me/audit-logs` | 500 | `"Internal server error"` |
+| `GET /api/health` | 503 | `"Service is degraded — database not connected"` |
+| `GET /api/health` | 500 | `"Health check failed"` |
 
 Additionally, any endpoint with Zod validation can return `400` with `{ "errors": [ ...ZodIssue[] ] }`.
 

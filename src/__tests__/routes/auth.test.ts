@@ -392,3 +392,146 @@ describe('POST /api/auth/logout — Logout', () => {
     expect(res.body.message).toBe('Invalid token');
   });
 });
+
+// ---------------------------------------------------------------------------
+// POST /api/auth/refresh — Token refresh
+// ---------------------------------------------------------------------------
+describe('POST /api/auth/refresh — Refresh', () => {
+  it('returns 401 when no refresh token cookie is sent', async () => {
+    const res = await request.post('/api/auth/refresh');
+    expect(res.status).toBe(401);
+    expect(res.body.success).toBe(false);
+    expect(res.body.message).toBe('Refresh token not found');
+  });
+
+  it('returns 401 when an invalid refresh token is sent', async () => {
+    const res = await request
+      .post('/api/auth/refresh')
+      .set('Cookie', 'refreshToken=invalid-token');
+
+    expect(res.status).toBe(401);
+    expect(res.body.success).toBe(false);
+    expect(res.body.message).toBe('Invalid refresh token');
+  });
+
+  it('returns 200 and rotates the refresh token', async () => {
+    const hashedPassword = await bcrypt.hash('Password123', 10);
+    const user = await userModel.create({
+      username: 'refreshuser',
+      email: 'refresh@example.com',
+      password: hashedPassword,
+      isVerified: true,
+    });
+
+    const loginRes = await request.post('/api/auth/login').send({
+      email: 'refresh@example.com',
+      password: 'Password123',
+    });
+
+    const cookies = loginRes.headers['set-cookie'];
+    expect(cookies).toBeDefined();
+    const cookieStr = Array.isArray(cookies) ? cookies.join('; ') : cookies;
+    const refreshTokenMatch = cookieStr.match(/refreshToken=([^;]+)/);
+    expect(refreshTokenMatch).not.toBeNull();
+
+    const oldRefreshCookie = `refreshToken=${refreshTokenMatch![1]}`;
+
+    const res = await request
+      .post('/api/auth/refresh')
+      .set('Cookie', oldRefreshCookie);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.message).toBe('Token refreshed successfully');
+
+    const tokensAfter = await refreshTokenModel.find({ user: user._id });
+    expect(tokensAfter.length).toBe(1);
+    expect(tokensAfter[0].family).toBeDefined();
+  });
+
+  it('rejects reuse of an already rotated refresh token', async () => {
+    const hashedPassword = await bcrypt.hash('Password123', 10);
+    const user = await userModel.create({
+      username: 'reuseuser',
+      email: 'reuse@example.com',
+      password: hashedPassword,
+      isVerified: true,
+    });
+
+    const loginRes = await request.post('/api/auth/login').send({
+      email: 'reuse@example.com',
+      password: 'Password123',
+    });
+
+    const cookieStr = Array.isArray(loginRes.headers['set-cookie'])
+      ? loginRes.headers['set-cookie'].join('; ')
+      : loginRes.headers['set-cookie'];
+    const refreshTokenMatch = cookieStr.match(/refreshToken=([^;]+)/);
+    expect(refreshTokenMatch).not.toBeNull();
+
+    const oldRefreshCookie = `refreshToken=${refreshTokenMatch![1]}`;
+
+    await request.post('/api/auth/refresh').set('Cookie', oldRefreshCookie);
+    const res = await request.post('/api/auth/refresh').set('Cookie', oldRefreshCookie);
+
+    expect(res.status).toBe(401);
+    expect(res.body.success).toBe(false);
+    expect(res.body.message).toBe('Invalid refresh token');
+
+    const tokensAfter = await refreshTokenModel.find({ user: user._id });
+    expect(tokensAfter.length).toBe(1);
+  });
+
+  it('returns 401 when refresh token is expired', async () => {
+    const user = await userModel.create({
+      username: 'expiredtokenuser',
+      email: 'expiredtoken@example.com',
+      password: 'hashed',
+      isVerified: true,
+    });
+
+    const rawToken = crypto.randomBytes(40).toString('hex');
+    const family = crypto.randomUUID();
+    const hashedToken = hashToken(rawToken);
+
+    await refreshTokenModel.create({
+      token: hashedToken,
+      user: user._id,
+      family,
+      expiresAt: new Date(Date.now() - 1000),
+    });
+
+    const res = await request
+      .post('/api/auth/refresh')
+      .set('Cookie', `refreshToken=${rawToken}`);
+
+    expect(res.status).toBe(401);
+    expect(res.body.success).toBe(false);
+    expect(res.body.message).toBe('Refresh token expired');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/auth/login — Non-local provider
+// ---------------------------------------------------------------------------
+describe('POST /api/auth/login — Non-local provider', () => {
+  it('returns 400 when trying to login with email of an OAuth-only account', async () => {
+    await userModel.create({
+      username: 'googleuser',
+      email: 'google@example.com',
+      password: 'hashedpassword',
+      isVerified: true,
+      provider: 'google',
+      googleId: 'google123',
+    });
+
+    const res = await request.post('/api/auth/login').send({
+      email: 'google@example.com',
+      password: 'Password123',
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.message).toBe('This account uses google login. Please sign in with google.');
+  });
+});

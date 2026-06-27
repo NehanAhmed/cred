@@ -3,6 +3,7 @@ import { Strategy as GoogleStrategy, VerifyCallback } from 'passport-google-oaut
 import { Strategy as GitHubStrategy } from 'passport-github2';
 import userModel from '../models/user.models';
 import crypto from 'crypto';
+import { logAuditEvent } from '../helpers/audit.helpers';
 
 const generateUniqueUsername = async (base: string): Promise<string> => {
   const sanitized = base
@@ -30,12 +31,23 @@ const findOrCreateOAuthUser = async (
   if (user) return user;
 
   if (email) {
-    user = await userModel.findOne({ email });
+    user = await userModel.findOne({ email: email.toLowerCase() });
     if (user) {
+      const wasLocal = user.provider === 'local';
       user.set(providerField, profileId);
       if (!user.avatar) user.avatar = avatar || null;
-      if (user.provider === 'local') user.provider = provider;
-      return await user.save();
+      if (wasLocal) user.provider = provider;
+      const saved = await user.save();
+      if (wasLocal) {
+        logAuditEvent({
+          userId: saved._id.toString(),
+          action: 'oauth_login',
+          status: 'success',
+          provider,
+          metadata: { reason: 'Account linked to existing local user by email' },
+        }).catch(() => {});
+      }
+      return saved;
     }
   }
 

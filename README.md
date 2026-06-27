@@ -111,7 +111,7 @@ All routes are prefixed with `/api`.
 
 ## Testing
 
-80 tests across 5 suites. In-memory MongoDB (`mongodb-memory-server`), supertest for HTTP, email helpers mocked.
+115 tests across 7 suites. In-memory MongoDB (`mongodb-memory-server`), supertest for HTTP, email helpers mocked.
 
 ```bash
 pnpm test              # run all
@@ -120,25 +120,13 @@ pnpm test:coverage     # with coverage report
 
 | Suite | Tests |
 |---|---|
-| Auth (register, login, logout, verify-email) | 24 |
+| Auth (register, login, logout, refresh, verify-email) | 27 |
 | Auth email (forgot-password, reset-password) | 11 |
 | Profile (get, update, delete, change-password) | 26 |
 | OAuth (Google + GitHub init + callback) | 15 |
+| Health (app + DB status) | 10 |
+| Audit (session logging, pagination) | 22 |
 | Rate limiters (all 8 limiters) | 4 |
-
-## Roadmap
-
-| Feature | Status |
-|---|---|
-| Refresh token rotation | ✅ Done |
-| JWT access + refresh token system | ✅ Done |
-| OAuth (Google + GitHub) | ✅ Done |
-| Email verification | ✅ Done |
-| Password reset flow | ✅ Done |
-| Rate limiting per endpoint | ✅ Done |
-| Health check endpoint | ✅ Done |
-| Account lockout after failed attempts | ✅ Done |
-| Session audit logging | ✅ Done |
 
 ## License
 

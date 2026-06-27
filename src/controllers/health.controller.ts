@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { sendSuccess, sendError } from '../helpers/api.helpers';
+import pkg from '../../package.json';
 
 const PING_TIMEOUT_MS = 3000;
 const startTime = Date.now();
@@ -37,8 +38,8 @@ export const healthCheck = async (_req: Request, res: Response) => {
     }
 
     const healthData = {
-      name: 'cred',
-      version: '1.0.0',
+      name: pkg.name,
+      version: pkg.version,
       environment: process.env.NODE_ENV || 'development',
       uptime: Math.floor((Date.now() - startTime) / 1000),
       memory: process.memoryUsage(),
@@ -47,7 +48,6 @@ export const healthCheck = async (_req: Request, res: Response) => {
       database: {
         status: dbStatus,
         latency: dbLatency,
-        state: dbStatus,
       },
       timestamp: new Date().toISOString(),
     };
@@ -63,6 +63,18 @@ export const healthCheck = async (_req: Request, res: Response) => {
 
     return sendSuccess(res, healthData, 'Service is healthy', 200);
   } catch (error) {
-    return sendError(res, 'Health check failed', 500);
+    return res.status(500).json({
+      success: false,
+      message: 'Health check failed',
+      error: 'Health check failed',
+      data: {
+        name: pkg.name,
+        version: pkg.version,
+        environment: process.env.NODE_ENV || 'development',
+        uptime: Math.floor((Date.now() - startTime) / 1000),
+        database: { status: 'unknown', latency: null },
+        timestamp: new Date().toISOString(),
+      },
+    });
   }
 };
