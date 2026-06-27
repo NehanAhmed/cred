@@ -14,7 +14,8 @@ const LOCK_DURATION_MS = 15 * 60 * 1000;
 
 export const register = async (req: Request<{}, {}, RegisterRequest>, res: Response) => {
   try {
-    const { username, email, password, bio, phoneNumber, gender } = req.body;
+    const { username, email: rawEmail, password, bio, phoneNumber, gender } = req.body;
+    const email = rawEmail.toLowerCase().trim();
 
     const existingUser = await userModel.findOne({
       $or: [{ email }, { username }],
@@ -36,7 +37,7 @@ export const register = async (req: Request<{}, {}, RegisterRequest>, res: Respo
 
     const user = await userModel.create({
       username,
-      email: email.toLowerCase().trim(),
+      email,
       password: hashedPassword,
       bio,
       phoneNumber,
@@ -134,7 +135,7 @@ export const login = async (req: Request<{}, {}, LoginRequest>, res: Response) =
       );
       if (updated && updated.loginAttempts >= MAX_LOGIN_ATTEMPTS) {
         await userModel.updateOne(
-          { _id: user._id, lockoutUntil: null },
+          { _id: user._id, $or: [{ lockoutUntil: null }, { lockoutUntil: { $lte: new Date() } }] },
           { $set: { lockoutUntil: new Date(Date.now() + LOCK_DURATION_MS) } }
         );
       }
@@ -220,11 +221,31 @@ export const refresh = async (req: Request, res: Response) => {
       return sendError(res, 'Refresh token not found', 401);
     }
 
-    // Atomically consume the token — first caller wins
+    // Atomically claim the token as consumed — first caller wins
     const hashed = hashToken(rawToken);
-    const consumedToken = await refreshTokenModel.findOneAndDelete({ token: hashed });
+    const claimed = await refreshTokenModel.findOneAndUpdate(
+      { token: hashed, consumed: false },
+      { $set: { consumed: true } },
+      { returnDocument: 'after' }
+    );
 
-    if (!consumedToken) {
+    if (!claimed) {
+      // Token not found or already consumed — check if it ever existed (reuse detection)
+      const existing = await refreshTokenModel.findOne({ token: hashed });
+      if (existing) {
+        // Token was already consumed — this is a replay attack; revoke the entire family
+        await refreshTokenModel.deleteMany({ user: existing.user, family: existing.family });
+        clearAuthCookies(res);
+        await logAuditEvent({
+          userId: existing.user.toString(),
+          action: 'token_refresh',
+          status: 'failure',
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+          metadata: { reason: 'Refresh token reuse detected' },
+        });
+        return sendError(res, 'Refresh token reuse detected. All sessions revoked.', 401);
+      }
       clearAuthCookies(res);
       await logAuditEvent({
         action: 'token_refresh',
@@ -236,10 +257,10 @@ export const refresh = async (req: Request, res: Response) => {
       return sendError(res, 'Invalid refresh token', 401);
     }
 
-    if (consumedToken.expiresAt < new Date()) {
+    if (claimed.expiresAt < new Date()) {
       clearAuthCookies(res);
       await logAuditEvent({
-        userId: consumedToken.user.toString(),
+        userId: claimed.user.toString(),
         action: 'token_refresh',
         status: 'failure',
         ip: req.ip,
@@ -249,28 +270,7 @@ export const refresh = async (req: Request, res: Response) => {
       return sendError(res, 'Refresh token expired', 401);
     }
 
-    // Check for reuse — if another token exists in the same family,
-    // this token was already rotated (someone is replaying an old token)
-    const reused = await refreshTokenModel.findOne({
-      user: consumedToken.user,
-      family: consumedToken.family,
-    });
-
-    if (reused) {
-      await refreshTokenModel.deleteMany({ user: consumedToken.user, family: consumedToken.family });
-      clearAuthCookies(res);
-      await logAuditEvent({
-        userId: consumedToken.user.toString(),
-        action: 'token_refresh',
-        status: 'failure',
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-        metadata: { reason: 'Refresh token reuse detected' },
-      });
-      return sendError(res, 'Refresh token reuse detected. All sessions revoked.', 401);
-    }
-
-    const user = await userModel.findById(consumedToken.user);
+    const user = await userModel.findById(claimed.user);
     if (!user) {
       clearAuthCookies(res);
       await logAuditEvent({
@@ -283,12 +283,13 @@ export const refresh = async (req: Request, res: Response) => {
       return sendError(res, 'User not found', 401);
     }
 
+    // Rotate: new token in the same family, then delete the consumed one
     const rtData = generateRefreshTokenData();
 
     await refreshTokenModel.create({
       token: rtData.hashedToken,
       user: user._id,
-      family: rtData.family,
+      family: claimed.family,
       expiresAt: rtData.expiresAt,
     });
 

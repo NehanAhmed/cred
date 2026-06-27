@@ -1,6 +1,7 @@
 import supertest from 'supertest';
 import { createTestApp } from '../helpers/test-app';
 import { setupTestDB } from '../helpers/db';
+import pkg from '../../../package.json';
 
 setupTestDB();
 
@@ -16,8 +17,8 @@ describe('GET /api/health — Health check', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(res.body.data.name).toBe('cred');
-    expect(res.body.data.version).toBe('1.0.0');
+    expect(res.body.data.name).toBe(pkg.name);
+    expect(res.body.data.version).toBe(pkg.version);
     expect(res.body.data.database).toBeDefined();
     expect(res.body.data.database.status).toBe('connected');
     expect(typeof res.body.data.uptime).toBe('number');

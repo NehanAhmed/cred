@@ -5,6 +5,7 @@ import { Request, Response } from 'express';
 import { PasswordChangeRequest, ProfileUpdateRequest } from '../types/auth.types';
 import bcrypt from 'bcryptjs';
 import { logAuditEvent } from '../helpers/audit.helpers';
+import { clearAuthCookies } from '../helpers/token.helpers';
 
 export const getProfile = async (req: Request, res: Response) => {
   try {
@@ -158,6 +159,7 @@ export const deleteAccount = async (req: Request, res: Response) => {
     });
 
     await user.deleteOne();
+    clearAuthCookies(res);
     return sendSuccess(res, null, 'Account deleted successfully', 200);
   } catch (error) {
     console.error('Delete account error:', error);

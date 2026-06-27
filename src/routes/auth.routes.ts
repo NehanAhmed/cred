@@ -78,7 +78,7 @@ const logoutLimiter = rateLimit({
 
 router.post('/', registerLimiter, validate(registerSchema), register);
 router.post('/login', loginLimiter, validate(loginSchema), login);
-router.post('/logout', authMiddleware, logoutLimiter, logout);
+router.post('/logout', logoutLimiter, authMiddleware, logout);
 router.post('/refresh', refreshLimiter, refresh);
 router.get('/verify-email/:token', verifyEmailLimiter, verifyEmail);
 router.post('/forgot-password', forgotLimiter, validate(passwordForgotSchema), forgotPassword);

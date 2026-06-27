@@ -444,9 +444,9 @@ describe('POST /api/auth/refresh — Refresh', () => {
     expect(res.body.success).toBe(true);
     expect(res.body.message).toBe('Token refreshed successfully');
 
-    const tokensAfter = await refreshTokenModel.find({ user: user._id });
-    expect(tokensAfter.length).toBe(1);
-    expect(tokensAfter[0].family).toBeDefined();
+    const activeTokens = await refreshTokenModel.find({ user: user._id, consumed: false });
+    expect(activeTokens.length).toBe(1);
+    expect(activeTokens[0].family).toBeDefined();
   });
 
   it('rejects reuse of an already rotated refresh token', async () => {
@@ -476,10 +476,10 @@ describe('POST /api/auth/refresh — Refresh', () => {
 
     expect(res.status).toBe(401);
     expect(res.body.success).toBe(false);
-    expect(res.body.message).toBe('Invalid refresh token');
+    expect(res.body.message).toBe('Refresh token reuse detected. All sessions revoked.');
 
     const tokensAfter = await refreshTokenModel.find({ user: user._id });
-    expect(tokensAfter.length).toBe(1);
+    expect(tokensAfter.length).toBe(0);
   });
 
   it('returns 401 when refresh token is expired', async () => {

@@ -56,7 +56,8 @@ app.use('/api/health', healthRoutes);
 
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/auth', authLimiter, oauthRoutes);
-app.use('/api/profile', profileLimiter, profileRoutes);
-app.use('/api/profile', profileLimiter, auditRoutes);
+app.use('/api/profile', profileLimiter);
+app.use('/api/profile', profileRoutes);
+app.use('/api/profile', auditRoutes);
 
 export default app;

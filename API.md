@@ -200,11 +200,11 @@ The API uses **layered rate limiting**. Each request to a protected route passes
 | Name | `refreshToken` |
 | `httpOnly` | `true` |
 | `secure` | `true` when `NODE_ENV === 'production'`, else `false` |
-| `sameSite` | `"strict"` |
-| `path` | `/api/auth/refresh` |
+| `sameSite` | `"strict"` (standard auth) or `"lax"` (OAuth) |
+| `path` | `/api/auth` |
 | `maxAge` | `604800000` ms (7 days) |
 
-The refresh token cookie is scoped to `/api/auth/refresh` so it is only sent on refresh requests. It stores a SHA-256 hash of the raw token. Tokens are rotated on each use — old tokens are deleted atomically via `findOneAndDelete` and a new token in the same family is created. Replay of a consumed token returns `401`. Expired tokens are also rejected with `401`.
+The refresh token cookie is scoped to `/api/auth` so it is sent on any auth-related request. It stores a SHA-256 hash of the raw token. Tokens are rotated on each use — the old token is atomically marked as consumed and a new token in the same family is created. Replay of a consumed token revokes the entire token family and returns `401`. Expired tokens are also rejected with `401`.
 
 ### JWT Payload
 
@@ -234,7 +234,7 @@ The refresh token cookie is scoped to `/api/auth/refresh` so it is only sent on 
 
 Create a new user account. Sends a verification email to the provided address. Login is blocked until the email is verified.
 
-```
+```http
 POST /api/auth
 ```
 
@@ -448,7 +448,7 @@ curl -X POST http://localhost:3000/api/auth/logout \
 
 Exchange a valid refresh token for a new access token and a rotated refresh token. The old refresh token is atomically consumed (deleted); a new one in the same family is issued.
 
-```
+```http
 POST /api/auth/refresh
 ```
 
@@ -475,13 +475,7 @@ curl -X POST http://localhost:3000/api/auth/refresh \
 {
   "success": true,
   "message": "Token refreshed successfully",
-  "data": {
-    "user": {
-      "_id": "664f1a2b3c4d5e6f7a8b9c0d",
-      "username": "johndoe",
-      "email": "john@example.com"
-    }
-  }
+  "data": null
 }
 ```
 
@@ -498,9 +492,9 @@ curl -X POST http://localhost:3000/api/auth/refresh \
 #### Notes
 
 - The refresh token cookie must be present and valid. It is **not** the `token` cookie.
-- Refresh token rotation is atomic — concurrent reuse of the same token is safe (only one request succeeds; the rest see `"Invalid refresh token"`).
+- Refresh token rotation is atomic — concurrent reuse of the same token is safe (only one request succeeds; the rest see `"Refresh token reuse detected. All sessions revoked."` and the entire token family is invalidated).
 - Expired tokens are explicitly rejected with a distinct error message.
-- The new `token` cookie is set (24h expiry) along with the rotated `refreshToken` cookie (7 days).
+- The new `token` cookie is set (15m expiry) along with the rotated `refreshToken` cookie (7 days).
 
 ---
 
@@ -696,7 +690,7 @@ A cryptographically random `oauth_state` value is generated on each OAuth initia
 
 Redirects the user to Google's consent screen.
 
-```
+```http
 GET /api/auth/google
 ```
 
@@ -724,7 +718,7 @@ If rate limited — standard `429` JSON response.
 
 Handles the callback from Google after user authorization.
 
-```
+```http
 GET /api/auth/google/callback?code=<authorization-code>&state=<state>
 ```
 
@@ -754,7 +748,7 @@ Redirects to `{CLIENT_URL}/auth/callback` with JWT cookies set.
 
 Redirects the user to GitHub's authorization screen.
 
-```
+```http
 GET /api/auth/github
 ```
 
@@ -777,7 +771,7 @@ Redirects to GitHub's authorization screen.
 
 Handles the callback from GitHub after user authorization.
 
-```
+```http
 GET /api/auth/github/callback?code=<authorization-code>&state=<state>
 ```
 
@@ -1063,7 +1057,7 @@ curl -X POST http://localhost:3000/api/profile/me/change-password \
 
 Returns the application and database health status. Useful for monitoring and load balancer health probes.
 
-```
+```http
 GET /api/health
 ```
 
@@ -1150,7 +1144,7 @@ Every authentication event (login, logout, refresh, OAuth, password operations, 
 
 Returns paginated audit log entries for the current user.
 
-```
+```http
 GET /api/profile/me/audit-logs
 ```
 

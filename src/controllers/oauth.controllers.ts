@@ -19,13 +19,15 @@ export const oauthCallback = async (req: Request, res: Response) => {
     }
 
     const userId = req.user._id ?? req.user.id;
-    if (!userId) {
+    const { email, username } = req.user;
+
+    if (!userId || !email || !username) {
       await logAuditEvent({
         action: 'oauth_login',
         status: 'failure',
         ip: req.ip,
         userAgent: req.headers['user-agent'],
-        metadata: { reason: 'Invalid user object from OAuth provider' },
+        metadata: { reason: 'Invalid user object from OAuth provider', fields: { userId: !!userId, email: !!email, username: !!username } },
       });
       return res.redirect(`${process.env.CLIENT_URL}/login?error=oauth_failed`);
     }

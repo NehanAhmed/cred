@@ -75,10 +75,13 @@ passport.use(
     },
     async (_accessToken, _refreshToken, profile, done: VerifyCallback) => {
       try {
+        const googleProfile = profile as typeof profile & { _json?: { email_verified?: boolean } };
+        const email = googleProfile._json?.email_verified ? profile.emails?.[0]?.value : undefined;
+
         const user = await findOrCreateOAuthUser(
           'google',
           profile.id,
-          profile.emails?.[0]?.value,
+          email,
           profile.displayName ||
             profile.name?.givenName ||
             profile.emails?.[0]?.value?.split('@')[0] ||
@@ -104,11 +107,11 @@ passport.use(
     async (
       _accessToken: string,
       _refreshToken: string,
-      profile: { id: string; displayName?: string; username?: string; emails?: { value: string }[]; photos?: { value: string }[] },
+      profile: { id: string; displayName?: string; username?: string; emails?: { value: string; primary?: boolean; verified?: boolean }[]; photos?: { value: string }[] },
       done: VerifyCallback
     ) => {
       try {
-        const email = profile.emails?.[0]?.value;
+        const email = profile.emails?.find(e => e.verified && e.primary)?.value;
 
         const user = await findOrCreateOAuthUser(
           'github',

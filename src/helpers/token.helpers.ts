@@ -5,6 +5,7 @@ import { JWTPayload } from '../types/jwt.types';
 import { Types } from 'mongoose';
 
 const ACCESS_TOKEN_EXPIRY = '15m';
+const ACCESS_TOKEN_EXPIRY_MS = 15 * 60 * 1000;
 const REFRESH_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const generateAccessToken = (user: { _id: Types.ObjectId | string; email: string; username: string }): string => {
@@ -35,8 +36,6 @@ export const hashToken = (token: string): string => {
   return crypto.createHash('sha256').update(token).digest('hex');
 };
 
-const REFRESH_TOKEN_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
-
 export const setAuthCookies = (
   res: Response,
   accessToken: string,
@@ -47,7 +46,7 @@ export const setAuthCookies = (
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite,
-    maxAge: 15 * 60 * 1000,
+    maxAge: ACCESS_TOKEN_EXPIRY_MS,
   });
 
   res.cookie('refreshToken', rawRefreshToken, {
@@ -55,7 +54,7 @@ export const setAuthCookies = (
     secure: process.env.NODE_ENV === 'production',
     sameSite,
     path: '/api/auth',
-    maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE,
+    maxAge: REFRESH_TOKEN_EXPIRY_MS,
   });
 };
 
