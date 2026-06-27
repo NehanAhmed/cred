@@ -4,6 +4,7 @@ import { Request, Response } from 'express';
 import { LoginRequest, RegisterRequest } from '../types/auth.types';
 import { sendError, sendSuccess } from '../helpers/api.helpers';
 import { generateAccessToken, generateRefreshTokenData, hashToken } from '../helpers/token.helpers';
+import { logAuditEvent } from '../helpers/audit.helpers';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { sendEmailVerification, sendPasswordReset } from '../helpers/email.helpers';
@@ -46,6 +47,13 @@ export const register = async (req: Request<{}, {}, RegisterRequest>, res: Respo
       $or: [{ email }, { username }],
     });
     if (existingUser) {
+      await logAuditEvent({
+        action: 'register',
+        status: 'failure',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { reason: 'User already exists', email, username },
+      });
       return sendError(res, 'User already exists', 400);
     }
 
@@ -68,8 +76,23 @@ export const register = async (req: Request<{}, {}, RegisterRequest>, res: Respo
       await sendEmailVerification(user.email, rawToken);
     } catch {
       await userModel.deleteOne({ _id: user._id });
+      await logAuditEvent({
+        action: 'register',
+        status: 'failure',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { reason: 'Failed to send verification email', email },
+      });
       return sendError(res, 'Failed to send verification email. Please try again.', 500);
     }
+
+    await logAuditEvent({
+      userId: user._id.toString(),
+      action: 'register',
+      status: 'success',
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
 
     return sendSuccess(res, {}, 'User registered successfully. Verify your email first.', 201);
   } catch (error) {
@@ -85,22 +108,47 @@ export const login = async (req: Request<{}, {}, LoginRequest>, res: Response) =
     });
 
     if (!user) {
+      await logAuditEvent({
+        action: 'login',
+        status: 'failure',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { reason: 'Invalid credentials', loginIdentifier: email || username },
+      });
       return sendError(res, 'Invalid credentials', 401);
     }
-
-    if (user.lockoutUntil) {
-      if (user.lockoutUntil > new Date()) {
-        return sendError(res, 'Account locked due to too many failed login attempts. Please try again later.', 401);
-      }
-      user.loginAttempts = 0;
-      user.lockoutUntil = null;
-      await user.save();
+    if (user.lockoutUntil && user.lockoutUntil > new Date()) {
+      await logAuditEvent({
+        userId: user._id.toString(),
+        action: 'login',
+        status: 'failure',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { reason: 'Account locked' },
+      });
+      return sendError(res, 'Account locked due to too many failed login attempts. Please try again later.', 401);
     }
     if (user.provider !== 'local') {
+      await logAuditEvent({
+        userId: user._id.toString(),
+        action: 'login',
+        status: 'failure',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { reason: `Account uses ${user.provider} login`, provider: user.provider },
+      });
       return sendError(res, `This account uses ${user.provider} login. Please sign in with ${user.provider}.`, 400);
     }
 
     if (!user.isVerified) {
+      await logAuditEvent({
+        userId: user._id.toString(),
+        action: 'login',
+        status: 'failure',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { reason: 'Email not verified' },
+      });
       return sendError(res, 'Please verify your email first', 401);
     }
 
@@ -117,10 +165,21 @@ export const login = async (req: Request<{}, {}, LoginRequest>, res: Response) =
           { $set: { lockoutUntil: new Date(Date.now() + LOCK_DURATION_MS) } }
         );
       }
+      await user.save();
+      await logAuditEvent({
+        userId: user._id.toString(),
+        action: 'login',
+        status: 'failure',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { reason: 'Invalid credentials', loginAttempts: user.loginAttempts },
+      });
       return sendError(res, 'Invalid credentials', 401);
     }
     user.loginAttempts = 0;
     user.lockoutUntil = null;
+    user.lastLogin = new Date();
+    user.lastIp = req.ip;
     await user.save();
 
     const accessToken = generateAccessToken(user);
@@ -134,6 +193,14 @@ export const login = async (req: Request<{}, {}, LoginRequest>, res: Response) =
     });
 
     setAuthCookies(res, accessToken, rtData.rawToken, 'strict');
+
+    await logAuditEvent({
+      userId: user._id.toString(),
+      action: 'login',
+      status: 'success',
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
 
     const { password: _, ...userWithoutPassword } = user.toObject();
     return sendSuccess(res, { user: userWithoutPassword }, 'Logged in successfully', 200);
@@ -151,6 +218,14 @@ export const logout = async (req: Request, res: Response) => {
       await refreshTokenModel.deleteOne({ token: hashed });
     }
 
+    await logAuditEvent({
+      userId: req.user.id,
+      action: 'logout',
+      status: 'success',
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
     clearAuthCookies(res);
     return sendSuccess(res, null, 'Logged out successfully', 200);
   } catch (error) {
@@ -163,6 +238,13 @@ export const refresh = async (req: Request, res: Response) => {
   try {
     const rawToken = req.cookies.refreshToken;
     if (!rawToken) {
+      await logAuditEvent({
+        action: 'token_refresh',
+        status: 'failure',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { reason: 'Refresh token not found' },
+      });
       return sendError(res, 'Refresh token not found', 401);
     }
 
@@ -171,12 +253,27 @@ export const refresh = async (req: Request, res: Response) => {
 
     if (!storedToken) {
       clearAuthCookies(res);
+      await logAuditEvent({
+        action: 'token_refresh',
+        status: 'failure',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { reason: 'Invalid refresh token' },
+      });
       return sendError(res, 'Invalid refresh token', 401);
     }
 
     if (storedToken.expiresAt < new Date()) {
       await storedToken.deleteOne();
       clearAuthCookies(res);
+      await logAuditEvent({
+        userId: storedToken.user.toString(),
+        action: 'token_refresh',
+        status: 'failure',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { reason: 'Refresh token expired' },
+      });
       return sendError(res, 'Refresh token expired', 401);
     }
 
@@ -184,6 +281,13 @@ export const refresh = async (req: Request, res: Response) => {
     if (!user) {
       await storedToken.deleteOne();
       clearAuthCookies(res);
+      await logAuditEvent({
+        action: 'token_refresh',
+        status: 'failure',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { reason: 'User not found' },
+      });
       return sendError(res, 'User not found', 401);
     }
 
@@ -196,6 +300,14 @@ export const refresh = async (req: Request, res: Response) => {
     if (reused) {
       await refreshTokenModel.deleteMany({ user: storedToken.user, family: storedToken.family });
       clearAuthCookies(res);
+      await logAuditEvent({
+        userId: user._id.toString(),
+        action: 'token_refresh',
+        status: 'failure',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { reason: 'Refresh token reuse detected' },
+      });
       return sendError(res, 'Refresh token reuse detected. All sessions revoked.', 401);
     }
 
@@ -212,6 +324,14 @@ export const refresh = async (req: Request, res: Response) => {
 
     const accessToken = generateAccessToken(user);
     setAuthCookies(res, accessToken, rtData.rawToken, 'strict');
+
+    await logAuditEvent({
+      userId: user._id.toString(),
+      action: 'token_refresh',
+      status: 'success',
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
 
     return sendSuccess(res, null, 'Token refreshed successfully', 200);
   } catch (error) {
@@ -231,6 +351,13 @@ export const verifyEmail = async (req: Request<{ token: string }>, res: Response
     });
 
     if (!user) {
+      await logAuditEvent({
+        action: 'email_verification',
+        status: 'failure',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { reason: 'Invalid or expired token' },
+      });
       return res.redirect(`${process.env.CLIENT_URL}/login?verified=false`);
     }
 
@@ -238,6 +365,14 @@ export const verifyEmail = async (req: Request<{ token: string }>, res: Response
     user.verificationToken = null;
     user.verificationTokenExpires = null;
     await user.save();
+
+    await logAuditEvent({
+      userId: user._id.toString(),
+      action: 'email_verification',
+      status: 'success',
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
 
     return res.redirect(`${process.env.CLIENT_URL}/login?verified=true`);
   } catch (error) {
@@ -271,6 +406,13 @@ export const forgotPassword = async (req: Request, res: Response) => {
     const user = await userModel.findOne({ email });
 
     if (!user) {
+      await logAuditEvent({
+        action: 'password_reset_request',
+        status: 'failure',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { reason: 'User not found', email },
+      });
       return sendSuccess(
         res,
         null,
@@ -280,6 +422,14 @@ export const forgotPassword = async (req: Request, res: Response) => {
     }
 
     if (user.provider !== 'local') {
+      await logAuditEvent({
+        userId: user._id.toString(),
+        action: 'password_reset_request',
+        status: 'failure',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { reason: 'Social login account', provider: user.provider },
+      });
       return sendSuccess(
         res,
         null,
@@ -303,6 +453,14 @@ export const forgotPassword = async (req: Request, res: Response) => {
       await user.save();
     }
 
+    await logAuditEvent({
+      userId: user._id.toString(),
+      action: 'password_reset_request',
+      status: 'success',
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
     return sendSuccess(res, null, 'If an account exists, a password reset link has been sent', 200);
   } catch (error) {
     console.error('Forgot password error:', error);
@@ -325,6 +483,13 @@ export const resetPassword = async (
     });
 
     if (!user) {
+      await logAuditEvent({
+        action: 'password_reset',
+        status: 'failure',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { reason: 'Invalid or expired token' },
+      });
       return sendError(res, 'Invalid or expired token', 400);
     }
 
@@ -332,6 +497,14 @@ export const resetPassword = async (
     user.resetPasswordToken = null;
     user.resetPasswordExpires = null;
     await user.save();
+
+    await logAuditEvent({
+      userId: user._id.toString(),
+      action: 'password_reset',
+      status: 'success',
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
 
     return sendSuccess(res, null, 'Password reset successfully', 200);
   } catch (error) {

@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.routes';
 import profileRoutes from './routes/profile.routes';
 import oauthRoutes from './routes/oauth.routes';
 import healthRoutes from './routes/health.routes';
+import auditRoutes from './routes/audit.routes';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import { config } from 'dotenv';
@@ -56,5 +57,6 @@ app.use('/api/health', healthRoutes);
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/auth', oauthRoutes);
 app.use('/api/profile', profileLimiter, profileRoutes);
+app.use('/api/profile', auditRoutes);
 
 export default app;

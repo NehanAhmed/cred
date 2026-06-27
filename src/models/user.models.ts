@@ -72,6 +72,14 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    lastLogin: {
+      type: Date,
+      default: null,
+    },
+    lastIp: {
+      type: String,
+      default: null,
+    },
   },
   { timestamps: true }
 );
