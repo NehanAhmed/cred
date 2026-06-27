@@ -265,6 +265,91 @@ describe('POST /api/auth/login — Login', () => {
       expect(res.body.errors).toBeDefined();
     });
   });
+
+  describe('account lockout', () => {
+    it('increments loginAttempts on wrong password', async () => {
+      await request.post('/api/auth/login').send({
+        email: 'test@example.com',
+        password: 'WrongPass1'
+      });
+
+      const user = await userModel.findOne({ email: 'test@example.com' });
+      expect(user!.loginAttempts).toBe(1);
+    });
+
+    it('locks the account after 5 failed attempts', async () => {
+      for (let i = 0; i < 5; i++) {
+        await request.post('/api/auth/login').send({
+          email: 'test@example.com',
+          password: 'WrongPass1'
+        });
+      }
+
+      const user = await userModel.findOne({ email: 'test@example.com' });
+      expect(user!.loginAttempts).toBe(5);
+      expect(user!.lockoutUntil).not.toBeNull();
+      expect(user!.lockoutUntil!.getTime()).toBeGreaterThan(Date.now());
+    });
+
+    it('returns lockout error when account is locked', async () => {
+      for (let i = 0; i < 5; i++) {
+        await request.post('/api/auth/login').send({
+          email: 'test@example.com',
+          password: 'WrongPass1'
+        });
+      }
+
+      const res = await request.post('/api/auth/login').send({
+        email: 'test@example.com',
+        password: 'WrongPass1'
+      });
+
+      expect(res.status).toBe(401);
+      expect(res.body.success).toBe(false);
+      expect(res.body.message).toBe('Account locked due to too many failed login attempts. Please try again later.');
+    });
+
+    it('resets loginAttempts on successful login', async () => {
+      await request.post('/api/auth/login').send({
+        email: 'test@example.com',
+        password: 'WrongPass1'
+      });
+      await request.post('/api/auth/login').send({
+        email: 'test@example.com',
+        password: 'WrongPass1'
+      });
+
+      const successRes = await request.post('/api/auth/login').send({
+        email: 'test@example.com',
+        password: 'Password123'
+      });
+      expect(successRes.status).toBe(200);
+
+      const user = await userModel.findOne({ email: 'test@example.com' });
+      expect(user!.loginAttempts).toBe(0);
+      expect(user!.lockoutUntil).toBeNull();
+    });
+
+    it('allows login after lock duration expires', async () => {
+      for (let i = 0; i < 5; i++) {
+        await request.post('/api/auth/login').send({
+          email: 'test@example.com',
+          password: 'WrongPass1'
+        });
+      }
+
+      await userModel.findOneAndUpdate(
+        { email: 'test@example.com' },
+        { lockoutUntil: new Date(Date.now() - 1000) }
+      );
+
+      const res = await request.post('/api/auth/login').send({
+        email: 'test@example.com',
+        password: 'Password123'
+      });
+      expect(res.status).toBe(200);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

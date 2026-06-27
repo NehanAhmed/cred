@@ -9,7 +9,8 @@ import crypto from 'crypto';
 import { sendEmailVerification, sendPasswordReset } from '../helpers/email.helpers';
 
 const REFRESH_TOKEN_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
-
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCK_DURATION_MS = 15 * 60 * 1000;
 const setAuthCookies = (
   res: Response,
   accessToken: string,
@@ -87,6 +88,14 @@ export const login = async (req: Request<{}, {}, LoginRequest>, res: Response) =
       return sendError(res, 'Invalid credentials', 401);
     }
 
+    if (user.lockoutUntil) {
+      if (user.lockoutUntil > new Date()) {
+        return sendError(res, 'Account locked due to too many failed login attempts. Please try again later.', 401);
+      }
+      user.loginAttempts = 0;
+      user.lockoutUntil = null;
+      await user.save();
+    }
     if (user.provider !== 'local') {
       return sendError(res, `This account uses ${user.provider} login. Please sign in with ${user.provider}.`, 400);
     }
@@ -97,8 +106,22 @@ export const login = async (req: Request<{}, {}, LoginRequest>, res: Response) =
 
     const isPasswordValid = await bcrypt.compare(password, user.password!);
     if (!isPasswordValid) {
+      await userModel.updateOne(
+        { _id: user._id },
+        { $inc: { loginAttempts: 1 } }
+      );
+      const updated = await userModel.findById(user._id, 'loginAttempts lockoutUntil');
+      if (updated!.loginAttempts >= MAX_LOGIN_ATTEMPTS) {
+        await userModel.updateOne(
+          { _id: user._id, lockoutUntil: null },
+          { $set: { lockoutUntil: new Date(Date.now() + LOCK_DURATION_MS) } }
+        );
+      }
       return sendError(res, 'Invalid credentials', 401);
     }
+    user.loginAttempts = 0;
+    user.lockoutUntil = null;
+    await user.save();
 
     const accessToken = generateAccessToken(user);
     const rtData = generateRefreshTokenData();
