@@ -3,6 +3,7 @@ import { Strategy as GoogleStrategy, VerifyCallback } from 'passport-google-oaut
 import { Strategy as GitHubStrategy } from 'passport-github2';
 import userModel from '../models/user.models';
 import crypto from 'crypto';
+import { logAuditEvent } from '../helpers/audit.helpers';
 
 const generateUniqueUsername = async (base: string): Promise<string> => {
   const sanitized = base
@@ -30,12 +31,23 @@ const findOrCreateOAuthUser = async (
   if (user) return user;
 
   if (email) {
-    user = await userModel.findOne({ email });
+    user = await userModel.findOne({ email: email.toLowerCase() });
     if (user) {
+      const wasLocal = user.provider === 'local';
       user.set(providerField, profileId);
       if (!user.avatar) user.avatar = avatar || null;
-      if (user.provider === 'local') user.provider = provider;
-      return await user.save();
+      if (wasLocal) user.provider = provider;
+      const saved = await user.save();
+      if (wasLocal) {
+        logAuditEvent({
+          userId: saved._id.toString(),
+          action: 'oauth_login',
+          status: 'success',
+          provider,
+          metadata: { reason: 'Account linked to existing local user by email' },
+        }).catch(() => {});
+      }
+      return saved;
     }
   }
 
@@ -63,10 +75,13 @@ passport.use(
     },
     async (_accessToken, _refreshToken, profile, done: VerifyCallback) => {
       try {
+        const googleProfile = profile as typeof profile & { _json?: { email_verified?: boolean } };
+        const email = googleProfile._json?.email_verified ? profile.emails?.[0]?.value : undefined;
+
         const user = await findOrCreateOAuthUser(
           'google',
           profile.id,
-          profile.emails?.[0]?.value,
+          email,
           profile.displayName ||
             profile.name?.givenName ||
             profile.emails?.[0]?.value?.split('@')[0] ||
@@ -92,11 +107,11 @@ passport.use(
     async (
       _accessToken: string,
       _refreshToken: string,
-      profile: { id: string; displayName?: string; username?: string; emails?: { value: string }[]; photos?: { value: string }[] },
+      profile: { id: string; displayName?: string; username?: string; emails?: { value: string; primary?: boolean; verified?: boolean }[]; photos?: { value: string }[] },
       done: VerifyCallback
     ) => {
       try {
-        const email = profile.emails?.[0]?.value;
+        const email = profile.emails?.find(e => e.verified && e.primary)?.value;
 
         const user = await findOrCreateOAuthUser(
           'github',

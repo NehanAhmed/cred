@@ -1,9 +1,11 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import { Response } from 'express';
 import { JWTPayload } from '../types/jwt.types';
 import { Types } from 'mongoose';
 
 const ACCESS_TOKEN_EXPIRY = '15m';
+const ACCESS_TOKEN_EXPIRY_MS = 15 * 60 * 1000;
 const REFRESH_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const generateAccessToken = (user: { _id: Types.ObjectId | string; email: string; username: string }): string => {
@@ -32,4 +34,31 @@ export const generateRefreshTokenData = (): RefreshTokenData => {
 
 export const hashToken = (token: string): string => {
   return crypto.createHash('sha256').update(token).digest('hex');
+};
+
+export const setAuthCookies = (
+  res: Response,
+  accessToken: string,
+  rawRefreshToken: string,
+  sameSite: 'strict' | 'lax'
+) => {
+  res.cookie('token', accessToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite,
+    maxAge: ACCESS_TOKEN_EXPIRY_MS,
+  });
+
+  res.cookie('refreshToken', rawRefreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite,
+    path: '/api/auth',
+    maxAge: REFRESH_TOKEN_EXPIRY_MS,
+  });
+};
+
+export const clearAuthCookies = (res: Response) => {
+  res.clearCookie('token');
+  res.clearCookie('refreshToken', { path: '/api/auth' });
 };

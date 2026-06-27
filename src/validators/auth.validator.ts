@@ -1,8 +1,14 @@
 import * as z from 'zod';
 
 const bioSchema = z.string().min(3).max(200).optional();
-const phoneSchema = z.string().min(10).max(15).optional();
+const phoneSchema = z.string().regex(/^\d{10,15}$/, 'Phone number must contain 10-15 digits').optional();
 const genderSchema = z.enum(['male', 'female', 'other']).optional();
+
+const passwordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters')
+  .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+  .regex(/\d/, 'Password must contain at least one digit');
 
 export const loginSchema = z
   .object({
@@ -17,7 +23,7 @@ export const passwordForgotSchema = z.object({
 });
 
 export const passwordResetSchema = z.object({
-  password: z.string().min(8).regex(/[A-Z]/).regex(/\d/),
+  password: passwordSchema,
 });
 
 export const profileSchema = z.object({
@@ -30,7 +36,7 @@ export const profileSchema = z.object({
 export const registerSchema = z.object({
   username: z.string().min(3).max(30),
   email: z.email(),
-  password: z.string().min(8).regex(/[A-Z]/).regex(/\d/),
+  password: passwordSchema,
   bio: bioSchema,
   phoneNumber: phoneSchema,
   gender: z.enum(['male', 'female', 'other']).optional(),
@@ -38,5 +44,5 @@ export const registerSchema = z.object({
 
 export const passwordChangeSchema = z.object({
   currentPassword: z.string().min(1),
-  newPassword: z.string().min(8).regex(/[A-Z]/).regex(/\d/),
+  newPassword: passwordSchema,
 });
