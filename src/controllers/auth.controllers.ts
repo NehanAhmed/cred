@@ -3,45 +3,19 @@ import refreshTokenModel from '../models/refreshToken.models';
 import { Request, Response } from 'express';
 import { LoginRequest, RegisterRequest } from '../types/auth.types';
 import { sendError, sendSuccess } from '../helpers/api.helpers';
-import { generateAccessToken, generateRefreshTokenData, hashToken } from '../helpers/token.helpers';
+import { generateAccessToken, generateRefreshTokenData, hashToken, setAuthCookies, clearAuthCookies } from '../helpers/token.helpers';
 import { logAuditEvent } from '../helpers/audit.helpers';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { sendEmailVerification, sendPasswordReset } from '../helpers/email.helpers';
 
-const REFRESH_TOKEN_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCK_DURATION_MS = 15 * 60 * 1000;
-const setAuthCookies = (
-  res: Response,
-  accessToken: string,
-  rawRefreshToken: string,
-  sameSite: 'strict' | 'lax'
-) => {
-  res.cookie('token', accessToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite,
-    maxAge: 15 * 60 * 1000,
-  });
-
-  res.cookie('refreshToken', rawRefreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite,
-    path: '/api/auth',
-    maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE,
-  });
-};
-
-const clearAuthCookies = (res: Response) => {
-  res.clearCookie('token');
-  res.clearCookie('refreshToken', { path: '/api/auth' });
-};
 
 export const register = async (req: Request<{}, {}, RegisterRequest>, res: Response) => {
   try {
-    const { username, email, password, bio, phoneNumber, gender } = req.body;
+    const { username, email: rawEmail, password, bio, phoneNumber, gender } = req.body;
+    const email = rawEmail.toLowerCase().trim();
 
     const existingUser = await userModel.findOne({
       $or: [{ email }, { username }],
@@ -59,7 +33,7 @@ export const register = async (req: Request<{}, {}, RegisterRequest>, res: Respo
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const rawToken = crypto.randomBytes(32).toString('hex');
-    const hashToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
 
     const user = await userModel.create({
       username,
@@ -68,7 +42,7 @@ export const register = async (req: Request<{}, {}, RegisterRequest>, res: Respo
       bio,
       phoneNumber,
       gender,
-      verificationToken: hashToken,
+      verificationToken: hashedToken,
       verificationTokenExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
 
@@ -113,7 +87,7 @@ export const login = async (req: Request<{}, {}, LoginRequest>, res: Response) =
         status: 'failure',
         ip: req.ip,
         userAgent: req.headers['user-agent'],
-        metadata: { reason: 'Invalid credentials', loginIdentifier: email || username },
+        metadata: { reason: 'Invalid credentials' },
       });
       return sendError(res, 'Invalid credentials', 401);
     }
@@ -154,25 +128,24 @@ export const login = async (req: Request<{}, {}, LoginRequest>, res: Response) =
 
     const isPasswordValid = await bcrypt.compare(password, user.password!);
     if (!isPasswordValid) {
-      await userModel.updateOne(
-        { _id: user._id },
-        { $inc: { loginAttempts: 1 } }
+      const updated = await userModel.findByIdAndUpdate(
+        user._id,
+        { $inc: { loginAttempts: 1 } },
+        { returnDocument: 'after', fields: 'loginAttempts lockoutUntil' }
       );
-      const updated = await userModel.findById(user._id, 'loginAttempts lockoutUntil');
-      if (updated!.loginAttempts >= MAX_LOGIN_ATTEMPTS) {
+      if (updated && updated.loginAttempts >= MAX_LOGIN_ATTEMPTS) {
         await userModel.updateOne(
-          { _id: user._id, lockoutUntil: null },
+          { _id: user._id, $or: [{ lockoutUntil: null }, { lockoutUntil: { $lte: new Date() } }] },
           { $set: { lockoutUntil: new Date(Date.now() + LOCK_DURATION_MS) } }
         );
       }
-      await user.save();
       await logAuditEvent({
         userId: user._id.toString(),
         action: 'login',
         status: 'failure',
         ip: req.ip,
         userAgent: req.headers['user-agent'],
-        metadata: { reason: 'Invalid credentials', loginAttempts: user.loginAttempts },
+        metadata: { reason: 'Invalid credentials', loginAttempts: updated?.loginAttempts ?? 0 },
       });
       return sendError(res, 'Invalid credentials', 401);
     }
@@ -219,7 +192,7 @@ export const logout = async (req: Request, res: Response) => {
     }
 
     await logAuditEvent({
-      userId: req.user.id,
+      userId: req.user!.id,
       action: 'logout',
       status: 'success',
       ip: req.ip,
@@ -248,26 +221,46 @@ export const refresh = async (req: Request, res: Response) => {
       return sendError(res, 'Refresh token not found', 401);
     }
 
+    // Atomically claim the token as consumed — first caller wins
     const hashed = hashToken(rawToken);
-    const storedToken = await refreshTokenModel.findOne({ token: hashed });
+    const claimed = await refreshTokenModel.findOneAndUpdate(
+      { token: hashed, consumed: false },
+      { $set: { consumed: true } },
+      { returnDocument: 'after' }
+    );
 
-    if (!storedToken) {
+    if (!claimed) {
+      // Token not found or already consumed — check if it ever existed (reuse detection)
+      const existing = await refreshTokenModel.findOne({ token: hashed });
+      if (existing) {
+        // Token was already consumed — this is a replay attack; revoke the entire family
+        await refreshTokenModel.deleteMany({ user: existing.user, family: existing.family });
+        clearAuthCookies(res);
+        await logAuditEvent({
+          userId: existing.user.toString(),
+          action: 'token_refresh',
+          status: 'failure',
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+          metadata: { reason: 'Refresh token reuse detected' },
+        });
+        return sendError(res, 'Refresh token reuse detected. All sessions revoked.', 401);
+      }
       clearAuthCookies(res);
       await logAuditEvent({
         action: 'token_refresh',
         status: 'failure',
         ip: req.ip,
         userAgent: req.headers['user-agent'],
-        metadata: { reason: 'Invalid refresh token' },
+        metadata: { reason: 'Invalid or already consumed refresh token' },
       });
       return sendError(res, 'Invalid refresh token', 401);
     }
 
-    if (storedToken.expiresAt < new Date()) {
-      await storedToken.deleteOne();
+    if (claimed.expiresAt < new Date()) {
       clearAuthCookies(res);
       await logAuditEvent({
-        userId: storedToken.user.toString(),
+        userId: claimed.user.toString(),
         action: 'token_refresh',
         status: 'failure',
         ip: req.ip,
@@ -277,9 +270,8 @@ export const refresh = async (req: Request, res: Response) => {
       return sendError(res, 'Refresh token expired', 401);
     }
 
-    const user = await userModel.findById(storedToken.user);
+    const user = await userModel.findById(claimed.user);
     if (!user) {
-      await storedToken.deleteOne();
       clearAuthCookies(res);
       await logAuditEvent({
         action: 'token_refresh',
@@ -291,34 +283,13 @@ export const refresh = async (req: Request, res: Response) => {
       return sendError(res, 'User not found', 401);
     }
 
-    const reused = await refreshTokenModel.findOne({
-      user: storedToken.user,
-      family: storedToken.family,
-      _id: { $ne: storedToken._id },
-    });
-
-    if (reused) {
-      await refreshTokenModel.deleteMany({ user: storedToken.user, family: storedToken.family });
-      clearAuthCookies(res);
-      await logAuditEvent({
-        userId: user._id.toString(),
-        action: 'token_refresh',
-        status: 'failure',
-        ip: req.ip,
-        userAgent: req.headers['user-agent'],
-        metadata: { reason: 'Refresh token reuse detected' },
-      });
-      return sendError(res, 'Refresh token reuse detected. All sessions revoked.', 401);
-    }
-
-    await storedToken.deleteOne();
-
+    // Rotate: new token in the same family, then delete the consumed one
     const rtData = generateRefreshTokenData();
 
     await refreshTokenModel.create({
       token: rtData.hashedToken,
       user: user._id,
-      family: rtData.family,
+      family: claimed.family,
       expiresAt: rtData.expiresAt,
     });
 
@@ -343,10 +314,10 @@ export const refresh = async (req: Request, res: Response) => {
 export const verifyEmail = async (req: Request<{ token: string }>, res: Response) => {
   try {
     const { token } = req.params;
-    const hashToken = crypto.createHash('sha256').update(token).digest('hex');
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
     const user = await userModel.findOne({
-      verificationToken: hashToken,
+      verificationToken: hashedToken,
       verificationTokenExpires: { $gt: new Date() },
     });
 
@@ -439,9 +410,9 @@ export const forgotPassword = async (req: Request, res: Response) => {
     }
 
     const token = crypto.randomBytes(32).toString('hex');
-    const hashToken = crypto.createHash('sha256').update(token).digest('hex');
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
-    user.resetPasswordToken = hashToken;
+    user.resetPasswordToken = hashedToken;
     user.resetPasswordExpires = new Date(Date.now() + 3600000);
     await user.save();
 
@@ -451,6 +422,20 @@ export const forgotPassword = async (req: Request, res: Response) => {
       user.resetPasswordToken = null;
       user.resetPasswordExpires = null;
       await user.save();
+      await logAuditEvent({
+        userId: user._id.toString(),
+        action: 'password_reset_request',
+        status: 'failure',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { reason: 'Failed to send password reset email' },
+      });
+      return sendSuccess(
+        res,
+        null,
+        'If an account exists, a password reset link has been sent',
+        200
+      );
     }
 
     await logAuditEvent({
@@ -475,10 +460,10 @@ export const resetPassword = async (
   try {
     const { token } = req.params;
     const { password } = req.body;
-    const hashToken = crypto.createHash('sha256').update(token).digest('hex');
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
     const user = await userModel.findOne({
-      resetPasswordToken: hashToken,
+      resetPasswordToken: hashedToken,
       resetPasswordExpires: { $gt: new Date() },
     });
 
@@ -496,7 +481,11 @@ export const resetPassword = async (
     user.password = await bcrypt.hash(password, 10);
     user.resetPasswordToken = null;
     user.resetPasswordExpires = null;
+    user.loginAttempts = 0;
+    user.lockoutUntil = null;
     await user.save();
+
+    await refreshTokenModel.deleteMany({ user: user._id });
 
     await logAuditEvent({
       userId: user._id.toString(),

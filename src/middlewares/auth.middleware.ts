@@ -12,7 +12,7 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JWTPayload;
 
-    if (decoded.tokenType !== 'access') {
+    if (decoded.tokenType !== 'access' || !decoded.id || !decoded.email || !decoded.username) {
       return sendError(res, 'Invalid token', 401);
     }
 
@@ -24,7 +24,7 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
       exp: decoded.exp,
     };
     next();
-  } catch (error) {
+  } catch {
     return sendError(res, 'Invalid token', 401);
   }
 };

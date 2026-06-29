@@ -1,9 +1,11 @@
 import { sendError, sendSuccess } from '../helpers/api.helpers';
 import userModel from '../models/user.models';
+import refreshTokenModel from '../models/refreshToken.models';
 import { Request, Response } from 'express';
 import { PasswordChangeRequest, ProfileUpdateRequest } from '../types/auth.types';
 import bcrypt from 'bcryptjs';
 import { logAuditEvent } from '../helpers/audit.helpers';
+import { clearAuthCookies } from '../helpers/token.helpers';
 
 export const getProfile = async (req: Request, res: Response) => {
   try {
@@ -64,7 +66,11 @@ export const updatePassword = async (
     }
 
     user.password = await bcrypt.hash(newPassword, 10);
+    user.loginAttempts = 0;
+    user.lockoutUntil = null;
     await user.save();
+
+    await refreshTokenModel.deleteMany({ user: user._id });
 
     await logAuditEvent({
       userId: user._id.toString(),
@@ -115,11 +121,13 @@ export const updateProfile = async (req: Request<{}, {}, ProfileUpdateRequest>, 
 
     const { password: _, ...userWithoutPassword } = user.toObject();
     return sendSuccess(res, userWithoutPassword, 'Profile updated successfully', 200);
-  } catch (error: any) {
-    if (error?.code === 11000) {
-      const field = Object.keys(error.keyPattern ?? {})[0] || 'field';
+  } catch (error: unknown) {
+    const mongoError = error as Record<string, unknown>;
+    if (mongoError?.code === 11000) {
+      const keyPattern = mongoError.keyPattern as Record<string, unknown> || {};
+      const field = Object.keys(keyPattern)[0] || 'field';
       await logAuditEvent({
-        userId: req.user.id,
+        userId: req.user?.id,
         action: 'profile_update',
         status: 'failure',
         ip: req.ip,
@@ -140,6 +148,8 @@ export const deleteAccount = async (req: Request, res: Response) => {
       return sendError(res, 'User not found', 404);
     }
 
+    await refreshTokenModel.deleteMany({ user: user._id });
+
     await logAuditEvent({
       userId: user._id.toString(),
       action: 'account_deletion',
@@ -149,6 +159,7 @@ export const deleteAccount = async (req: Request, res: Response) => {
     });
 
     await user.deleteOne();
+    clearAuthCookies(res);
     return sendSuccess(res, null, 'Account deleted successfully', 200);
   } catch (error) {
     console.error('Delete account error:', error);
