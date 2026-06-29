@@ -1,7 +1,7 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
-import passport from './services/passport';
+import passport, { initializePassport } from './services/passport';
 import authRoutes from './routes/auth.routes';
 import profileRoutes from './routes/profile.routes';
 import oauthRoutes from './routes/oauth.routes';
@@ -12,6 +12,7 @@ import cors from 'cors';
 import { config } from 'dotenv';
 
 config();
+initializePassport();
 
 const requiredEnvVars = ['MONGO_URI', 'JWT_SECRET', 'CLIENT_URL', 'BACKEND_URL', 'CORS_ORIGIN'];
 for (const key of requiredEnvVars) {

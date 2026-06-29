@@ -54,66 +54,82 @@ const findOrCreateOAuthUser = async (
   });
 };
 
-passport.use(
-  new GoogleStrategy(
-    {
-      clientID: process.env.GOOGLE_OAUTH_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET!,
-      callbackURL: '/api/auth/google/callback',
-    },
-    async (_accessToken, _refreshToken, profile, done: VerifyCallback) => {
-      try {
-        const user = await findOrCreateOAuthUser(
-          'google',
-          profile.id,
-          profile.emails?.[0]?.value,
-          profile.displayName ||
-            profile.name?.givenName ||
-            profile.emails?.[0]?.value?.split('@')[0] ||
-            'user',
-          profile.photos?.[0]?.value
-        );
-        done(null, user);
-      } catch (error) {
-        done(error as Error);
-      }
-    }
-  )
-);
+export function initializePassport(): void {
+  const googleClientID = process.env.GOOGLE_OAUTH_CLIENT_ID;
+  const googleClientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
 
-passport.use(
-  new GitHubStrategy(
-    {
-      clientID: process.env.GITHUB_OAUTH_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_OAUTH_CLIENT_SECRET!,
-      callbackURL: '/api/auth/github/callback',
-      scope: ['user:email'],
-    },
-    async (
-      _accessToken: string,
-      _refreshToken: string,
-      profile: { id: string; displayName?: string; username?: string; emails?: { value: string }[]; photos?: { value: string }[] },
-      done: VerifyCallback
-    ) => {
-      try {
-        const email = profile.emails?.[0]?.value;
+  if (googleClientID && googleClientSecret) {
+    passport.use(
+      new GoogleStrategy(
+        {
+          clientID: googleClientID,
+          clientSecret: googleClientSecret,
+          callbackURL: '/api/auth/google/callback',
+        },
+        async (_accessToken, _refreshToken, profile, done: VerifyCallback) => {
+          try {
+            const user = await findOrCreateOAuthUser(
+              'google',
+              profile.id,
+              profile.emails?.[0]?.value,
+              profile.displayName ||
+                profile.name?.givenName ||
+                profile.emails?.[0]?.value?.split('@')[0] ||
+                'user',
+              profile.photos?.[0]?.value
+            );
+            done(null, user);
+          } catch (error) {
+            done(error as Error);
+          }
+        }
+      )
+    );
+  } else {
+    console.warn('Missing GOOGLE_OAUTH_CLIENT_ID or GOOGLE_OAUTH_CLIENT_SECRET. Google login disabled.');
+  }
 
-        const user = await findOrCreateOAuthUser(
-          'github',
-          profile.id,
-          email,
-          profile.displayName ||
-            profile.username ||
-            email?.split('@')[0] ||
-            'user',
-          profile.photos?.[0]?.value
-        );
-        done(null, user);
-      } catch (error) {
-        done(error as Error);
-      }
-    }
-  )
-);
+  const githubClientID = process.env.GITHUB_OAUTH_CLIENT_ID;
+  const githubClientSecret = process.env.GITHUB_OAUTH_CLIENT_SECRET;
+
+  if (githubClientID && githubClientSecret) {
+    passport.use(
+      new GitHubStrategy(
+        {
+          clientID: githubClientID,
+          clientSecret: githubClientSecret,
+          callbackURL: '/api/auth/github/callback',
+          scope: ['user:email'],
+        },
+        async (
+          _accessToken: string,
+          _refreshToken: string,
+          profile: { id: string; displayName?: string; username?: string; emails?: { value: string }[]; photos?: { value: string }[] },
+          done: VerifyCallback
+        ) => {
+          try {
+            const email = profile.emails?.[0]?.value;
+
+            const user = await findOrCreateOAuthUser(
+              'github',
+              profile.id,
+              email,
+              profile.displayName ||
+                profile.username ||
+                email?.split('@')[0] ||
+                'user',
+              profile.photos?.[0]?.value
+            );
+            done(null, user);
+          } catch (error) {
+            done(error as Error);
+          }
+        }
+      )
+    );
+  } else {
+    console.warn('Missing GITHUB_OAUTH_CLIENT_ID or GITHUB_OAUTH_CLIENT_SECRET. GitHub login disabled.');
+  }
+}
 
 export default passport;
