@@ -76,7 +76,7 @@ export function initializePassport(): void {
         {
           clientID: googleClientID,
           clientSecret: googleClientSecret,
-          callbackURL: '/api/auth/google/callback',
+          callbackURL: `${process.env.BACKEND_URL}/api/auth/google/callback`,
         },
         async (_accessToken, _refreshToken, profile, done: VerifyCallback) => {
           try {
@@ -110,7 +110,7 @@ export function initializePassport(): void {
         {
           clientID: githubClientID,
           clientSecret: githubClientSecret,
-          callbackURL: '/api/auth/github/callback',
+          callbackURL: `${process.env.BACKEND_URL}/api/auth/github/callback`,
           scope: ['user:email'],
         },
         async (
