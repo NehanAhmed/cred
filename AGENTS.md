@@ -4,18 +4,18 @@
 
 ```bash
 pnpm install
-pnpm dev          # ts-node-dev --respawn --transpile-only src/index.ts
-pnpm build        # tsc -> dist/
-pnpm start        # node dist/index.js
-pnpm test         # jest (61 tests across 3 suites)
-pnpm test:coverage# jest --coverage
+pnpm dev          # turbo dev → builds deps, starts api in dev mode
+pnpm build        # turbo build → tsc apps/api + tsup packages/shared
+pnpm start        # node apps/api/dist/index.js
+pnpm test         # turbo test → jest (115 tests across 7 suites)
+pnpm test:coverage  # jest --coverage
 ```
 
 Package manager is **pnpm** (v10.33.2). Lockfile: `pnpm-lock.yaml`.
 
 ## Stack
 
-- **Express 5** + **Mongoose 9** + **TypeScript 6.0.3** (commonjs, ES2022 target)
+- **Express 5** + **Mongoose 9** + **TypeScript 6.0.3** (ESM, ES2022 target)
 - Auth: `bcryptjs`, `jsonwebtoken`, `cookie-parser`, `dotenv`
 - Validation: `zod` 4
 - Rate limiting: `express-rate-limit`
@@ -23,36 +23,32 @@ Package manager is **pnpm** (v10.33.2). Lockfile: `pnpm-lock.yaml`.
 - OAuth: `passport`, `passport-google-oauth20`, `passport-github2`
 - Security: `helmet`
 
-## Architecture
+## Architecture (monorepo)
 
-```
-src/
-  index.ts                 — entrypoint: awaits connectDB(), starts Express
-  app.ts                   — Express app setup, mounts /api/auth + /api/profile
-  db/db.ts                 — mongoose.connect(MONGO_URI)
-  models/user.models.ts    — User schema (username, email, password, bio, phoneNumber, gender,
-                             isVerified, verificationToken, verificationTokenExpires,
-                             resetPasswordToken, resetPasswordExpires,
-                             googleId, githubId, provider, avatar)
-  services/
-    passport.ts            — Passport strategies for Google + GitHub OAuth
-  routes/
-    auth.routes.ts         — register, login, logout, verify-email, forgot-password, reset-password
-    oauth.routes.ts        — google, google/callback, github, github/callback
-    profile.routes.ts      — get/update profile, change password, delete account
-  controllers/
-    auth.controllers.ts
-    oauth.controllers.ts
-    profile.controllers.ts
-  middlewares/
-    auth.middleware.ts      — JWT verify from req.cookies.token
-    validate.middleware.ts  — generic Zod schema validation
-  validators/auth.validator.ts  — Zod schemas for all request bodies
-  helpers/
-    api.helpers.ts          — sendSuccess / sendError helper
-    email.helpers.ts        — Nodemailer (Ethereal dev or SMTP prod)
-  templates/email.templates.ts  — HTML email templates
-  types/                    — auth.types.ts, api.types.ts, types.d.ts (global Express.Request.user)
+```text
+cred/
+  apps/
+    api/                  — Express API server (@cred/api)
+      src/
+        index.ts          — entrypoint: awaits connectDB(), starts Express
+        app.ts            — Express app setup, mounts /api/auth + /api/profile
+        db/db.ts          — mongoose.connect(MONGO_URI)
+        models/           — User, RefreshToken, AuditLog Mongoose models
+        services/passport.ts  — Passport strategies
+        routes/           — auth, oauth, profile, health, audit
+        controllers/      — auth, oauth, profile, health, audit
+        middlewares/       — JWT auth, Zod validation
+        helpers/          — API helpers, token helpers, email, audit
+        templates/        — HTML email templates
+  packages/
+    shared/               — @cred/shared (types, Zod validators)
+      src/
+        types/            — auth.types, jwt.types, api.types, audit.types
+        validators/       — auth.validator (Zod schemas)
+    config/               — @cred/config (shared tsconfigs)
+      tsconfig/
+        base.json
+        node.json
 ```
 
 ## API endpoints
@@ -85,7 +81,7 @@ Auth uses **httpOnly cookies** (`token`). `secure` flag depends on `NODE_ENV ===
 
 ## Environment
 
-`.env` requires: `PORT`, `MONGO_URI`, `JWT_SECRET`, `CLIENT_URL`, `BACKEND_URL`, `CORS_ORIGIN`.
+`.env` (in `apps/api/`) requires: `PORT`, `MONGO_URI`, `JWT_SECRET`, `CLIENT_URL`, `BACKEND_URL`, `CORS_ORIGIN`.
 
 ## Rate limiting
 
@@ -101,10 +97,11 @@ Auth uses **httpOnly cookies** (`token`). `secure` flag depends on `NODE_ENV ===
 
 ## Notable facts
 
-- `req.user` is globally typed via `src/types/types.d.ts`.
+- `req.user` is globally typed via `apps/api/src/types/types.d.ts`.
+- `@cred/shared` is built with `tsup` (ESM output); `@cred/api` is built with `tsc`.
 - Dev email uses Ethereal (auto-creates test account, logs preview URL to console).
 - Production SMTP is configured via `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`.
 - Passwords are excluded from all API responses (destructured via `toObject()`).
-- Tests use **Jest** + **ts-jest** + **supertest** + **mongodb-memory-server** (61 tests, 3 suites).
-- Run with `pnpm test` or `pnpm test:coverage`.
+- Tests use **Jest** + **ts-jest** (ESM preset) + **supertest** + **mongodb-memory-server** (115 tests, 7 suites).
+- Run with `pnpm test` or `pnpm test:coverage` from root (turbo delegates to apps/api).
 - No linter, no formatter, no CI configured.
