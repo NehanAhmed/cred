@@ -8,7 +8,7 @@ pnpm dev          # turbo dev → builds deps, starts api in dev mode
 pnpm build        # turbo build → tsc apps/api + tsup packages/shared
 pnpm start        # node apps/api/dist/index.js
 pnpm test         # turbo test → jest (115 tests across 7 suites)
-pnpm test:coverage# jest --coverage
+pnpm test:coverage  # jest --coverage
 ```
 
 Package manager is **pnpm** (v10.33.2). Lockfile: `pnpm-lock.yaml`.
@@ -25,7 +25,7 @@ Package manager is **pnpm** (v10.33.2). Lockfile: `pnpm-lock.yaml`.
 
 ## Architecture (monorepo)
 
-```
+```text
 cred/
   apps/
     api/                  — Express API server (@cred/api)

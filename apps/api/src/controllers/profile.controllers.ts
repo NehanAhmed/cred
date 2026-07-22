@@ -30,7 +30,7 @@ export const updatePassword = async (
     const user = await userModel.findById(req.user?.id);
     if (!user) {
       await logAuditEvent({
-        userId: req.user.id,
+        userId: req.user!.id,
         action: 'password_change',
         status: 'failure',
         ip: req.ip,
@@ -94,7 +94,7 @@ export const updateProfile = async (req: Request<{}, {}, ProfileUpdateRequest>, 
     const user = await userModel.findById(req.user?.id);
     if (!user) {
       await logAuditEvent({
-        userId: req.user.id,
+        userId: req.user!.id,
         action: 'profile_update',
         status: 'failure',
         ip: req.ip,
