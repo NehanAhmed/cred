@@ -1,6 +1,6 @@
 declare namespace Express {
   interface Request {
-    user: {
+    user?: {
       id: string;
       _id?: import('mongoose').Types.ObjectId;
       email: string;

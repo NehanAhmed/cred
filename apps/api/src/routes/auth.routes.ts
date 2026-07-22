@@ -17,63 +17,58 @@ import {
   passwordForgotSchema,
   passwordResetSchema
 } from '@cred/shared';
+import {
+  loginLimiterConfig,
+  registerLimiterConfig,
+  forgotLimiterConfig,
+  refreshLimiterConfig,
+  verifyEmailLimiterConfig,
+  resetPasswordLimiterConfig,
+  logoutLimiterConfig,
+} from '../config/rate-limiters.js';
 
 const router = express.Router();
 
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 5,
+  ...loginLimiterConfig,
   standardHeaders: true,
   legacyHeaders: false,
-  message: 'Too many login attempts, please try again in 15 minutes.'
 });
 
 const registerLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  limit: 3,
+  ...registerLimiterConfig,
   standardHeaders: true,
   legacyHeaders: false,
-  message: 'Too many registration attempts, please try again in 60 minutes.'
 });
 
 const forgotLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  limit: 3,
+  ...forgotLimiterConfig,
   standardHeaders: true,
   legacyHeaders: false,
-  message: 'Too many password reset attempts, please try again in 60 minutes.'
 });
 
 const refreshLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 10,
+  ...refreshLimiterConfig,
   standardHeaders: true,
   legacyHeaders: false,
-  message: 'Too many refresh attempts, please try again in 15 minutes.'
 });
 
 const verifyEmailLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 10,
+  ...verifyEmailLimiterConfig,
   standardHeaders: true,
   legacyHeaders: false,
-  message: 'Too many verification attempts, please try again later.'
 });
 
 const resetPasswordLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 5,
+  ...resetPasswordLimiterConfig,
   standardHeaders: true,
   legacyHeaders: false,
-  message: 'Too many password reset attempts, please try again later.'
 });
 
 const logoutLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 20,
+  ...logoutLimiterConfig,
   standardHeaders: true,
   legacyHeaders: false,
-  message: 'Too many logout attempts, please try again later.'
 });
 
 router.post('/', registerLimiter, validate(registerSchema), register);

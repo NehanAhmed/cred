@@ -10,6 +10,7 @@ import auditRoutes from './routes/audit.routes.js';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import { config } from 'dotenv';
+import { authLimiterConfig, profileLimiterConfig } from './config/rate-limiters.js';
 
 config();
 initializePassport();
@@ -26,19 +27,15 @@ const app = express();
 app.set('trust proxy', 1);
 
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 20,
+  ...authLimiterConfig,
   standardHeaders: true,
   legacyHeaders: false,
-  message: 'Too many authentication attempts, please try again later.',
 });
 
 const profileLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 50,
+  ...profileLimiterConfig,
   standardHeaders: true,
   legacyHeaders: false,
-  message: 'Too many profile requests, please try again later.',
 });
 
 app.use(helmet());

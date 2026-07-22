@@ -1,4 +1,5 @@
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import {
   getProfile,
   updateProfile,
@@ -8,12 +9,10 @@ import {
 import { authMiddleware } from '../middlewares/auth.middleware.js';
 import { validate } from '../middlewares/validate.middleware.js';
 import { profileSchema, passwordChangeSchema } from '@cred/shared';
-import { rateLimit } from 'express-rate-limit';
+import { profileUpdateLimiterConfig } from '../config/rate-limiters.js';
 
 const profileUpdateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 50,
-  message: 'Too many profile update attempts, please try again later.'
+  ...profileUpdateLimiterConfig,
 });
 
 const router = express.Router();

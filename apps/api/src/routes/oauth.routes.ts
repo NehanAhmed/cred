@@ -3,13 +3,12 @@ import passport from '../services/passport.js';
 import { oauthCallback } from '../controllers/oauth.controllers.js';
 import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
+import { oauthLimiterConfig } from '../config/rate-limiters.js';
 
 const router = express.Router();
 
 const oauthLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: 'Too many OAuth attempts, please try again later.',
+  ...oauthLimiterConfig,
 });
 
 router.use(oauthLimiter);

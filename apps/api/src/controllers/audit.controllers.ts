@@ -10,12 +10,12 @@ export const getAuditLogs = async (req: Request, res: Response) => {
 
     const [logs, total] = await Promise.all([
       auditLogModel
-        .find({ user: req.user.id })
+        .find({ user: req.user!.id })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
-      auditLogModel.countDocuments({ user: req.user.id }),
+      auditLogModel.countDocuments({ user: req.user!.id }),
     ]);
 
     return sendSuccess(
