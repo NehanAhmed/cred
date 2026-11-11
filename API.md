@@ -2,7 +2,7 @@
 
 **Version:** 1.0.0  
 **Base URL:** `http://localhost:3000/api`  
-**Last updated:** 2026-06-18
+**Last updated:** 2026-11-11
 
 ---
 
@@ -23,22 +23,24 @@
   - [POST /api/auth/reset-password/:token — Reset Password](#post-apiauthreset-passwordtoken--reset-password)
   - [OAuth Endpoints](#oauth-endpoints)
 - [Profile Endpoints](#profile-endpoints)
-- [Health Endpoint](#health-endpoint)
-- [Session Audit Logging](#session-audit-logging)
   - [GET /api/profile/me — Get Profile](#get-apiprofileme--get-profile)
   - [PUT /api/profile/me — Update Profile](#put-apiprofileme--update-profile)
   - [DELETE /api/profile/me — Delete Account](#delete-apiprofileme--delete-account)
   - [POST /api/profile/me/change-password — Change Password](#post-apiprofilemechange-password--change-password)
+- [Health Endpoint](#health-endpoint)
+- [Session Audit Logging](#session-audit-logging)
+  - [GET /api/profile/me/audit-logs — Get Audit Logs](#get-apiprofilemeaudit-logs--get-audit-logs)
 - [Data Models](#data-models)
 - [Error Reference](#error-reference)
 - [Security Considerations](#security-considerations)
 - [Email System](#email-system)
+- [Quick Start](#quick-start)
 
 ---
 
 ## Overview
 
-**Cred** is a drop-in authentication API built with Express 5, Mongoose 9, and TypeScript 6. All authentication is handled via **httpOnly JWT cookies** — no bearer tokens, no `Authorization` headers. The API is stateless beyond the MongoDB user store; session state lives entirely in the signed JWT.
+**Cred** is a drop-in authentication API built with Express 5, Mongoose 9, and TypeScript 6. All authentication is handled via **httpOnly JWT cookies** — no bearer tokens, no `Authorization` headers. Access state lives in the signed JWT; refresh tokens are stored as SHA-256 hashes in MongoDB so they can be rotated and revoked.
 
 ### Key Design Decisions
 
@@ -46,7 +48,7 @@
 |---|---|
 | httpOnly cookies over bearer tokens | Mitigates XSS token theft. No client-side token management needed. |
 | Zod for request validation | Schema-based parsing with typed inference. Strips unknown fields automatically. |
-| SHA-256 hashing of email tokens | The raw verification/reset token is never stored — only its hash. Limits damage if the database is compromised. |
+| SHA-256 hashing of email and refresh tokens | Raw verification, reset, and refresh tokens are never stored — only their hashes. Limits damage if the database is compromised. |
 | Same forgot-password response for all emails | Prevents email enumeration attacks. |
 | Layered rate limiting | Route-specific limiters sit behind a global auth ceiling for defense in depth. |
 
@@ -54,14 +56,15 @@
 
 ## Standard Response Format
 
-All endpoints return JSON. There are **three distinct response shapes**.
+Most endpoints return JSON. There are **three distinct JSON response shapes**; the exceptions
+are rate-limit responses (plain text) and browser redirects (`verify-email` and OAuth).
 
 ### Success Response
 
 ```json
 {
   "success": true,
-  "message": "User logged in successfully",
+  "message": "Logged in successfully",
   "data": { }
 }
 ```
@@ -134,9 +137,15 @@ Each issue conforms to the [Zod `ZodIssue`](https://zod.dev/ERROR_HANDLING) spec
 | `PORT` | No | `"3000"` | Server listen port |
 | `MONGO_URI` | **Yes** | — | MongoDB connection string |
 | `JWT_SECRET` | **Yes** | — | Secret key for signing JWTs |
-| `CLIENT_URL` | **Yes** | `http://localhost:5173` | Frontend URL (used for email verification redirect) |
-| `BACKEND_URL` | **Yes** | `http://localhost:3000` | Backend URL (used to construct verification/reset links in emails) |
-| `NODE_ENV` | No | — | When set to `"production"`, enables `secure: true` on cookies |
+| `CLIENT_URL` | **Yes** | — | Frontend URL, e.g. `http://localhost:5173` (used for redirects) |
+| `BACKEND_URL` | **Yes** | — | Public API origin, e.g. `http://localhost:3000` (email links and OAuth callbacks) |
+| `NODE_ENV` | **Yes** | — | `development` or `production`; the app throws on startup if unset |
+| `CORS_ORIGIN` | **Yes** | — | Allowed CORS origin, e.g. `http://localhost:5173`; must match the frontend |
+| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | No | — | Enables Google OAuth when both are set |
+| `GITHUB_OAUTH_CLIENT_ID` / `GITHUB_OAUTH_CLIENT_SECRET` | No | — | Enables GitHub OAuth when both are set |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | No | Ethereal | Production email; without `SMTP_HOST`, Ethereal is used |
+
+> The effective env file is `apps/api/.env` for Turbo-run commands (`pnpm start`, `pnpm dev`). A root `.env` is not loaded by those commands.
 
 ---
 
@@ -144,30 +153,33 @@ Each issue conforms to the [Zod `ZodIssue`](https://zod.dev/ERROR_HANDLING) spec
 
 The API uses **layered rate limiting**. Each request to a protected route passes through a global rate limiter and then a route-specific limiter. The tighter limit governs.
 
-| Limiter | Window | Max Requests | Applies To | Defined In |
-|---|---|---|---|---|---|
-| `authLimiter` | 15 min | 20 | All `/api/auth/*` | `src/app.ts:27` |
-| `loginLimiter` | 15 min | 5 | `POST /api/auth/login` | `src/routes/auth.routes.ts:23` |
-| `registerLimiter` | 60 min | 3 | `POST /api/auth` | `src/routes/auth.routes.ts:31` |
-| `forgotLimiter` | 60 min | 3 | `POST /api/auth/forgot-password` | `src/routes/auth.routes.ts:39` |
-| `refreshLimiter` | 15 min | 10 | `POST /api/auth/refresh` | `src/routes/auth.routes.ts:47` |
-| `verifyEmailLimiter` | 15 min | 10 | `GET /api/auth/verify-email/:token` | `src/routes/auth.routes.ts:55` |
-| `resetPasswordLimiter` | 15 min | 5 | `POST /api/auth/reset-password/:token` | `src/routes/auth.routes.ts:63` |
-| `logoutLimiter` | 15 min | 20 | `POST /api/auth/logout` | `src/routes/auth.routes.ts:71` |
-| `oauthLimiter` | 15 min | 10 | All OAuth routes (`/api/auth/google*`, `/api/auth/github*`) | `src/routes/oauth.routes.ts:9` |
-| `profileLimiter` | 15 min | 50 | All `/api/profile/me*` | `src/app.ts:35` |
-| `profileUpdateLimiter` | 15 min | 50 | `PUT /api/profile/me` and `POST /api/profile/me/change-password` | `src/routes/profile.routes.ts:13` |
-| `healthLimiter` | 1 min | 30 | `GET /api/health` | `src/routes/health.routes.ts:7` |
+| Limiter | Window | Max Requests | Applies To |
+|---|---|---|---|
+| `authLimiter` | 15 min | 20 | All `/api/auth/*`, including OAuth |
+| `loginLimiter` | 15 min | 5 | `POST /api/auth/login` |
+| `registerLimiter` | 60 min | 3 | `POST /api/auth` |
+| `forgotLimiter` | 60 min | 3 | `POST /api/auth/forgot-password` |
+| `refreshLimiter` | 15 min | 10 | `POST /api/auth/refresh` |
+| `verifyEmailLimiter` | 15 min | 10 | `GET /api/auth/verify-email/:token` |
+| `resetPasswordLimiter` | 15 min | 5 | `POST /api/auth/reset-password/:token` |
+| `logoutLimiter` | 15 min | 20 | `POST /api/auth/logout` |
+| `oauthLimiter` | 15 min | 10 | All OAuth routes (`/api/auth/google*`, `/api/auth/github*`) |
+| `profileLimiter` | 15 min | 50 | All `/api/profile/*` |
+| `profileUpdateLimiter` | 15 min | 50 | `PUT /api/profile/me` and `POST /api/profile/me/change-password` |
+| `healthLimiter` | 1 min | 30 | `GET /api/health` |
 
-**Rate limit response** (HTTP 429):
+All limiter options are defined in `apps/api/src/config/rate-limiters.ts` (`healthLimiter` is inline
+in `health.routes.ts`). The API trusts the first proxy hop, so limits and audit IPs use the
+forwarded client address.
 
-```json
-{
-  "message": "Too many authentication attempts, please try again later."
-}
+**Rate limit response** (HTTP 429, plain text):
+
+```text
+Too many authentication attempts, please try again later.
 ```
 
-> **Note:** The rate limit response does **not** follow the standard `ApiResponse` envelope. It is the default `express-rate-limit` output.
+> The rate limit response does **not** follow the standard `ApiResponse` envelope. It is the
+> default plain-text body from `express-rate-limit`.
 
 ---
 
@@ -179,7 +191,7 @@ The API uses **layered rate limiting**. Each request to a protected route passes
 2. User verifies email → `isVerified` set to `true`, login unblocked.
 3. User logs in → credentials validated, JWT signed, stored in an **httpOnly cookie** named `token`.
 4. Authenticated requests → `authMiddleware` reads `req.cookies.token`, verifies the JWT, attaches the decoded payload to `req.user`.
-5. Logout → cookie is cleared server-side.
+5. Logout → the presented refresh token is deleted and both auth cookies are cleared.
 
 ### Cookie Configuration
 
@@ -190,8 +202,8 @@ The API uses **layered rate limiting**. Each request to a protected route passes
 | Name | `token` |
 | `httpOnly` | `true` |
 | `secure` | `true` when `NODE_ENV === 'production'`, else `false` |
-| `sameSite` | `"strict"` |
-| `maxAge` | `86400000` ms (24 hours) |
+| `sameSite` | `"strict"` (standard auth) or `"lax"` (OAuth) |
+| `maxAge` | `900000` ms (15 minutes) |
 
 #### Refresh Token (`refreshToken`)
 
@@ -213,15 +225,16 @@ The refresh token cookie is scoped to `/api/auth` so it is sent on any auth-rela
   "id": "664f1a2b3c4d5e6f7a8b9c0d",
   "email": "user@example.com",
   "username": "johndoe",
+  "tokenType": "access",
   "iat": 1718000000,
-  "exp": 1718086400
+  "exp": 1718000900
 }
 ```
 
 ### Auth Middleware Behavior
 
 - **No cookie** → `401 { success: false, message: "Unauthorized", error: "Unauthorized" }`
-- **Invalid / expired cookie** → `401 { success: false, message: "Invalid token", error: "Invalid token" }`
+- **Invalid / expired / non-access cookie** → `401 { success: false, message: "Invalid token", error: "Invalid token" }`
 - **Valid cookie** → `req.user` is populated, request proceeds.
 
 ---
@@ -250,7 +263,7 @@ POST /api/auth
   "email": "john@example.com",
   "password": "SecurePass1",
   "bio": "Full-stack developer",
-  "phoneNumber": "+1234567890",
+  "phoneNumber": "1234567890",
   "gender": "male"
 }
 ```
@@ -260,8 +273,8 @@ POST /api/auth
 | `username` | `string` | Yes | 3–30 characters |
 | `email` | `string` (email) | Yes | Valid email format |
 | `password` | `string` | Yes | Min 8 chars, must contain ≥1 uppercase letter, ≥1 digit |
-| `bio` | `string` | No | No constraints enforced at schema level |
-| `phoneNumber` | `string` | No | No constraints enforced at schema level |
+| `bio` | `string` | No | 3–200 characters |
+| `phoneNumber` | `string` | No | 10–15 digits |
 | `gender` | `"male" \| "female" \| "other"` | No | Must be one of the enum values |
 
 #### Example
@@ -283,7 +296,7 @@ curl -X POST http://localhost:3000/api/auth \
 ```json
 {
   "success": true,
-  "message": "User registered successfully. Verify Your Email First.",
+  "message": "User registered successfully. Verify your email first.",
   "data": {}
 }
 ```
@@ -295,12 +308,14 @@ curl -X POST http://localhost:3000/api/auth \
 | `400` | `{ "success": false, "message": "User already exists", "error": "User already exists" }` |
 | `400` | `{ "errors": [ ...ZodIssue[] ] }` — validation failure |
 | `429` | Rate limited |
-| `500` | `{ "success": false, "message": "Something went wrong", "error": "Something went wrong" }` |
+| `500` | `{ "success": false, "message": "Failed to send verification email. Please try again.", "error": "..." }` |
+| `500` | `{ "success": false, "message": "Internal server error", "error": "Internal server error" }` |
 
 #### Notes
 
 - Username and email are both **unique**. A conflict on either triggers "User already exists".
 - The raw verification token is emailed. The database stores a **SHA-256 hash** of the token. The token expires after **24 hours**.
+- If the verification email cannot be sent, the new user is deleted and the API returns `500 Failed to send verification email. Please try again.`
 
 ---
 
@@ -353,12 +368,12 @@ curl -X POST http://localhost:3000/api/auth/login \
 
 #### Success Response
 
-**HTTP 200** — also sets cookie `token` (httpOnly, sameSite=strict, 24h expiry)
+**HTTP 200** — also sets cookie `token` (httpOnly, sameSite=strict, 15-minute expiry)
 
 ```json
 {
   "success": true,
-  "message": "User logged in successfully",
+  "message": "Logged in successfully",
   "data": {
     "user": {
       "_id": "664f1a2b3c4d5e6f7a8b9c0d",
@@ -387,10 +402,11 @@ curl -X POST http://localhost:3000/api/auth/login \
 |---|---|
 | `400` | `{ "errors": [ ...ZodIssue[] ] }` — validation failure |
 | `401` | `{ "success": false, "message": "Please verify your email first", "error": "..." }` |
-| `401` | `{ "success": false, "message": "Invalid password", "error": "..." }` |
-| `404` | `{ "success": false, "message": "User not found", "error": "..." }` |
+| `401` | `{ "success": false, "message": "Invalid credentials", "error": "..." }` |
+| `401` | `{ "success": false, "message": "Account locked due to too many failed login attempts. Please try again later.", "error": "..." }` |
+| `400` | `{ "success": false, "message": "This account uses google login. Please sign in with google.", "error": "..." }` |
 | `429` | Rate limited |
-| `500` | `{ "success": false, "message": "Something went wrong", "error": "..." }` |
+| `500` | `{ "success": false, "message": "Internal server error", "error": "..." }` |
 
 #### Notes
 
@@ -401,15 +417,16 @@ curl -X POST http://localhost:3000/api/auth/login \
 
 ### POST /api/auth/logout — Logout
 
-Clears the JWT cookie. Requires a valid token cookie.
+Deletes the presented refresh token (if any) and clears both the `token` and `refreshToken`
+cookies. Requires a valid access-token cookie.
 
 ```
 POST /api/auth/logout
 ```
 
 **Auth required:** Yes  
-**Rate limiting:** Global (20/15min)  
-**Middleware chain:** `authLimiter` → `authMiddleware` → `controllers.logout`
+**Rate limiting:** Global (20/15min) + Logout-specific (20/15min)  
+**Middleware chain:** `authLimiter` → `logoutLimiter` → `authMiddleware` → `controllers.logout`
 
 #### Request Body
 
@@ -429,7 +446,7 @@ curl -X POST http://localhost:3000/api/auth/logout \
 ```json
 {
   "success": true,
-  "message": "User logged out successfully",
+  "message": "Logged out successfully",
   "data": null
 }
 ```
@@ -440,13 +457,13 @@ curl -X POST http://localhost:3000/api/auth/logout \
 |---|---|
 | `401` | `{ "success": false, "message": "Unauthorized", "error": "Unauthorized" }` |
 | `401` | `{ "success": false, "message": "Invalid token", "error": "Invalid token" }` |
-| `500` | `{ "success": false, "message": "Something went wrong", "error": "..." }` |
+| `500` | `{ "success": false, "message": "Internal server error", "error": "..." }` |
 
 ---
 
 ### POST /api/auth/refresh — Refresh Token
 
-Exchange a valid refresh token for a new access token and a rotated refresh token. The old refresh token is atomically consumed (deleted); a new one in the same family is issued.
+Exchange a valid refresh token for a new access token and a rotated refresh token. The old refresh token is atomically marked as consumed; a new one in the same family is issued.
 
 ```http
 POST /api/auth/refresh
@@ -485,9 +502,11 @@ curl -X POST http://localhost:3000/api/auth/refresh \
 |---|---|
 | `401` | `{ "success": false, "message": "Refresh token not found", "error": "..." }` |
 | `401` | `{ "success": false, "message": "Invalid refresh token", "error": "..." }` |
+| `401` | `{ "success": false, "message": "Refresh token reuse detected. All sessions revoked.", "error": "..." }` |
 | `401` | `{ "success": false, "message": "Refresh token expired", "error": "..." }` |
+| `401` | `{ "success": false, "message": "User not found", "error": "..." }` |
 | `429` | Rate limited |
-| `500` | `{ "success": false, "message": "Something went wrong", "error": "..." }` |
+| `500` | `{ "success": false, "message": "Internal server error", "error": "..." }` |
 
 #### Notes
 
@@ -507,8 +526,8 @@ GET /api/auth/verify-email/:token
 ```
 
 **Auth required:** No  
-**Rate limiting:** Global (20/15min)  
-**Middleware chain:** `authLimiter` → `controllers.verifyEmail`
+**Rate limiting:** Global (20/15min) + Verify-specific (10/15min)  
+**Middleware chain:** `authLimiter` → `verifyEmailLimiter` → `controllers.verifyEmail`
 
 #### Path Parameters
 
@@ -591,7 +610,7 @@ curl -X POST http://localhost:3000/api/auth/forgot-password \
 |---|---|
 | `400` | `{ "errors": [ ...ZodIssue[] ] }` — validation failure |
 | `429` | Rate limited |
-| `500` | `{ "success": false, "message": "Something went wrong", "error": "..." }` |
+| `500` | `{ "success": false, "message": "Internal server error", "error": "..." }` |
 
 #### Notes
 
@@ -610,8 +629,8 @@ POST /api/auth/reset-password/:token
 ```
 
 **Auth required:** No  
-**Rate limiting:** Global (20/15min) only  
-**Middleware chain:** `authLimiter` → `validate(passwordResetSchema)` → `controllers.resetPassword`
+**Rate limiting:** Global (20/15min) + Reset-specific (5/15min)  
+**Middleware chain:** `authLimiter` → `resetPasswordLimiter` → `validate(passwordResetSchema)` → `controllers.resetPassword`
 
 #### Path Parameters
 
@@ -658,12 +677,13 @@ curl -X POST http://localhost:3000/api/auth/reset-password/a1b2c3d4e5f6... \
 | `400` | `{ "errors": [ ...ZodIssue[] ] }` — validation failure |
 | `400` | `{ "success": false, "message": "Invalid or expired token", "error": "Invalid or expired token" }` |
 | `429` | Rate limited |
-| `500` | `{ "success": false, "message": "Something went wrong", "error": "..." }` |
+| `500` | `{ "success": false, "message": "Internal server error", "error": "..." }` |
 
 #### Notes
 
 - The raw token from the URL is SHA-256 hashed before the database lookup.
-- After a successful reset, the `resetPasswordToken` and `resetPasswordExpires` fields are nullified.
+- After a successful reset, the `resetPasswordToken` and `resetPasswordExpires` fields are nullified and all refresh tokens for the user are revoked.
+- Login attempts and any active lockout are reset.
 - Multiple resets with the same token are not possible — the token is a one-time use.
 
 ---
@@ -680,9 +700,12 @@ OAuth authentication is handled via Passport.js with Google and GitHub strategie
 4. The server exchanges the code for an access token, fetches the user's profile, and creates or links an account.
 5. The server sets the JWT cookies and redirects to `{CLIENT_URL}/auth/callback`.
 
+> If an existing account matches by email, it is linked and `provider` becomes `google` or `github`.
+> That account can then no longer use password login or change-password.
+
 ### State Parameter (CSRF Protection)
 
-A cryptographically random `oauth_state` value is generated on each OAuth initiation, stored as an httpOnly cookie (`oauth_state`), and verified on callback. A mismatch results in a redirect to `{CLIENT_URL}/login?error=oauth_state_mismatch`.
+A cryptographically random `oauth_state` value is generated on each OAuth initiation, stored as an httpOnly cookie (`oauth_state`) with a 10-minute lifetime, and verified on callback. A mismatch results in a redirect to `{CLIENT_URL}/login?error=oauth_state_mismatch`.
 
 ---
 
@@ -710,7 +733,7 @@ Redirects to Google's OAuth consent screen.
 
 #### Error Behavior
 
-If rate limited — standard `429` JSON response.
+If rate limited — `429` with the default plain-text `express-rate-limit` body.
 
 ---
 
@@ -828,13 +851,15 @@ curl http://localhost:3000/api/profile/me \
     "username": "johndoe",
     "email": "john@example.com",
     "bio": "Full-stack developer",
-    "phoneNumber": "+1234567890",
+    "phoneNumber": "1234567890",
     "gender": "male",
     "isVerified": true,
     "verificationToken": null,
     "verificationTokenExpires": null,
     "resetPasswordToken": null,
     "resetPasswordExpires": null,
+    "provider": "local",
+    "avatar": null,
     "createdAt": "2026-06-18T10:00:00.000Z",
     "updatedAt": "2026-06-18T10:00:00.000Z"
   }
@@ -869,7 +894,7 @@ PUT /api/profile/me
 {
   "username": "johndoe_new",
   "bio": "Updated bio text",
-  "phoneNumber": "+9876543210",
+  "phoneNumber": "9876543210",
   "gender": "other"
 }
 ```
@@ -878,8 +903,8 @@ PUT /api/profile/me
 |---|---|---|---|
 | `username` | `string` | No | 3–30 characters |
 | `bio` | `string` | No | 3–200 characters |
-| `phoneNumber` | `string` | No | 10–15 characters |
-| `gender` | `"male" \| "female" \| "other"` | No | Nullable |
+| `phoneNumber` | `string` | No | 10–15 digits |
+| `gender` | `"male" \| "female" \| "other"` | No | Not nullable through this endpoint |
 
 #### Example
 
@@ -921,15 +946,18 @@ curl -X PUT http://localhost:3000/api/profile/me \
 | Status | Body |
 |---|---|
 | `400` | `{ "errors": [ ...ZodIssue[] ] }` — validation failure |
+| `400` | `{ "success": false, "message": "{field} is already taken", "error": "..." }` — unique conflict |
 | `401` | Unauthorized / Invalid token |
 | `404` | `{ "success": false, "message": "User not found", "error": "..." }` |
 | `500` | `{ "success": false, "message": "Internal server error", "error": "..." }` |
 
-#### Known Limitation
+#### Update semantics
 
-The controller uses `if(value)` checks to determine which fields to update. This means:
-- **Falsy values** (`""`, `0`, `false`, `null`) will be skipped. You cannot clear a field to an empty value through this endpoint.
-- Sending `null` for `gender` (which Zod validates as valid) will also be skipped.
+- Omitted fields are left untouched. Zod strips unknown fields before the controller runs.
+- `username` must be 3–30 characters; `bio` 3–200; `phoneNumber` 10–15 digits; `gender` must be
+  `male`, `female`, or `other`.
+- `gender` is not nullable through this endpoint (the Zod schema rejects `null`).
+- Unique conflicts are reported as `400 {field} is already taken`.
 
 ---
 
@@ -974,8 +1002,7 @@ curl -X DELETE http://localhost:3000/api/profile/me \
 
 #### Notes
 
-- This action is **irreversible**. The user document is removed from MongoDB via `deleteOne()`.
-- The JWT cookie is **not** automatically cleared after account deletion. The client should call `POST /api/auth/logout` or clear the cookie client-side.
+- This action is **irreversible**. The user document is removed, all refresh tokens for the user are deleted, and both auth cookies are cleared in the response.
 
 ---
 
@@ -1002,7 +1029,7 @@ POST /api/profile/me/change-password
 
 | Field | Type | Required | Constraints |
 |---|---|---|---|
-| `currentPassword` | `string` | Yes | No minimum length enforced (must match stored hash) |
+| `currentPassword` | `string` | Yes | Min 1 character (must match the stored hash) |
 | `newPassword` | `string` | Yes | Min 8 chars, must contain ≥1 uppercase letter, ≥1 digit |
 
 #### Example
@@ -1040,14 +1067,15 @@ curl -X POST http://localhost:3000/api/profile/me/change-password \
 |---|---|
 | `400` | `{ "errors": [ ...ZodIssue[] ] }` — validation failure |
 | `400` | `{ "success": false, "message": "Current password is incorrect", "error": "..." }` |
+| `400` | `{ "success": false, "message": "Cannot change password for social login accounts", "error": "..." }` |
 | `401` | Unauthorized / Invalid token |
 | `404` | `{ "success": false, "message": "User not found", "error": "..." }` |
 | `500` | `{ "success": false, "message": "Internal server error", "error": "..." }` |
 
 #### Notes
 
-- The `currentPassword` field has **no minimum length** constraint in the Zod schema, but must match the stored bcrypt hash.
-- The password update uses `updateOne()` directly — the returned user object in `data` reflects the **pre-update** state fetched before the password change.
+- Passwords are hashed with bcrypt (10 rounds) and saved via `user.save()`. All refresh tokens for the user are revoked, and the returned user reflects the post-save document with `password` removed.
+- Social-login accounts (`provider` not `local`) cannot change passwords; the API returns `400 Cannot change password for social login accounts`.
 
 ---
 
@@ -1208,7 +1236,7 @@ curl http://localhost:3000/api/profile/me/audit-logs?page=1&limit=10 \
 #### Notes
 
 - Logs are sorted newest-first.
-- Tracked actions: `login`, `logout`, `refresh`, `register`, `password_reset`, `password_change`, `account_deletion`, `oauth_login`, `oauth_account_linked`.
+- Tracked actions: `register`, `login`, `logout`, `token_refresh`, `email_verification`, `password_reset_request`, `password_reset`, `oauth_login`, `profile_update`, `password_change`, `account_deletion`.
 - Audit logging is fire-and-forget — a logging failure never breaks the request.
 
 ---
@@ -1222,7 +1250,7 @@ curl http://localhost:3000/api/profile/me/audit-logs?page=1&limit=10 \
 | `_id` | `ObjectId` | — | — | auto | MongoDB document ID |
 | `username` | `string` | Yes | Yes | — | Display name (3–30 chars) |
 | `email` | `string` | Yes | Yes | — | Email address |
-| `password` | `string` | Yes | No | — | bcrypt hash (never returned in API responses) |
+| `password` | `string` | Conditional | No | — | bcrypt hash; required by a pre-save hook for `provider=local`; never returned in API responses |
 | `bio` | `string` | No | No | — | Short biography |
 | `phoneNumber` | `string` | No | No | — | Contact number |
 | `gender` | `string` | No | No | — | `"male"`, `"female"`, or `"other"` |
@@ -1231,6 +1259,14 @@ curl http://localhost:3000/api/profile/me/audit-logs?page=1&limit=10 \
 | `verificationTokenExpires` | `Date \| null` | No | No | `null` | Expiry for verification token |
 | `resetPasswordToken` | `string \| null` | No | No | `null` | SHA-256 hash of password reset token |
 | `resetPasswordExpires` | `Date \| null` | No | No | `null` | Expiry for reset token |
+| `provider` | `string` | No | No | `"local"` | `"local"`, `"google"`, or `"github"` |
+| `googleId` | `string` | No | Sparse | — | Google profile ID when linked |
+| `githubId` | `string` | No | Sparse | — | GitHub profile ID when linked |
+| `avatar` | `string \| null` | No | No | `null` | Avatar URL from the OAuth provider |
+| `loginAttempts` | `number` | No | No | `0` | Consecutive failed login count |
+| `lockoutUntil` | `Date \| null` | No | No | `null` | Lockout expiry after repeated failures |
+| `lastLogin` | `Date \| null` | No | No | `null` | Last successful login |
+| `lastIp` | `string \| null` | No | No | `null` | Last successful login IP |
 | `createdAt` | `Date` | — | — | auto | Via Mongoose `timestamps: true` |
 | `updatedAt` | `Date` | — | — | auto | Via Mongoose `timestamps: true` |
 
@@ -1241,8 +1277,9 @@ curl http://localhost:3000/api/profile/me/audit-logs?page=1&limit=10 \
 | `id` | `string` | User's MongoDB `_id` |
 | `email` | `string` | User's email address |
 | `username` | `string` | User's username |
+| `tokenType` | `"access"` | Access-token discriminator; refresh tokens are rejected by `authMiddleware` |
 | `iat` | `number` | Issued at (Unix timestamp) |
-| `exp` | `number` | Expiry (Unix timestamp, 24h from `iat`) |
+| `exp` | `number` | Expiry (Unix timestamp, 15 minutes from `iat`) |
 
 ---
 
@@ -1253,28 +1290,33 @@ Every possible error message grouped by endpoint.
 | Endpoint | Status | `message` / `error` |
 |---|---|---|
 | `POST /api/auth` | 400 | `"User already exists"` |
-| `POST /api/auth` | 500 | `"Something went wrong"` |
+| `POST /api/auth` | 500 | `"Failed to send verification email. Please try again."` / `"Internal server error"` |
 | `POST /api/auth/login` | 401 | `"Please verify your email first"` |
-| `POST /api/auth/login` | 401 | `"Invalid password"` |
-| `POST /api/auth/login` | 404 | `"User not found"` |
-| `POST /api/auth/login` | 500 | `"Something went wrong"` |
+| `POST /api/auth/login` | 401 | `"Invalid credentials"` |
+| `POST /api/auth/login` | 401 | `"Account locked due to too many failed login attempts. Please try again later."` |
+| `POST /api/auth/login` | 400 | `"This account uses {provider} login. Please sign in with {provider}."` |
+| `POST /api/auth/login` | 500 | `"Internal server error"` |
 | `POST /api/auth/logout` | 401 | `"Unauthorized"` |
 | `POST /api/auth/logout` | 401 | `"Invalid token"` |
-| `POST /api/auth/logout` | 500 | `"Something went wrong"` |
+| `POST /api/auth/logout` | 500 | `"Internal server error"` |
 | `POST /api/auth/refresh` | 401 | `"Refresh token not found"` |
 | `POST /api/auth/refresh` | 401 | `"Invalid refresh token"` |
+| `POST /api/auth/refresh` | 401 | `"Refresh token reuse detected. All sessions revoked."` |
 | `POST /api/auth/refresh` | 401 | `"Refresh token expired"` |
-| `POST /api/auth/refresh` | 500 | `"Something went wrong"` |
-| `POST /api/auth/forgot-password` | 500 | `"Something went wrong"` |
+| `POST /api/auth/refresh` | 401 | `"User not found"` |
+| `POST /api/auth/refresh` | 500 | `"Internal server error"` |
+| `POST /api/auth/forgot-password` | 500 | `"Internal server error"` |
 | `POST /api/auth/reset-password/:token` | 400 | `"Invalid or expired token"` |
-| `POST /api/auth/reset-password/:token` | 500 | `"Something went wrong"` |
+| `POST /api/auth/reset-password/:token` | 500 | `"Internal server error"` |
 | `GET /api/profile/me` | 404 | `"User not found"` |
 | `GET /api/profile/me` | 500 | `"Internal server error"` |
+| `PUT /api/profile/me` | 400 | `"{field} is already taken"` |
 | `PUT /api/profile/me` | 404 | `"User not found"` |
 | `PUT /api/profile/me` | 500 | `"Internal server error"` |
 | `DELETE /api/profile/me` | 404 | `"User not found"` |
 | `DELETE /api/profile/me` | 500 | `"Internal server error"` |
 | `POST /api/profile/me/change-password` | 400 | `"Current password is incorrect"` |
+| `POST /api/profile/me/change-password` | 400 | `"Cannot change password for social login accounts"` |
 | `POST /api/profile/me/change-password` | 404 | `"User not found"` |
 | `POST /api/profile/me/change-password` | 500 | `"Internal server error"` |
 | `GET /api/profile/me/audit-logs` | 500 | `"Internal server error"` |
@@ -1290,15 +1332,15 @@ Additionally, any endpoint with Zod validation can return `400` with `{ "errors"
 | Practice | Implementation |
 |---|---|
 | **Password hashing** | bcrypt with 10 salt rounds at registration, password reset, and password change |
-| **Token hashing** | Email verification and password reset tokens are hashed with SHA-256 before database storage. The raw token is only sent via email. |
-| **httpOnly cookies** | The JWT is inaccessible to JavaScript, mitigating XSS-based token theft. |
-| **sameSite: strict** | Prevents CSRF attacks by not sending the cookie on cross-origin requests. |
+| **Token hashing** | Email verification, password reset, and refresh tokens are hashed with SHA-256 before database storage. Raw tokens are only sent to the client. |
+| **httpOnly cookies** | The JWT and refresh token are inaccessible to JavaScript, mitigating XSS-based token theft. |
+| **sameSite cookies** | `strict` for normal auth flows; `lax` only where OAuth redirects require it. |
 | **Secure flag in production** | The cookie is only transmitted over HTTPS when `NODE_ENV=production`. |
 | **No email enumeration** | `forgot-password` returns the same response whether or not the email exists. |
 | **Input validation** | All request bodies are parsed and validated by Zod schemas. Unknown fields are stripped. Type coercion is prevented by Zod 4's strict parsing. |
 | **Rate limiting** | Every endpoint has at least one rate limiter to mitigate brute-force and DoS attacks. Login is limited to 5 attempts per 15 minutes. Registration and forgot-password are limited to 3 per 60 minutes. |
 | **Password excluded from responses** | The `password` field is destructured out via `toObject()` in every response. |
-| **No CORS** | CORS is not configured. The API will only accept requests from the same origin. For cross-origin frontend access, add `cors` middleware or use a reverse proxy. |
+| **CORS** | Configured with `CORS_ORIGIN` and `credentials: true`; set it to the exact frontend origin. |
 
 ---
 
@@ -1318,18 +1360,16 @@ The `Preview URL` is logged to the console for every email sent. Open it in a br
 
 ### Production
 
-Replace the Ethereal transporter with your production SMTP credentials in `src/helpers/email.helpers.ts`:
+Set `SMTP_HOST` and the related variables; `email.helpers.ts` selects SMTP automatically and falls
+back to Ethereal only when `SMTP_HOST` is absent. No code change is required.
 
-```ts
-transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT),
-  secure: true,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-})
+```bash
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your-user
+SMTP_PASS=your-password
+SMTP_FROM=noreply@example.com
 ```
 
 ### Email Templates
@@ -1349,20 +1389,20 @@ Both templates are minimal HTML strings in `src/templates/email.templates.ts`. C
 # Install dependencies
 pnpm install
 
-# Set up environment (.env)
+# Create the env file used by Turbo scripts
+cp apps/api/.env.example apps/api/.env
+
+# Minimum required values
+NODE_ENV=development
 PORT=3000
 MONGO_URI=mongodb://localhost:27017/auth
 JWT_SECRET=your-secret-key
 CLIENT_URL=http://localhost:5173
 BACKEND_URL=http://localhost:3000
+CORS_ORIGIN=http://localhost:5173
 
-# Run development server (hot reload)
-pnpm dev
-
-# Build for production
+# Build and start (the current `pnpm dev` script is broken; see AGENTS.md)
 pnpm build
-
-# Start production server
 pnpm start
 ```
 
@@ -1374,7 +1414,7 @@ curl http://localhost:3000/api/auth/login \
   -d '{"email":"test@test.com","password":"test"}'
 ```
 
-Expect a `404` or `400` (no user exists yet) — this confirms the API is live.
+Expect a `401` with `Invalid credentials` (no user exists yet) — this confirms the API is live.
 
 ---
 
