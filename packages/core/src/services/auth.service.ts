@@ -11,8 +11,11 @@ export async function register(
     const { email: rawEmail, username, password, bio, phoneNumber, gender } = input;
     const email = rawEmail.toLowerCase().trim();
 
-    const existingUser = await deps.database.findOne(email, username);
-    if (existingUser) {
+    const [byUsername, byEmail] = await Promise.all([
+        deps.database.findOne({ username }),
+        deps.database.findOne({ email })
+    ]);
+    if (byUsername || byEmail) {
         throw new AuthError('USER_EXISTS', 'User already exists', 400);
     }
 
@@ -46,3 +49,22 @@ export async function register(
 
 
 }
+
+export async function verifyEmail(token: string, deps: { database: DatabaseAdapter }) {
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await deps.database.findOne({ verificationToken: hashedToken });
+    if (!user || !user.verificationTokenExpires || user.verificationTokenExpires < new Date()) {
+        throw new AuthError('INVALID_TOKEN', 'Invalid or expired token', 400);
+    }
+
+    const updatedUser = await deps.database.update(user.id, {
+        verificationToken: null,
+        verificationTokenExpires: null,
+        isVerified: true
+    })
+
+    return { isVerified: true }
+
+}   
+
