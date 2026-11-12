@@ -1,0 +1,23 @@
+{
+  "name": "@cred/core",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@types/node": "^26.6.6",
+    "bcryptjs": "^3.0.3",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "vitest": "^5.1.0"
+  }
+}
