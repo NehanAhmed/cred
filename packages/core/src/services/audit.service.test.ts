@@ -88,6 +88,50 @@ describe('getAuditLogs', () => {
     expect(clamped.logs).toHaveLength(5);
   });
 
+  it('truncates fractional page and limit values to integers', async () => {
+    const deps = makeDeps();
+    await seedLogs(deps, 'user-1', 10);
+
+    const result = await getAuditLogs(
+      { userId: 'user-1', page: 2.9, limit: 2.9 },
+      { auditDatabase: deps.audit },
+    );
+
+    expect(result.pagination.page).toBe(2);
+    expect(result.pagination.limit).toBe(2);
+    expect(result.logs).toHaveLength(2);
+    expect(result.logs.length).toBeLessThanOrEqual(result.pagination.limit);
+  });
+
+  it('falls back to defaults for non-finite pagination values', async () => {
+    const deps = makeDeps();
+    await seedLogs(deps, 'user-1', 25);
+
+    const result = await getAuditLogs(
+      { userId: 'user-1', page: Number.NaN, limit: Number.POSITIVE_INFINITY },
+      { auditDatabase: deps.audit },
+    );
+
+    expect(result.pagination).toEqual({ page: 1, limit: 20, total: 25, totalPages: 2 });
+    expect(result.logs).toHaveLength(20);
+    expect(result.logs.length).toBeLessThanOrEqual(result.pagination.limit);
+  });
+
+  it('never returns more entries than the advertised limit on any page', async () => {
+    const deps = makeDeps();
+    await seedLogs(deps, 'user-1', 7);
+
+    for (const page of [1, 2, 3, 4]) {
+      const result = await getAuditLogs(
+        { userId: 'user-1', page: page + 0.5, limit: 3.5 },
+        { auditDatabase: deps.audit },
+      );
+
+      expect(result.pagination.limit).toBe(3);
+      expect(result.logs.length).toBeLessThanOrEqual(result.pagination.limit);
+    }
+  });
+
   it('defaults to page 1 and limit 20 when not provided', async () => {
     const deps = makeDeps();
     await seedLogs(deps, 'user-1', 25);

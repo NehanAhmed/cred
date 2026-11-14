@@ -3,8 +3,12 @@ export interface User extends RegisterRequest {
   isVerified: boolean;
   verificationToken: string | null;
   verificationTokenExpires: Date | null;
+  /** Public lookup id used to find a user by an opaque verification token. */
+  verificationTokenLookup?: string | null;
   resetPasswordToken: string | null;
   resetPasswordExpires: Date | null;
+  /** Public lookup id used to find a user by an opaque reset token. */
+  resetPasswordTokenLookup?: string | null;
   googleId?: string;
   githubId?: string;
   provider: 'local' | 'github' | 'google';
@@ -55,10 +59,12 @@ export interface RefreshTokenData {
   family: string;
   hashedToken: string;
   expiresAt: Date;
+  lookupId: string;
 }
 
 export interface RefreshToken {
-  
+  /** Public lookup id used to find the token before bcrypt verification. */
+  lookupId?: string;
   token:string;
   user:string
   family:string

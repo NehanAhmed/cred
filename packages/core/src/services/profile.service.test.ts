@@ -6,6 +6,7 @@ import {
   updatePassword,
   deleteAccount,
 } from './profile.service.js';
+import { DuplicateKeyError } from '../errors/duplicate-key-error.js';
 import { makeDeps } from '../__tests__/fakes.js';
 
 const CURRENT_PASSWORD = 'CurrentPass1';
@@ -100,11 +101,8 @@ describe('updateProfile', () => {
     ]);
   });
 
-  it('maps a duplicate-key database error to a field-specific AuthError and audits it', async () => {
-    const duplicateError = Object.assign(new Error('E11000 duplicate key'), {
-      code: 11000,
-      keyPattern: { username: 1 },
-    });
+  it('maps a duplicate-key adapter error to a field-specific AuthError and audits it', async () => {
+    const duplicateError = new DuplicateKeyError('username');
     const updateSpy = vi.spyOn(deps.users, 'update').mockRejectedValue(duplicateError);
 
     try {
@@ -141,6 +139,26 @@ describe('updateProfile', () => {
     } finally {
       updateSpy.mockRestore();
     }
+  });
+
+  it('maps a uniqueness violation enforced by the adapter to DUPLICATE_KEY', async () => {
+    await deps.users.create({
+      username: 'taken',
+      email: 'taken@example.com',
+      password: 'hashed-password',
+    });
+
+    await expect(
+      updateProfile(
+        { username: 'taken' },
+        { userId },
+        { userDatabase: deps.users, auditDatabase: deps.audit },
+      ),
+    ).rejects.toMatchObject({
+      code: 'DUPLICATE_KEY',
+      statusCode: 400,
+      message: 'username is already taken',
+    });
   });
 });
 
@@ -180,6 +198,36 @@ describe('updatePassword', () => {
     expect(deps.audit.logs).toEqual([
       expect.objectContaining({ user: userId, action: 'password_change', status: 'success' }),
     ]);
+  });
+
+  it('leaves the password unchanged when token revocation fails so the change can be retried', async () => {
+    const revokeSpy = vi.spyOn(deps.tokens, 'deleteMany').mockRejectedValueOnce(new Error('token store down'));
+
+    try {
+      await expect(
+        updatePassword(
+          { currentPassword: CURRENT_PASSWORD, newPassword },
+          { userId },
+          passwordDeps(),
+        ),
+      ).rejects.toThrow('token store down');
+
+      const user = deps.users.users.find((u) => u.id === userId)!;
+      expect(await bcrypt.compare(CURRENT_PASSWORD, user.password)).toBe(true);
+      expect(await bcrypt.compare(newPassword, user.password)).toBe(false);
+    } finally {
+      revokeSpy.mockRestore();
+    }
+
+    // The same current password can be used again once revocation recovers.
+    await updatePassword(
+      { currentPassword: CURRENT_PASSWORD, newPassword },
+      { userId },
+      passwordDeps(),
+    );
+
+    const user = deps.users.users.find((u) => u.id === userId)!;
+    expect(await bcrypt.compare(newPassword, user.password)).toBe(true);
   });
 
   it('throws INVALID_CURRENT_PASSWORD and audits the failure for a wrong current password', async () => {
@@ -272,6 +320,23 @@ describe('deleteAccount', () => {
     expect(deps.audit.logs).toEqual([
       expect.objectContaining({ user: userId, action: 'account_deletion', status: 'success' }),
     ]);
+  });
+
+  it('does not audit account deletion as successful when the delete fails', async () => {
+    const deleteSpy = vi.spyOn(deps.users, 'delete').mockRejectedValueOnce(new Error('delete failed'));
+
+    try {
+      await expect(
+        deleteAccount(
+          { userId },
+          { userDatabase: deps.users, refreshTokenDatabase: deps.tokens, auditDatabase: deps.audit },
+        ),
+      ).rejects.toThrow('delete failed');
+
+      expect(deps.audit.logs).toHaveLength(0);
+    } finally {
+      deleteSpy.mockRestore();
+    }
   });
 
   it('throws USER_NOT_FOUND without auditing when the user is gone', async () => {

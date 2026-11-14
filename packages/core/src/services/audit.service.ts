@@ -1,11 +1,15 @@
 import { AuditDatabaseAdapter } from "../types/deps.types.js";
 
+const toFiniteInteger = (value: number | undefined, fallback: number): number => {
+    return typeof value === 'number' && Number.isFinite(value) ? Math.trunc(value) : fallback;
+};
+
 export async function getAuditLogs(
     input: { userId: string, page?: number, limit?: number },
     deps: { auditDatabase: AuditDatabaseAdapter }
 ) {
-    const page = Math.max(1, input.page || 1);
-    const limit = Math.min(100, Math.max(1, input.limit || 20));
+    const page = Math.max(1, toFiniteInteger(input.page, 1));
+    const limit = Math.min(100, Math.max(1, toFiniteInteger(input.limit, 20)));
     const skip = (page - 1) * limit;
 
     const [logs, total] = await Promise.all([

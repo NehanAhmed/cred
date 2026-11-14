@@ -1,7 +1,10 @@
 import { AuditLogParams } from "../types/audit.types.js";
-import { AuditDatabaseAdapter } from "../types/deps.types.js";
+import { AuditDatabaseAdapter, AuditErrorLogger } from "../types/deps.types.js";
 
-export const logAuditEvent = async (params: AuditLogParams, deps: { auditDatabase?: AuditDatabaseAdapter }): Promise<void> => {
+export const logAuditEvent = async (
+  params: AuditLogParams,
+  deps: { auditDatabase?: AuditDatabaseAdapter; logger?: AuditErrorLogger },
+): Promise<void> => {
   if (!deps.auditDatabase) return;
   try {
     await deps.auditDatabase.create({
@@ -13,7 +16,8 @@ export const logAuditEvent = async (params: AuditLogParams, deps: { auditDatabas
       provider: params.provider || null,
       metadata: params.metadata || null,
     });
-  } catch {
-    console.error('Audit log error:', params.action, params.status);
+  } catch (error) {
+    // Audit failures must stay isolated from the operation being audited.
+    deps.logger?.error('Audit log error:', params.action, params.status, error);
   }
 };

@@ -11,7 +11,7 @@ import {
   resetPassword,
 } from './auth.service.js';
 import { AuthError } from '../errors/auth-error.js';
-import { generateAccessToken, hashToken } from '../helpers/auth.helper.js';
+import { generateAccessToken, hashToken, parseToken, parseTokenLookupId, verifyRawToken } from '../helpers/auth.helper.js';
 import { makeDeps, TEST_JWT_SECRET } from '../__tests__/fakes.js';
 import type { RegisterRequest } from '../types/auth.types.js';
 
@@ -56,15 +56,17 @@ describe('register', () => {
     expect(await bcrypt.compare(validInput.password, stored)).toBe(true);
   });
 
-  it('emails the raw token and stores only its SHA-256 hash', async () => {
+  it('emails the raw token and stores only a bcrypt hash with its lookup id', async () => {
     await register(validInput, { userDatabase: deps.users, email: deps.email });
 
     const { rawToken } = deps.email.verifications[0];
-    const expectedHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const stored = deps.users.users[0];
 
-    expect(rawToken).toMatch(/^[a-f0-9]{64}$/);
-    expect(deps.users.users[0].verificationToken).toBe(expectedHash);
-    expect(deps.users.users[0].verificationToken).not.toBe(rawToken);
+    expect(rawToken).toMatch(/^[a-f0-9]{32}\.[a-f0-9]{64}$/);
+    expect(stored.verificationToken).not.toBe(rawToken);
+    expect(stored.verificationToken).toMatch(/^\$2[aby]\$/);
+    expect(await verifyRawToken(rawToken, stored.verificationToken!)).toBe(true);
+    expect(stored.verificationTokenLookup).toBe(parseTokenLookupId(rawToken));
   });
 
   it('sets the verification token to expire in about 24 hours', async () => {
@@ -207,18 +209,20 @@ describe('login', () => {
 
     expect(result.user).toMatchObject({ id: userId, username: 'testuser', email: 'test@example.com' });
     expect('password' in result.user).toBe(false);
-    expect(result.refreshToken).toMatch(/^[a-f0-9]{80}$/);
+    expect(result.refreshToken).toMatch(/^[a-f0-9]{32}\.[a-f0-9]{64}$/);
 
     const decoded = JSON.parse(Buffer.from(result.accessToken.split('.')[1], 'base64').toString());
     expect(decoded).toMatchObject({ id: userId, email: 'test@example.com', username: 'testuser', tokenType: 'access' });
   });
 
-  it('stores the refresh token hashed and marks it unconsumed', async () => {
+  it('stores the refresh token as a bcrypt hash with its lookup id and marks it unconsumed', async () => {
     const result = await login({ email: 'test@example.com', password }, loginDeps(), { jwtSecret: TEST_JWT_SECRET });
 
     expect(deps.tokens.tokens).toHaveLength(1);
-    expect(deps.tokens.tokens[0].token).toBe(hashToken(result.refreshToken));
+    expect(deps.tokens.tokens[0].token).toMatch(/^\$2[aby]\$/);
     expect(deps.tokens.tokens[0].token).not.toBe(result.refreshToken);
+    expect(await verifyRawToken(result.refreshToken, deps.tokens.tokens[0].token)).toBe(true);
+    expect(deps.tokens.tokens[0].lookupId).toBe(parseTokenLookupId(result.refreshToken));
     expect(deps.tokens.tokens[0].consumed).toBe(false);
     expect(deps.tokens.tokens[0].user).toBe(userId);
     expect(deps.tokens.tokens[0].expiresAt.getTime()).toBeGreaterThan(Date.now());
@@ -393,9 +397,11 @@ describe('login', () => {
 describe('logout', () => {
   it('deletes the presented refresh token and audits the success', async () => {
     const deps = makeDeps();
-    const rawToken = crypto.randomBytes(40).toString('hex');
+    const lookupId = crypto.randomBytes(16).toString('hex');
+    const rawToken = `${lookupId}.${crypto.randomBytes(40).toString('hex')}`;
     await deps.tokens.create({
-      token: hashToken(rawToken),
+      lookupId,
+      token: await hashToken(parseToken(rawToken)!.secret),
       user: 'user-1',
       family: crypto.randomUUID(),
       expiresAt: new Date(Date.now() + 60_000),
@@ -428,7 +434,8 @@ describe('logout', () => {
 // refresh
 // ---------------------------------------------------------------------------
 describe('refresh', () => {
-  const rawToken = crypto.randomBytes(40).toString('hex');
+  const lookupId = crypto.randomBytes(16).toString('hex');
+  const rawToken = `${lookupId}.${crypto.randomBytes(40).toString('hex')}`;
   const family = crypto.randomUUID();
   let deps = makeDeps();
   let userId: string;
@@ -452,7 +459,8 @@ describe('refresh', () => {
 
   const seedToken = async (overrides: Partial<{ expiresAt: Date; consumed: boolean }> = {}) => {
     await deps.tokens.create({
-      token: hashToken(rawToken),
+      lookupId,
+      token: await hashToken(parseToken(rawToken)!.secret),
       user: userId,
       family,
       expiresAt: overrides.expiresAt ?? new Date(Date.now() + 60_000),
@@ -496,10 +504,11 @@ describe('refresh', () => {
     expect(result.refreshToken).not.toBe(rawToken);
     const active = deps.tokens.tokens.filter((t) => !t.consumed);
     expect(active).toHaveLength(1);
-    expect(active[0].token).toBe(hashToken(result.refreshToken));
+    expect(await verifyRawToken(result.refreshToken, active[0].token)).toBe(true);
+    expect(active[0].lookupId).toBe(parseTokenLookupId(result.refreshToken));
     expect(active[0].family).toBe(family);
     expect(active[0].expiresAt.getTime()).toBeGreaterThan(Date.now());
-    expect(deps.tokens.tokens.find((t) => t.token === hashToken(rawToken))!.consumed).toBe(true);
+    expect(deps.tokens.tokens.find((t) => t.lookupId === lookupId)!.consumed).toBe(true);
 
     const decoded = JSON.parse(Buffer.from(result.accessToken.split('.')[1], 'base64').toString());
     expect(decoded).toMatchObject({ id: userId, tokenType: 'access' });
@@ -574,13 +583,15 @@ describe('refresh', () => {
     await seedToken();
 
     const originalFindOne = deps.tokens.findOne.bind(deps.tokens);
+    let findOneCalls = 0;
     const findOneSpy = vi
       .spyOn(deps.tokens, 'findOne')
       .mockImplementation(async (filter) => {
         const found = await originalFindOne(filter);
+        findOneCalls += 1;
         // Simulate a concurrent replay deleting the family between the
-        // successor being issued and the predecessor re-check.
-        if (found) {
+        // successor being issued and the predecessor re-check (second lookup).
+        if (found && findOneCalls === 2) {
           const index = deps.tokens.tokens.findIndex((t) => t.token === found.token);
           if (index !== -1) deps.tokens.tokens.splice(index, 1);
           return null;
@@ -605,8 +616,8 @@ describe('refresh', () => {
 // verifyEmail
 // ---------------------------------------------------------------------------
 describe('verifyEmail', () => {
-  const rawToken = crypto.randomBytes(32).toString('hex');
-  const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+  const lookupId = crypto.randomBytes(16).toString('hex');
+  const rawToken = `${lookupId}.${crypto.randomBytes(32).toString('hex')}`;
   let deps = makeDeps();
 
   beforeEach(() => {
@@ -618,8 +629,9 @@ describe('verifyEmail', () => {
       username: 'verifyuser',
       email: 'verify@example.com',
       password: 'hashed-password',
-      verificationToken: hashedToken,
+      verificationToken: await hashToken(parseToken(rawToken)!.secret),
       verificationTokenExpires: expiresAt,
+      verificationTokenLookup: lookupId,
     });
   };
 
@@ -697,12 +709,13 @@ describe('forgotPassword', () => {
     expect(result.message).toBe('If an account exists, a password reset link has been sent.');
 
     const user = deps.users.users.find((u) => u.id === userId)!;
-    expect(user.resetPasswordToken).toMatch(/^[a-f0-9]{64}$/);
+    expect(user.resetPasswordToken).toMatch(/^\$2[aby]\$/);
     expect(user.resetPasswordExpires).not.toBeNull();
 
     expect(deps.email.passwordResets).toHaveLength(1);
     expect(deps.email.passwordResets[0].to).toBe('existing@example.com');
-    expect(hashToken(deps.email.passwordResets[0].rawToken)).toBe(user.resetPasswordToken);
+    expect(await verifyRawToken(deps.email.passwordResets[0].rawToken, user.resetPasswordToken!)).toBe(true);
+    expect(user.resetPasswordTokenLookup).toBe(parseTokenLookupId(deps.email.passwordResets[0].rawToken));
 
     expect(deps.audit.logs).toEqual([
       expect.objectContaining({ user: userId, action: 'password_reset_request', status: 'success' }),
@@ -773,8 +786,8 @@ describe('forgotPassword', () => {
 // resetPassword
 // ---------------------------------------------------------------------------
 describe('resetPassword', () => {
-  const rawToken = crypto.randomBytes(32).toString('hex');
-  const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+  const lookupId = crypto.randomBytes(16).toString('hex');
+  const rawToken = `${lookupId}.${crypto.randomBytes(32).toString('hex')}`;
   const newPassword = 'NewPass123';
   let deps = makeDeps();
   let userId: string;
@@ -786,8 +799,9 @@ describe('resetPassword', () => {
       email: 'reset@example.com',
       password: await bcrypt.hash('OldPass123', 10),
       isVerified: true,
-      resetPasswordToken: hashedToken,
+      resetPasswordToken: await hashToken(parseToken(rawToken)!.secret),
       resetPasswordExpires: new Date(Date.now() + 3600_000),
+      resetPasswordTokenLookup: lookupId,
       loginAttempts: 3,
       lockoutUntil: new Date(Date.now() + 60_000),
     });
@@ -819,7 +833,8 @@ describe('resetPassword', () => {
 
   it('revokes all refresh tokens for the user', async () => {
     await deps.tokens.create({
-      token: hashToken('some-raw-token'),
+      lookupId: crypto.randomBytes(16).toString('hex'),
+      token: await hashToken(`some-lookup.${crypto.randomBytes(40).toString('hex')}`),
       user: userId,
       family: crypto.randomUUID(),
       expiresAt: new Date(Date.now() + 60_000),
@@ -829,6 +844,27 @@ describe('resetPassword', () => {
     await resetPassword({ token: rawToken, newPassword }, resetDeps(), {});
 
     expect(deps.tokens.tokens).toHaveLength(0);
+  });
+
+  it('leaves the reset token usable when revocation fails so the reset can be retried', async () => {
+    const revokeSpy = vi.spyOn(deps.tokens, 'deleteMany').mockRejectedValueOnce(new Error('token store down'));
+
+    try {
+      await expect(
+        resetPassword({ token: rawToken, newPassword }, resetDeps(), {}),
+      ).rejects.toThrow('token store down');
+    } finally {
+      revokeSpy.mockRestore();
+    }
+
+    const user = deps.users.users.find((u) => u.id === userId)!;
+    expect(await bcrypt.compare('OldPass123', user.password)).toBe(true);
+    expect(user.resetPasswordToken).not.toBeNull();
+    expect(user.resetPasswordTokenLookup).toBe(lookupId);
+
+    await resetPassword({ token: rawToken, newPassword }, resetDeps(), {});
+    expect(await bcrypt.compare(newPassword, user.password)).toBe(true);
+    expect(user.resetPasswordToken).toBeNull();
   });
 
   it('throws INVALID_TOKEN and audits the failure for an invalid token', async () => {

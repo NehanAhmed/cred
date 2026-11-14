@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import type { User, RefreshToken } from '../types/auth.types.js';
 import type { AuditLogInterface } from '../types/audit.types.js';
+import { DuplicateKeyError } from '../errors/duplicate-key-error.js';
 import type {
   AuditDatabaseAdapter,
   AuditLogFilter,
@@ -38,8 +39,10 @@ export function buildUser(input: Partial<CreateUserInput> = {}, id: string): Use
     isVerified: input.isVerified ?? false,
     verificationToken: input.verificationToken ?? null,
     verificationTokenExpires: input.verificationTokenExpires ?? null,
+    verificationTokenLookup: input.verificationTokenLookup ?? null,
     resetPasswordToken: input.resetPasswordToken ?? null,
     resetPasswordExpires: input.resetPasswordExpires ?? null,
+    resetPasswordTokenLookup: input.resetPasswordTokenLookup ?? null,
     provider: input.provider ?? 'local',
     avatar: input.avatar ?? null,
     loginAttempts: input.loginAttempts ?? 0,
@@ -62,8 +65,28 @@ export class FakeUserDatabase implements UserDatabaseAdapter {
     return this.users.find((u) => matchesFilter(u, filter)) ?? null;
   }
 
+  /**
+   * Test adapter translations of native uniqueness violations into the
+   * storage-neutral `DuplicateKeyError` contract.
+   */
+  private assertUnique(input: Partial<User>, excludeId?: string): void {
+    if (
+      input.username !== undefined &&
+      this.users.some((u) => u.id !== excludeId && u.username === input.username)
+    ) {
+      throw new DuplicateKeyError('username');
+    }
+    if (
+      input.email !== undefined &&
+      this.users.some((u) => u.id !== excludeId && u.email === input.email)
+    ) {
+      throw new DuplicateKeyError('email');
+    }
+  }
+
   async create(input: CreateUserInput): Promise<User> {
     if (this.createFails) return null as unknown as User;
+    this.assertUnique(input);
     const user = buildUser(input, String(this.users.length + 1));
     this.users.push(user);
     return user;
@@ -78,6 +101,7 @@ export class FakeUserDatabase implements UserDatabaseAdapter {
   async update(id: string, updates: Partial<User>): Promise<User> {
     const user = this.users.find((u) => u.id === id);
     if (!user) return null as unknown as User;
+    this.assertUnique(updates, id);
     Object.assign(user, updates, { updatedAt: new Date() });
     return user;
   }

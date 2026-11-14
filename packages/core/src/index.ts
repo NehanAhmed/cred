@@ -3,6 +3,7 @@ export * from './services/oauth.service.js';
 export * from './services/profile.service.js';
 export * from './services/audit.service.js';
 export * from './errors/auth-error.js';
+export * from './errors/duplicate-key-error.js';
 export * from './types/auth.types.js';
 export * from './types/oauth.types.js';
 export * from './types/audit.types.js';

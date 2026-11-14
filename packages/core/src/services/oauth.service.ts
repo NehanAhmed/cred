@@ -1,5 +1,5 @@
 import { AuthError } from "../errors/auth-error.js";
-import { OAuthCallbackInput, OAuthCallbackResult } from "../types/oauth.types.js";
+import { FindOrCreateOAuthUserInput, OAuthCallbackInput, OAuthCallbackResult } from "../types/oauth.types.js";
 import { AuditDatabaseAdapter, RefreshTokenDatabaseAdapter, UserDatabaseAdapter } from "../types/deps.types.js";
 import { User } from "../types/auth.types.js";
 import { generateAccessToken, generateRefreshTokenData } from "../helpers/auth.helper.js";
@@ -20,21 +20,27 @@ const generateUniqueUsername = async (base: string, deps: { userDatabase: UserDa
 };
 
 /**
- * Finds an OAuth user by provider id, links an existing local account by email,
- * or creates a new user — the core logic behind the passport strategies.
+ * Finds an OAuth user by provider id, links an existing account by email, or
+ * creates a new user — the core logic behind the passport strategies.
+ *
+ * `input.isEmailVerified` is required: an email may only be used to link an
+ * existing account when the OAuth provider has verified ownership of it.
+ * Unverified addresses fall through to account creation (or must use an
+ * explicit authenticated linking flow) to prevent account takeover.
  */
 export async function findOrCreateOAuthUser(
-    input: { provider: 'google' | 'github', profileId: string, email?: string, displayName?: string, avatar?: string },
+    input: FindOrCreateOAuthUserInput,
     deps: { userDatabase: UserDatabaseAdapter, auditDatabase?: AuditDatabaseAdapter }
 ): Promise<User> {
-    const { provider, profileId, email, displayName, avatar } = input;
+    const { provider, profileId, email, displayName, avatar, isEmailVerified } = input;
     const providerField = provider === 'google' ? 'googleId' : 'githubId';
+    const normalizedEmail = email ? email.trim().toLowerCase() : undefined;
 
     let existing = await deps.userDatabase.findOne({ [providerField]: profileId });
     if (existing) return existing;
 
-    if (email) {
-        existing = await deps.userDatabase.findOne({ email: email.toLowerCase() });
+    if (isEmailVerified && normalizedEmail) {
+        existing = await deps.userDatabase.findOne({ email: normalizedEmail });
         if (existing) {
             const wasLocal = existing.provider === 'local';
             const updates: Partial<User> = { [providerField]: profileId };
@@ -55,13 +61,13 @@ export async function findOrCreateOAuthUser(
     }
 
     const username = await generateUniqueUsername(
-        displayName || email?.split('@')[0] || 'user',
+        displayName || normalizedEmail?.split('@')[0] || 'user',
         deps
     );
 
     const user = await deps.userDatabase.create({
         username,
-        email: email || `${profileId}@${provider}.oauth`,
+        email: normalizedEmail || `${profileId}@${provider}.oauth`,
         password: crypto.randomBytes(32).toString('hex'),
         provider,
         [providerField]: profileId,
@@ -82,7 +88,7 @@ export async function oauthCallback(
     config: { jwtSecret: string },
     context: { ip?: string, userAgent?: string } = {}
 ): Promise<OAuthCallbackResult> {
-    const { user } = input;
+    const { user, provider } = input;
 
     if (!user) {
         await logAuditEvent({
@@ -115,9 +121,10 @@ export async function oauthCallback(
     });
 
     const accessToken = generateAccessToken({ id: userId, email, username }, config.jwtSecret);
-    const rtData = generateRefreshTokenData();
+    const rtData = await generateRefreshTokenData();
 
     const refreshToken = await deps.refreshTokenDatabase.create({
+        lookupId: rtData.lookupId,
         token: rtData.hashedToken,
         user: userId,
         family: rtData.family,
@@ -135,7 +142,7 @@ export async function oauthCallback(
         status: 'success',
         ip: context.ip,
         userAgent: context.userAgent,
-        provider: user.provider ?? null,
+        provider,
     }, { auditDatabase: deps.auditDatabase });
 
     return {
