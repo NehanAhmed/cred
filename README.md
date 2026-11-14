@@ -1,4 +1,4 @@
-<h1 style="bold">Currently Transforming Cred into a npm package and upgrading it to a adapter architexture. Readme is not Currently Updated according to it. After the code completion then i will update the docs and repo desc. </h1>
+<h1 style="bold">Currently Transforming Cred into a npm package and upgrading it to a adapter architecture pattern. Readme is not Currently Updated according to it. After the code completion then i will update the docs and repo desc. </h1>
 
 
 <p align="center">
