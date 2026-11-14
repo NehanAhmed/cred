@@ -93,11 +93,9 @@ export async function login(input: LoginRequest, deps: { userDatabase: UserDatab
     const isPasswordValid = await bcrypt.compare(input.password, user.password);
 
     if (!isPasswordValid) {
-        const updated = await deps.userDatabase.update(user.id, {
-            loginAttempts: user.loginAttempts + 1
-        })
-        if (updated && updated.loginAttempts >= 5) {
-            const updated = await deps.userDatabase.update(user.id, {
+        const loginAttempts = await deps.userDatabase.incrementLoginAttempts(user.id);
+        if (loginAttempts >= 5) {
+            await deps.userDatabase.update(user.id, {
                 lockoutUntil: new Date(Date.now() + LOCK_DURATION_MS)
             })
         }
@@ -149,7 +147,8 @@ export async function logout(context: { rawToken: string }, deps: { refreshToken
     if (!context.rawToken) {
         throw new AuthError('MISSING_TOKEN', "No token found.", 404)
     }
-    const deleteRefreshToken = await deps.refreshTokenDatabase.delete(context.rawToken)
+    const hashedToken = crypto.createHash('sha256').update(context.rawToken).digest('hex');
+    await deps.refreshTokenDatabase.delete(hashedToken)
 
 }
 
@@ -175,13 +174,27 @@ export async function refresh(context: { rawToken: string }, deps: { refreshToke
         throw new AuthError('UNEXPECTED_ERROR_OCCURED', "User not found.", 500)
     }
     const rtData = generateRefreshTokenData();
-    await deps.refreshTokenDatabase.create({
+    const successor = await deps.refreshTokenDatabase.create({
         user: user.id,
-        family: rtData.family,
+        family: claimed.family,
         token: rtData.hashedToken,
         expiresAt: rtData.expiresAt,
         consumed: false
     })
+    if (!successor) {
+        throw new AuthError('REFRESH_TOKEN_CREATION_FAILED', 'Failed to create refresh token', 500);
+    }
+
+    // A concurrent replay of the consumed predecessor revokes the whole family.
+    // The successor is issued into that same family, so the revocation deletes it
+    // as well. Re-check the predecessor after issuing the successor to close the
+    // window where a replay removed the family before the successor was written.
+    const predecessor = await deps.refreshTokenDatabase.findOne({ token: hashedToken })
+    if (!predecessor) {
+        await deps.refreshTokenDatabase.delete(rtData.hashedToken).catch(() => {})
+        throw new AuthError('REFRESH_TOKEN_REUSE_DETECTED', "Refresh token reuse detected. All sessions revoked.", 401)
+    }
+
     const accessToken = generateAccessToken({ id: user.id, email: user.email, username: user.username }, config.jwtSecret);
     return { accessToken, refreshToken: rtData.rawToken };
 
@@ -212,9 +225,9 @@ export async function forgotPassword(input: { email: string }, deps: { userDatab
         throw new AuthError('UNEXPECTED_ERROR_OCCURED', 'If an account exists, a password reset link has been sent.', 500)
     }
     try {
-        await deps.email.sendEmailVerification(user.email, token);
+        await deps.email.sendPasswordReset(user.email, token);
     } catch {
-        const updateUser = await deps.userDatabase.update(user.id, { resetPasswordToken: null, resetPasswordExpires: null })
+        await deps.userDatabase.update(user.id, { resetPasswordToken: null, resetPasswordExpires: null })
         throw new AuthError('EMAIL_SEND_FAILED', 'Failed to send password reset email. Please try again.', 500)
     }
     return { message: 'If an account exists, a password reset link has been sent.' }
@@ -222,15 +235,25 @@ export async function forgotPassword(input: { email: string }, deps: { userDatab
 
 export async function resetPassword(input: { token: string, newPassword: string }, deps: { userDatabase: UserDatabaseAdapter,refreshTokenDatabase:RefreshTokenDatabaseAdapter }) {
     const hashedToken = crypto.createHash('sha256').update(input.token).digest('hex')
-    const findUser = await deps.userDatabase.findOne({ resetPasswordToken: hashedToken })
-    if (!findUser || !findUser.resetPasswordExpires || findUser.resetPasswordExpires < new Date()) {
-        throw new AuthError('INVALID_TOKEN', 'Invalid or expired token', 400);
-    }
-
     const hashedPassword = await bcrypt.hash(input.newPassword, 10);
-    const updateUser = await deps.userDatabase.update(findUser.id, { password: hashedPassword, resetPasswordToken: null, resetPasswordExpires: null, loginAttempts: 0, lockoutUntil: null })
-    if(!updateUser){
-        throw new AuthError('UNEXPECTED_ERROR_OCCURED','An error occured while updating the password',500)
+
+    // Consume the token and replace the password in one conditional update so
+    // concurrent/replayed resets cannot both succeed and expired tokens are rejected.
+    const updateUser = await deps.userDatabase.findOneAndUpdate(
+        {
+            resetPasswordToken: hashedToken,
+            resetPasswordExpires: { $gt: new Date() }
+        },
+        {
+            password: hashedPassword,
+            resetPasswordToken: null,
+            resetPasswordExpires: null,
+            loginAttempts: 0,
+            lockoutUntil: null
+        }
+    )
+    if (!updateUser) {
+        throw new AuthError('INVALID_TOKEN', 'Invalid or expired token', 400);
     }
     await deps.refreshTokenDatabase.deleteMany({user: updateUser.id})
     return{
