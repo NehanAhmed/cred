@@ -1,5 +1,5 @@
 export interface User extends RegisterRequest {
-  id:string;
+  id: string;
   isVerified: boolean;
   verificationToken: string | null;
   verificationTokenExpires: Date | null;
@@ -16,7 +16,8 @@ export interface User extends RegisterRequest {
   createdAt: Date;
   updatedAt: Date;
 }
-export interface RegisterRequest {
+
+export type RegisterRequest = {
   username: string;
   email: string;
   password: string;
@@ -25,12 +26,10 @@ export interface RegisterRequest {
   gender?: 'male' | 'female' | 'other';
 }
 
-export interface LoginRequest {
-  email?: string;
-  username?: string;
-  password: string;
-}
-
+export type LoginRequest = { password: string } & (
+  | { email: string; username?: string }
+  | { email?: string; username: string }
+);
 export interface PasswordChangeRequest {
   currentPassword: string;
   newPassword: string;
@@ -41,4 +40,28 @@ export interface ProfileUpdateRequest {
   bio?: string;
   phoneNumber?: string;
   gender?: 'male' | 'female' | 'other';
+}
+export interface JWTPayload {
+  id: string;
+  email: string;
+  username: string;
+  tokenType: 'access' | 'refresh';
+  iat?: number;
+  exp?: number;
+}
+
+export interface RefreshTokenData {
+  rawToken: string;
+  family: string;
+  hashedToken: string;
+  expiresAt: Date;
+}
+
+export interface RefreshToken {
+  
+  token:string;
+  user:string
+  family:string
+  expiresAt:Date
+  consumed:boolean
 }
