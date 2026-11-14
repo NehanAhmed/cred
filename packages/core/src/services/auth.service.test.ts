@@ -11,7 +11,7 @@ import {
   resetPassword,
 } from './auth.service.js';
 import { AuthError } from '../errors/auth-error.js';
-import { generateAccessToken, hashToken, parseToken, parseTokenLookupId, verifyRawToken } from '../helpers/auth.helper.js';
+import { hashToken, parseToken, parseTokenLookupId, verifyRawToken } from '../helpers/auth.helper.js';
 import { makeDeps, TEST_JWT_SECRET } from '../__tests__/fakes.js';
 import type { RegisterRequest } from '../types/auth.types.js';
 

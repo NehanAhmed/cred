@@ -6,7 +6,9 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "test": "vitest run",
-    "build": "tsdown"
+    "build": "tsdown",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "keywords": [],
   "author": "",
@@ -17,12 +19,15 @@
     "bcryptjs": "^3.0.3",
     "jsonwebtoken": "^9.0.3",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.10",
+    "@typescript/native": "npm:typescript@^7.0.2",
+    "eslint": "^10.15.0",
     "tsdown": "^0.23.7",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "typescript-eslint": "^8.72.2",
     "vitest": "^5.1.0"
   }
 }

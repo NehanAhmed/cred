@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import jwt from 'jsonwebtoken';
 import { oauthCallback, findOrCreateOAuthUser } from './oauth.service.js';
-import { generateAccessToken } from '../helpers/auth.helper.js';
 import { makeDeps, TEST_JWT_SECRET, buildUser } from '../__tests__/fakes.js';
 
 // ---------------------------------------------------------------------------

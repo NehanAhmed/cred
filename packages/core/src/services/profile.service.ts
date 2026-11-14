@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs"
 import { AuthError } from "../errors/auth-error.js";
 import { DuplicateKeyError } from "../errors/duplicate-key-error.js";
-import { PasswordChangeRequest, ProfileUpdateRequest, User, UserWithoutPassword } from "../types/auth.types.js";
+import { ProfileUpdateRequest, User, UserWithoutPassword } from "../types/auth.types.js";
 import { AuditDatabaseAdapter, RefreshTokenDatabaseAdapter, UserDatabaseAdapter } from "../types/deps.types.js";
 import { logAuditEvent } from "../helpers/audit.helper.js";
 
@@ -14,12 +14,12 @@ export async function getProfile(
         throw new AuthError('USER_NOT_FOUND', 'User not found', 404);
     }
 
-    const { password: _, ...userWithoutPassword } = user;
+    const { password: _password, ...userWithoutPassword } = user;
     return userWithoutPassword;
 }
 
 export async function updatePassword(
-    input: PasswordChangeRequest,
+    input: import("../types/auth.types.js").PasswordChangeRequest,
     context: { userId: string, ip?: string, userAgent?: string },
     deps: { userDatabase: UserDatabaseAdapter, refreshTokenDatabase: RefreshTokenDatabaseAdapter, auditDatabase?: AuditDatabaseAdapter }
 ): Promise<UserWithoutPassword> {
@@ -69,7 +69,7 @@ export async function updatePassword(
     // current password instead of being locked out of the revocation step.
     await deps.refreshTokenDatabase.deleteMany({ user: user.id });
 
-    const updatedUser = await deps.userDatabase.update(user.id, {
+    const _updatedUser = await deps.userDatabase.update(user.id, {
         password: hashedPassword,
         loginAttempts: 0,
         lockoutUntil: null,
@@ -83,8 +83,7 @@ export async function updatePassword(
         userAgent: context.userAgent,
     }, { auditDatabase: deps.auditDatabase });
 
-    const { password: _, ...userWithoutPassword } = updatedUser;
-    return userWithoutPassword;
+    return await getProfile(context, deps);
 }
 
 export async function updateProfile(

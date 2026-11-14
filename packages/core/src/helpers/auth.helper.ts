@@ -5,7 +5,6 @@ import { JWTPayload, RefreshTokenData } from '../types/auth.types.js';
 import { AuthError } from '../errors/auth-error.js';
 
 const ACCESS_TOKEN_EXPIRY = '15m';
-const ACCESS_TOKEN_EXPIRY_MS = 15 * 60 * 1000;
 const REFRESH_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 const TOKEN_HASH_ROUNDS = 10;
 

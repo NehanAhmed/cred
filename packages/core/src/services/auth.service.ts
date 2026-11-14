@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs"
 import { AuthError } from "../errors/auth-error.js";
-import { LoginRequest, RegisterRequest, User } from "../types/auth.types.js";
+import { LoginRequest, RegisterRequest } from "../types/auth.types.js";
 import { AuditDatabaseAdapter, UserDatabaseAdapter, EmailAdapter, RefreshTokenDatabaseAdapter } from "../types/deps.types.js";
 import {
     generateAccessToken,
@@ -214,7 +214,7 @@ export async function login(input: LoginRequest, deps: { userDatabase: UserDatab
         }, { auditDatabase: deps.auditDatabase });
         throw new AuthError('INVALID_CREDENTIALS', 'Invalid Credentials', 401)
     }
-    const updated = await deps.userDatabase.update(user.id, {
+    const _updated = await deps.userDatabase.update(user.id, {
         lockoutUntil: null,
         lastLogin: new Date(),
         loginAttempts: 0,

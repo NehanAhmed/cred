@@ -14,7 +14,6 @@ import {
 } from './auth.helper.js';
 import { AuthError } from '../errors/auth-error.js';
 import { TEST_JWT_SECRET } from '../__tests__/fakes.js';
-import type { JWTPayload } from '../types/auth.types.js';
 
 const expectAuthError = (fn: () => unknown, expected: { code: string; statusCode: number }) => {
   let error: unknown;
