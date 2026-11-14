@@ -17,6 +17,11 @@ export type AuthErrorCode =
   | 'REFRESH_TOKEN_EXPIRED'
   | 'INVALID_EMAIL'
   | 'USER_NOT_FOUND'
+  | 'OAUTH_FAILED'
+  | 'OAUTH_INVALID_USER'
+  | 'SOCIAL_LOGIN_ACCOUNT'
+  | 'INVALID_CURRENT_PASSWORD'
+  | 'DUPLICATE_KEY'
   ;
 
 export class AuthError extends Error {

@@ -1,3 +1,4 @@
+import { AuditLogInterface, AuditLogParams } from "./audit.types.js";
 import { RefreshToken, RegisterRequest, User } from "./auth.types.js";
 
 /**
@@ -12,9 +13,21 @@ export type UserQuery = {
     [K in keyof User]?: QueryValue<User[K]>;
 };
 
+export type CreateUserInput = RegisterRequest & {
+    verificationToken?: string,
+    verificationTokenExpires?: Date,
+    verificationTokenLookup?: string | null,
+} & Partial<Pick<User, 'provider' | 'googleId' | 'githubId' | 'avatar' | 'isVerified' | 'resetPasswordToken' | 'resetPasswordExpires' | 'resetPasswordTokenLookup' | 'loginAttempts' | 'lockoutUntil'>>;
+
+/**
+ * Storage adapters must translate native uniqueness violations (for example,
+ * MongoDB error code 11000) into `DuplicateKeyError` from
+ * `../errors/duplicate-key-error.js`. Core services never inspect driver
+ * specific error codes.
+ */
 export interface UserDatabaseAdapter {
     findOne(filter: Partial<User>): Promise<User | null>;
-    create(user: RegisterRequest & { verificationToken: string, verificationTokenExpires: Date }): Promise<User>;
+    create(user: CreateUserInput): Promise<User>;
     delete(id: string): Promise<void>;
     update(id: string, updates: Partial<User>): Promise<User>;
     findOneByTwoConditions(filter1: Partial<User>, filter2: Partial<User>): Promise<User | null>;
@@ -25,6 +38,7 @@ export interface UserDatabaseAdapter {
      */
     findOneAndUpdate(condition: UserQuery, updates: Partial<User>): Promise<User | null>;
 }
+
 
 export interface RefreshTokenDatabaseAdapter {
     findOne(filter: Partial<RefreshToken>): Promise<RefreshToken | null>;
@@ -44,4 +58,29 @@ export interface RefreshTokenDatabaseAdapter {
 export interface EmailAdapter {
     sendEmailVerification(email: string, rawToken: string): Promise<void>;
     sendPasswordReset(email: string, rawToken: string): Promise<void>;
+}
+
+export interface AuditLogFilter {
+    user?: string | null;
+}
+
+export interface AuditDatabaseAdapter {
+    create(audit: Partial<AuditLogInterface>): Promise<AuditLogInterface>
+    /**
+     * Returns the logs matching `filter`, newest first.
+     */
+    find(filter: AuditLogFilter, options: { skip: number, limit: number }): Promise<AuditLogInterface[]>
+    /**
+     * Returns the number of logs matching `filter`.
+     */
+    count(filter: AuditLogFilter): Promise<number>
+}
+
+/**
+ * Optional sink for audit-write failures. Audit logging is fire-and-forget and
+ * must never change the result of the authentication operation that triggered
+ * it, so a missing logger simply drops the error.
+ */
+export interface AuditErrorLogger {
+    error(...args: unknown[]): void;
 }
