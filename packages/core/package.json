@@ -13,11 +13,13 @@
   "dependencies": {
     "@types/node": "^26.6.6",
     "bcryptjs": "^3.0.3",
+    "jsonwebtoken": "^9.0.3",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "vitest": "^5.1.0"
   }
 }

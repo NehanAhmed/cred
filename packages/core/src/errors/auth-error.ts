@@ -7,6 +7,9 @@ export type AuthErrorCode =
   | 'EMAIL_SEND_FAILED'
   | 'USER_CREATION_FAILED'
   | 'USER_DELETION_FAILED'
+  | 'MISSING_CREDENTIALS'
+  | 'INVALID_LOGIN_METHOD'
+  | 'REFRESH_TOKEN_CREATION_FAILED'
   ;
 
 export class AuthError extends Error {
