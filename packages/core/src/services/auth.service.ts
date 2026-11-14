@@ -70,11 +70,11 @@ export async function verifyEmail(token: string, deps: { userDatabase: UserDatab
 }
 
 export async function login(input: LoginRequest, deps: { userDatabase: UserDatabaseAdapter, refreshTokenDatabase: RefreshTokenDatabaseAdapter }, config: { jwtSecret: string },
-  context: { ip?: string } = {},) {
+    context: { ip?: string } = {},) {
 
     const user = await deps.userDatabase.findOneByTwoConditions({ username: input.username }, { email: input.email?.toLowerCase().trim() });
 
-    if(!user){
+    if (!user) {
         throw new AuthError('INVALID_CREDENTIALS', 'Invalid username or email', 400);
     }
 
@@ -114,7 +114,7 @@ export async function login(input: LoginRequest, deps: { userDatabase: UserDatab
     const rtData = generateRefreshTokenData();
 
     const refreshToken = await deps.refreshTokenDatabase.create({
-        
+
         user: user.id,
         family: rtData.family,
         token: rtData.hashedToken,
@@ -128,7 +128,7 @@ export async function login(input: LoginRequest, deps: { userDatabase: UserDatab
     return {
         accessToken,
         refreshToken: rtData.rawToken,
-        user:{
+        user: {
             id: user.id,
             email: user.email,
             username: user.username,
@@ -143,4 +143,97 @@ export async function login(input: LoginRequest, deps: { userDatabase: UserDatab
         }
     }
 
+}
+
+export async function logout(context: { rawToken: string }, deps: { refreshTokenDatabase: RefreshTokenDatabaseAdapter }) {
+    if (!context.rawToken) {
+        throw new AuthError('MISSING_TOKEN', "No token found.", 404)
+    }
+    const deleteRefreshToken = await deps.refreshTokenDatabase.delete(context.rawToken)
+
+}
+
+export async function refresh(context: { rawToken: string }, deps: { refreshTokenDatabase: RefreshTokenDatabaseAdapter, userDatabase: UserDatabaseAdapter }, config: { jwtSecret: string }) {
+    if (!context.rawToken) {
+        throw new AuthError('MISSING_TOKEN', "No token found.", 404)
+    }
+    const hashedToken = crypto.createHash('sha256').update(context.rawToken).digest('hex');
+    const claimed = await deps.refreshTokenDatabase.findOneAndUpdate({ token: hashedToken, consumed: false }, { consumed: true })
+    if (!claimed) {
+        const existing = await deps.refreshTokenDatabase.findOne({ token: hashedToken })
+        if (existing) {
+            await deps.refreshTokenDatabase.deleteMany({ family: existing.family, user: existing.user })
+            throw new AuthError('REFRESH_TOKEN_REUSE_DETECTED', "Refresh token reuse detected. All sessions revoked.", 401)
+        }
+        throw new AuthError('REFRESH_TOKEN_NOT_FOUND', "Invalid token.", 401)
+    }
+    if (claimed.expiresAt < new Date()) {
+        throw new AuthError('REFRESH_TOKEN_EXPIRED', "Refresh token expired.", 401)
+    }
+    const user = await deps.userDatabase.findOne({ id: claimed.user })
+    if (!user) {
+        throw new AuthError('UNEXPECTED_ERROR_OCCURED', "User not found.", 500)
+    }
+    const rtData = generateRefreshTokenData();
+    await deps.refreshTokenDatabase.create({
+        user: user.id,
+        family: rtData.family,
+        token: rtData.hashedToken,
+        expiresAt: rtData.expiresAt,
+        consumed: false
+    })
+    const accessToken = generateAccessToken({ id: user.id, email: user.email, username: user.username }, config.jwtSecret);
+    return { accessToken, refreshToken: rtData.rawToken };
+
+}
+
+export async function forgotPassword(input: { email: string }, deps: { userDatabase: UserDatabaseAdapter, email: EmailAdapter }) {
+    const { email: rawEmail } = input;
+    if (typeof rawEmail !== 'string' || !rawEmail.trim()) {
+        throw new AuthError('INVALID_EMAIL', "Invalid email address.", 400)
+    }
+    const email = rawEmail.trim().toLowerCase()
+    if (!email) {
+        throw new AuthError('INVALID_EMAIL', "Invalid email address.", 400)
+
+    }
+    const user = await deps.userDatabase.findOne({ email: email })
+    if (!user) {
+        throw new AuthError('USER_NOT_FOUND', 'User not found', 404)
+
+    }
+    if (user.provider !== 'local') {
+        throw new AuthError('UNEXPECTED_ERROR_OCCURED', 'If an account exists, a password reset link has been sent.', 500)
+    }
+    const token = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    const updateUser = await deps.userDatabase.update(user.id, { resetPasswordToken: hashedToken, resetPasswordExpires: new Date(Date.now() + 3600000) })
+    if (!updateUser) {
+        throw new AuthError('UNEXPECTED_ERROR_OCCURED', 'If an account exists, a password reset link has been sent.', 500)
+    }
+    try {
+        await deps.email.sendEmailVerification(user.email, token);
+    } catch {
+        const updateUser = await deps.userDatabase.update(user.id, { resetPasswordToken: null, resetPasswordExpires: null })
+        throw new AuthError('EMAIL_SEND_FAILED', 'Failed to send password reset email. Please try again.', 500)
+    }
+    return { message: 'If an account exists, a password reset link has been sent.' }
+}
+
+export async function resetPassword(input: { token: string, newPassword: string }, deps: { userDatabase: UserDatabaseAdapter,refreshTokenDatabase:RefreshTokenDatabaseAdapter }) {
+    const hashedToken = crypto.createHash('sha256').update(input.token).digest('hex')
+    const findUser = await deps.userDatabase.findOne({ resetPasswordToken: hashedToken })
+    if (!findUser || !findUser.resetPasswordExpires || findUser.resetPasswordExpires < new Date()) {
+        throw new AuthError('INVALID_TOKEN', 'Invalid or expired token', 400);
+    }
+
+    const hashedPassword = await bcrypt.hash(input.newPassword, 10);
+    const updateUser = await deps.userDatabase.update(findUser.id, { password: hashedPassword, resetPasswordToken: null, resetPasswordExpires: null, loginAttempts: 0, lockoutUntil: null })
+    if(!updateUser){
+        throw new AuthError('UNEXPECTED_ERROR_OCCURED','An error occured while updating the password',500)
+    }
+    await deps.refreshTokenDatabase.deleteMany({user: updateUser.id})
+    return{
+        message:"Password Updated."
+    }
 }

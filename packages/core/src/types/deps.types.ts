@@ -12,8 +12,10 @@ export interface UserDatabaseAdapter {
 export interface RefreshTokenDatabaseAdapter {
     findOne(filter: Partial<RefreshToken>): Promise<RefreshToken | null>;
     create(token: RefreshToken): Promise<RefreshToken>;
-    delete(id: string): Promise<void>;
+    delete(token: string): Promise<void>;
     update(id: string, updates: Partial<RefreshToken>): Promise<RefreshToken>;
+    findOneAndUpdate(condition: Partial<RefreshToken>, updation: Partial<RefreshToken>): Promise<RefreshToken>;
+    deleteMany(filter: Partial<RefreshToken>): Promise<void>;
 }
 
 
