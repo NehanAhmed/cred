@@ -1,8 +1,80 @@
 import { AuthError } from "../errors/auth-error.js";
 import { OAuthCallbackInput, OAuthCallbackResult } from "../types/oauth.types.js";
 import { AuditDatabaseAdapter, RefreshTokenDatabaseAdapter, UserDatabaseAdapter } from "../types/deps.types.js";
+import { User } from "../types/auth.types.js";
 import { generateAccessToken, generateRefreshTokenData } from "../helpers/auth.helper.js";
 import { logAuditEvent } from "../helpers/audit.helper.js";
+import crypto from 'node:crypto';
+
+const generateUniqueUsername = async (base: string, deps: { userDatabase: UserDatabaseAdapter }): Promise<string> => {
+    const sanitized = base
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+        .slice(0, 25) || `user_${crypto.randomBytes(4).toString('hex')}`;
+
+    const exists = await deps.userDatabase.findOne({ username: sanitized });
+    if (!exists) return sanitized;
+
+    const suffix = crypto.randomBytes(3).toString('hex');
+    return `${sanitized}_${suffix}`;
+};
+
+/**
+ * Finds an OAuth user by provider id, links an existing local account by email,
+ * or creates a new user — the core logic behind the passport strategies.
+ */
+export async function findOrCreateOAuthUser(
+    input: { provider: 'google' | 'github', profileId: string, email?: string, displayName?: string, avatar?: string },
+    deps: { userDatabase: UserDatabaseAdapter, auditDatabase?: AuditDatabaseAdapter }
+): Promise<User> {
+    const { provider, profileId, email, displayName, avatar } = input;
+    const providerField = provider === 'google' ? 'googleId' : 'githubId';
+
+    let existing = await deps.userDatabase.findOne({ [providerField]: profileId });
+    if (existing) return existing;
+
+    if (email) {
+        existing = await deps.userDatabase.findOne({ email: email.toLowerCase() });
+        if (existing) {
+            const wasLocal = existing.provider === 'local';
+            const updates: Partial<User> = { [providerField]: profileId };
+            if (!existing.avatar) updates.avatar = avatar || null;
+            if (wasLocal) updates.provider = provider;
+            const saved = await deps.userDatabase.update(existing.id, updates);
+            if (wasLocal) {
+                await logAuditEvent({
+                    user: saved.id,
+                    action: 'oauth_login',
+                    status: 'success',
+                    provider,
+                    metadata: { reason: 'Account linked to existing local user by email' },
+                }, { auditDatabase: deps.auditDatabase });
+            }
+            return saved;
+        }
+    }
+
+    const username = await generateUniqueUsername(
+        displayName || email?.split('@')[0] || 'user',
+        deps
+    );
+
+    const user = await deps.userDatabase.create({
+        username,
+        email: email || `${profileId}@${provider}.oauth`,
+        password: crypto.randomBytes(32).toString('hex'),
+        provider,
+        [providerField]: profileId,
+        avatar: avatar || null,
+        isVerified: true,
+    });
+
+    if (!user) {
+        throw new AuthError('USER_CREATION_FAILED', 'Failed to create user', 500);
+    }
+
+    return user;
+}
 
 export async function oauthCallback(
     input: OAuthCallbackInput,

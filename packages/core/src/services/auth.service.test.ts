@@ -16,6 +16,8 @@ const validInput: RegisterRequest = {
 
 function buildUser(input: CreateInput, id: string): User {
   return {
+    verificationToken: null,
+    verificationTokenExpires: null,
     ...input,
     id,
     isVerified: false,
