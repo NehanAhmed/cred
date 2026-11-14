@@ -4,9 +4,9 @@ import bcrypt from 'bcryptjs';
 import { register } from './auth.service.js';
 import { AuthError } from '../errors/auth-error.js';
 import type { RegisterRequest, User } from '../types/auth.types.js';
-import type { DatabaseAdapter, EmailAdapter } from '../types/deps.types.js';
+import type { UserDatabaseAdapter, EmailAdapter } from '../types/deps.types.js';
 
-type CreateInput = Parameters<DatabaseAdapter['create']>[0];
+type CreateInput = Parameters<UserDatabaseAdapter['create']>[0];
 
 const validInput: RegisterRequest = {
   username: 'johndoe',
@@ -35,15 +35,22 @@ function buildUser(input: CreateInput, id: string): User {
 function makeFakes(opts: { emailFails?: boolean; createReturnsNull?: boolean } = {}) {
   const users: User[] = [];
   const calls = {
-    findOne: [] as Array<{ email: string; username: string }>,
+    findOne: [] as Array<Partial<User>>,
     deleted: [] as string[],
     emails: [] as Array<{ to: string; rawToken: string }>,
+    passwordResets: [] as Array<{ to: string; rawToken: string }>,
   };
 
-  const database: DatabaseAdapter = {
-    findOne: async (email, username) => {
-      calls.findOne.push({ email, username });
-      return users.find((u) => u.email === email || u.username === username) ?? null;
+  const database: UserDatabaseAdapter = {
+    findOne: async (filter) => {
+      calls.findOne.push(filter);
+      return (
+        users.find((u) =>
+          Object.entries(filter).every(
+            ([field, value]) => u[field as keyof User] === value,
+          ),
+        ) ?? null
+      );
     },
     create: async (input) => {
       if (opts.createReturnsNull) return null as unknown as User;
@@ -56,6 +63,45 @@ function makeFakes(opts: { emailFails?: boolean; createReturnsNull?: boolean } =
       const i = users.findIndex((u) => u.id === id);
       if (i !== -1) users.splice(i, 1);
     },
+    update: async (id, updates) => {
+      const user = users.find((u) => u.id === id);
+      if (!user) return null as unknown as User;
+      Object.assign(user, updates);
+      return user;
+    },
+    findOneByTwoConditions: async (filter1, filter2) => {
+      return (
+        users.find(
+          (u) =>
+            Object.entries(filter1).every(
+              ([field, value]) => u[field as keyof User] === value,
+            ) ||
+            Object.entries(filter2).every(
+              ([field, value]) => u[field as keyof User] === value,
+            ),
+        ) ?? null
+      );
+    },
+    incrementLoginAttempts: async (id) => {
+      const user = users.find((u) => u.id === id);
+      if (!user) return 0;
+      user.loginAttempts += 1;
+      return user.loginAttempts;
+    },
+    findOneAndUpdate: async (condition, updates) => {
+      const user = users.find((u) =>
+        Object.entries(condition).every(([field, value]) => {
+          const current = u[field as keyof User];
+          if (value && typeof value === 'object' && '$gt' in value) {
+            return current instanceof Date && current > (value as { $gt: Date }).$gt;
+          }
+          return current === value;
+        }),
+      );
+      if (!user) return null;
+      Object.assign(user, updates);
+      return user;
+    },
   };
 
   const email: EmailAdapter = {
@@ -63,9 +109,12 @@ function makeFakes(opts: { emailFails?: boolean; createReturnsNull?: boolean } =
       if (opts.emailFails) throw new Error('SMTP down');
       calls.emails.push({ to, rawToken });
     },
+    sendPasswordReset: async (to, rawToken) => {
+      calls.passwordResets.push({ to, rawToken });
+    },
   };
 
-  return { users, calls, deps: { database, email } };
+  return { users, calls, deps: { userDatabase: database, email } };
 }
 
 describe('register', () => {
@@ -87,7 +136,8 @@ describe('register', () => {
   it('lowercases and trims the email before lookup and storage', async () => {
     await register({ ...validInput, email: '  John@Example.COM ' }, fakes.deps);
 
-    expect(fakes.calls.findOne[0].email).toBe('john@example.com');
+    const emailLookup = fakes.calls.findOne.find((filter) => filter.email !== undefined);
+    expect(emailLookup?.email).toBe('john@example.com');
     expect(fakes.users[0].email).toBe('john@example.com');
   });
 
