@@ -1,3 +1,6 @@
+<h1 style="bold">Currently Transforming Cred into a npm package and upgrading it to a adapter architexture. Readme is not Currently Updated according to it. After the code completion then i will update the docs and repo desc. </h1>
+
+
 <p align="center">
   <img src="https://ik.imagekit.io/td7wr0ax7o/Gemini_Generated_Image_cwp7cbcwp7cbcwp7.clean.png" alt="Cred Banner" width="100%">
 </p>
