@@ -65,3 +65,5 @@ export interface RefreshToken {
   expiresAt:Date
   consumed:boolean
 }
+
+export type UserWithoutPassword = Omit<User, 'password'>;
