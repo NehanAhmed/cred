@@ -16,7 +16,7 @@ export type UserQuery = {
 export type CreateUserInput = RegisterRequest & {
     verificationToken?: string,
     verificationTokenExpires?: Date,
-} & Partial<Pick<User, 'provider' | 'googleId' | 'githubId' | 'avatar' | 'isVerified'>>;
+} & Partial<Pick<User, 'provider' | 'googleId' | 'githubId' | 'avatar' | 'isVerified' | 'resetPasswordToken' | 'resetPasswordExpires' | 'loginAttempts' | 'lockoutUntil'>>;
 
 export interface UserDatabaseAdapter {
     findOne(filter: Partial<User>): Promise<User | null>;
