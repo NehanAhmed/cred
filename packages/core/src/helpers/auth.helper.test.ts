@@ -1,8 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import crypto from 'node:crypto';
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import {
   hashToken,
+  verifyToken,
+  verifyRawToken,
+  generateToken,
+  parseToken,
+  parseTokenLookupId,
   verifyAccessToken,
   generateAccessToken,
   generateRefreshTokenData,
@@ -23,32 +28,61 @@ const expectAuthError = (fn: () => unknown, expected: { code: string; statusCode
 };
 
 describe('hashToken', () => {
-  it('returns the SHA-256 hex digest of the input', () => {
+  it('returns a bcrypt hash that verifies the input', async () => {
     const token = 'some-raw-token';
-    const expected = crypto.createHash('sha256').update(token).digest('hex');
+    const hashed = await hashToken(token);
 
-    expect(hashToken(token)).toBe(expected);
-    expect(hashToken(token)).toMatch(/^[a-f0-9]{64}$/);
+    expect(hashed).not.toBe(token);
+    expect(hashed).toMatch(/^\$2[aby]\$/);
+    expect(await bcrypt.compare(token, hashed)).toBe(true);
   });
 
-  it('is deterministic and input-sensitive', () => {
-    expect(hashToken('a')).toBe(hashToken('a'));
-    expect(hashToken('a')).not.toBe(hashToken('b'));
+  it('is salted and input-sensitive', async () => {
+    const first = await hashToken('a');
+    const second = await hashToken('a');
+
+    expect(first).not.toBe(second);
+    expect(await verifyToken('a', first)).toBe(true);
+    expect(await verifyToken('b', first)).toBe(false);
+  });
+});
+
+describe('token lookup helpers', () => {
+  it('generates a token whose lookup id is embedded in the raw value', async () => {
+    const token = await generateToken(32);
+
+    expect(token.rawToken).toMatch(/^[a-f0-9]{32}\.[a-f0-9]{64}$/);
+    expect(token.lookupId).toMatch(/^[a-f0-9]{32}$/);
+    expect(parseTokenLookupId(token.rawToken)).toBe(token.lookupId);
+    expect(parseToken(token.rawToken)?.secret).toMatch(/^[a-f0-9]{64}$/);
+    expect(await verifyRawToken(token.rawToken, token.hashedToken)).toBe(true);
+    // bcrypt hashes only the secret, not the public lookup id.
+    expect(await verifyToken(token.rawToken, token.hashedToken)).toBe(false);
+  });
+
+  it('rejects malformed tokens when extracting the lookup id', () => {
+    expect(parseTokenLookupId('')).toBeNull();
+    expect(parseTokenLookupId('no-separator')).toBeNull();
+    expect(parseTokenLookupId('.secret')).toBeNull();
+    expect(parseTokenLookupId('lookup.')).toBeNull();
   });
 });
 
 describe('generateRefreshTokenData', () => {
-  it('produces a raw token whose stored hash is its SHA-256 digest', () => {
-    const data = generateRefreshTokenData();
+  it('produces a raw token whose stored hash is verifiable', async () => {
+    const data = await generateRefreshTokenData();
 
-    expect(data.rawToken).toMatch(/^[a-f0-9]{80}$/);
-    expect(data.hashedToken).toBe(hashToken(data.rawToken));
+    expect(data.rawToken).toMatch(/^[a-f0-9]{32}\.[a-f0-9]{64}$/);
+    expect(data.lookupId).toMatch(/^[a-f0-9]{32}$/);
+    expect(parseTokenLookupId(data.rawToken)).toBe(data.lookupId);
+    expect(data.hashedToken).not.toBe(data.rawToken);
+    expect(await verifyRawToken(data.rawToken, data.hashedToken)).toBe(true);
     expect(data.family).toMatch(/^[0-9a-f-]{36}$/);
   });
 
-  it('expires in about 7 days', () => {
+  it('expires in about 7 days', async () => {
     const before = Date.now();
-    const data = generateRefreshTokenData();
+    const data = await generateRefreshTokenData();
     const after = Date.now();
     const week = 7 * 24 * 60 * 60 * 1000;
 
@@ -56,9 +90,9 @@ describe('generateRefreshTokenData', () => {
     expect(data.expiresAt.getTime()).toBeLessThanOrEqual(after + week);
   });
 
-  it('produces unique tokens and families', () => {
-    const a = generateRefreshTokenData();
-    const b = generateRefreshTokenData();
+  it('produces unique tokens and families', async () => {
+    const a = await generateRefreshTokenData();
+    const b = await generateRefreshTokenData();
 
     expect(a.rawToken).not.toBe(b.rawToken);
     expect(a.family).not.toBe(b.family);

@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs"
 import { AuthError } from "../errors/auth-error.js";
+import { DuplicateKeyError } from "../errors/duplicate-key-error.js";
 import { PasswordChangeRequest, ProfileUpdateRequest, User, UserWithoutPassword } from "../types/auth.types.js";
 import { AuditDatabaseAdapter, RefreshTokenDatabaseAdapter, UserDatabaseAdapter } from "../types/deps.types.js";
 import { logAuditEvent } from "../helpers/audit.helper.js";
@@ -62,13 +63,17 @@ export async function updatePassword(
     }
 
     const hashedPassword = await bcrypt.hash(input.newPassword, 10);
+
+    // Revoke sessions before changing the credential. If revocation fails the
+    // password is still unchanged, so the caller can retry with the same
+    // current password instead of being locked out of the revocation step.
+    await deps.refreshTokenDatabase.deleteMany({ user: user.id });
+
     const updatedUser = await deps.userDatabase.update(user.id, {
         password: hashedPassword,
         loginAttempts: 0,
         lockoutUntil: null,
     });
-
-    await deps.refreshTokenDatabase.deleteMany({ user: user.id });
 
     await logAuditEvent({
         user: user.id,
@@ -110,11 +115,8 @@ export async function updateProfile(
     try {
         updatedUser = await deps.userDatabase.update(user.id, updates);
     } catch (error: unknown) {
-        // Duck-typed duplicate-key error from the database adapter (no ORM import here).
-        const mongoError = error as Record<string, unknown>;
-        if (mongoError?.code === 11000) {
-            const keyPattern = mongoError.keyPattern as Record<string, unknown> || {};
-            const field = Object.keys(keyPattern)[0] || 'field';
+        if (error instanceof DuplicateKeyError) {
+            const field = error.field || 'field';
             await logAuditEvent({
                 user: context.userId,
                 action: 'profile_update',
@@ -151,6 +153,8 @@ export async function deleteAccount(
 
     await deps.refreshTokenDatabase.deleteMany({ user: user.id });
 
+    await deps.userDatabase.delete(user.id);
+
     await logAuditEvent({
         user: user.id,
         action: 'account_deletion',
@@ -158,6 +162,4 @@ export async function deleteAccount(
         ip: context.ip,
         userAgent: context.userAgent,
     }, { auditDatabase: deps.auditDatabase });
-
-    await deps.userDatabase.delete(user.id);
 }

@@ -16,8 +16,15 @@ export type UserQuery = {
 export type CreateUserInput = RegisterRequest & {
     verificationToken?: string,
     verificationTokenExpires?: Date,
-} & Partial<Pick<User, 'provider' | 'googleId' | 'githubId' | 'avatar' | 'isVerified' | 'resetPasswordToken' | 'resetPasswordExpires' | 'loginAttempts' | 'lockoutUntil'>>;
+    verificationTokenLookup?: string | null,
+} & Partial<Pick<User, 'provider' | 'googleId' | 'githubId' | 'avatar' | 'isVerified' | 'resetPasswordToken' | 'resetPasswordExpires' | 'resetPasswordTokenLookup' | 'loginAttempts' | 'lockoutUntil'>>;
 
+/**
+ * Storage adapters must translate native uniqueness violations (for example,
+ * MongoDB error code 11000) into `DuplicateKeyError` from
+ * `../errors/duplicate-key-error.js`. Core services never inspect driver
+ * specific error codes.
+ */
 export interface UserDatabaseAdapter {
     findOne(filter: Partial<User>): Promise<User | null>;
     create(user: CreateUserInput): Promise<User>;
@@ -67,4 +74,13 @@ export interface AuditDatabaseAdapter {
      * Returns the number of logs matching `filter`.
      */
     count(filter: AuditLogFilter): Promise<number>
+}
+
+/**
+ * Optional sink for audit-write failures. Audit logging is fire-and-forget and
+ * must never change the result of the authentication operation that triggered
+ * it, so a missing logger simply drops the error.
+ */
+export interface AuditErrorLogger {
+    error(...args: unknown[]): void;
 }

@@ -1,9 +1,14 @@
 import bcrypt from "bcryptjs"
-import crypto from 'node:crypto'
 import { AuthError } from "../errors/auth-error.js";
 import { LoginRequest, RegisterRequest, User } from "../types/auth.types.js";
 import { AuditDatabaseAdapter, UserDatabaseAdapter, EmailAdapter, RefreshTokenDatabaseAdapter } from "../types/deps.types.js";
-import { generateAccessToken, generateRefreshTokenData } from "../helpers/auth.helper.js";
+import {
+    generateAccessToken,
+    generateRefreshTokenData,
+    generateToken,
+    parseTokenLookupId,
+    verifyRawToken,
+} from "../helpers/auth.helper.js";
 import { logAuditEvent } from "../helpers/audit.helper.js";
 const LOCK_DURATION_MS = 15 * 60 * 1000
 export async function register(
@@ -30,8 +35,7 @@ export async function register(
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const rawToken = crypto.randomBytes(32).toString('hex');
-    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const { rawToken, hashedToken, lookupId } = await generateToken(32);
 
     const user = await deps.userDatabase.create({
         email,
@@ -42,6 +46,7 @@ export async function register(
         gender,
         verificationToken: hashedToken,
         verificationTokenExpires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
+        verificationTokenLookup: lookupId,
     })
 
     if (!user) {
@@ -74,10 +79,22 @@ export async function register(
 }
 
 export async function verifyEmail(token: string, deps: { userDatabase: UserDatabaseAdapter, auditDatabase?: AuditDatabaseAdapter }, context: { ip?: string, userAgent?: string } = {}) {
-    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    const lookupId = parseTokenLookupId(token);
+    const user = lookupId
+        ? await deps.userDatabase.findOne({ verificationTokenLookup: lookupId })
+        : null;
 
-    const user = await deps.userDatabase.findOne({ verificationToken: hashedToken });
-    if (!user || !user.verificationTokenExpires || user.verificationTokenExpires < new Date()) {
+    const tokenMatches = user?.verificationToken
+        ? await verifyRawToken(token, user.verificationToken)
+        : false;
+
+    if (
+        !user ||
+        !user.verificationToken ||
+        !user.verificationTokenExpires ||
+        user.verificationTokenExpires < new Date() ||
+        !tokenMatches
+    ) {
         await logAuditEvent({
             action: 'email_verification',
             status: 'failure',
@@ -88,11 +105,32 @@ export async function verifyEmail(token: string, deps: { userDatabase: UserDatab
         throw new AuthError('INVALID_TOKEN', 'Invalid or expired token', 400);
     }
 
-    const updatedUser = await deps.userDatabase.update(user.id, {
-        verificationToken: null,
-        verificationTokenExpires: null,
-        isVerified: true
-    })
+    // Consume the token and verify the account atomically so concurrent uses
+    // cannot both succeed.
+    const updatedUser = await deps.userDatabase.findOneAndUpdate(
+        {
+            id: user.id,
+            verificationToken: user.verificationToken,
+            verificationTokenExpires: { $gt: new Date() },
+        },
+        {
+            verificationToken: null,
+            verificationTokenExpires: null,
+            verificationTokenLookup: null,
+            isVerified: true,
+        },
+    )
+
+    if (!updatedUser) {
+        await logAuditEvent({
+            action: 'email_verification',
+            status: 'failure',
+            ip: context.ip,
+            userAgent: context.userAgent,
+            metadata: { reason: 'Invalid or expired token' },
+        }, { auditDatabase: deps.auditDatabase });
+        throw new AuthError('INVALID_TOKEN', 'Invalid or expired token', 400);
+    }
 
     await logAuditEvent({
         user: user.id,
@@ -184,10 +222,10 @@ export async function login(input: LoginRequest, deps: { userDatabase: UserDatab
     })
 
     const accessToken = generateAccessToken({ id: user.id, email: user.email, username: user.username }, config.jwtSecret);
-    const rtData = generateRefreshTokenData();
+    const rtData = await generateRefreshTokenData();
 
     const refreshToken = await deps.refreshTokenDatabase.create({
-
+        lookupId: rtData.lookupId,
         user: user.id,
         family: rtData.family,
         token: rtData.hashedToken,
@@ -234,8 +272,13 @@ export async function logout(
     if (!context.rawToken) {
         throw new AuthError('MISSING_TOKEN', "No token found.", 404)
     }
-    const hashedToken = crypto.createHash('sha256').update(context.rawToken).digest('hex');
-    await deps.refreshTokenDatabase.delete(hashedToken)
+    const lookupId = parseTokenLookupId(context.rawToken);
+    if (lookupId) {
+        const stored = await deps.refreshTokenDatabase.findOne({ lookupId });
+        if (stored && await verifyRawToken(context.rawToken, stored.token)) {
+            await deps.refreshTokenDatabase.delete(stored.token)
+        }
+    }
 
     await logAuditEvent({
         user: context.userId,
@@ -261,10 +304,28 @@ export async function refresh(
         }, { auditDatabase: deps.auditDatabase });
         throw new AuthError('MISSING_TOKEN', "No token found.", 404)
     }
-    const hashedToken = crypto.createHash('sha256').update(context.rawToken).digest('hex');
-    const claimed = await deps.refreshTokenDatabase.findOneAndUpdate({ token: hashedToken, consumed: false }, { consumed: true })
+    const lookupId = parseTokenLookupId(context.rawToken);
+    const candidate = lookupId
+        ? await deps.refreshTokenDatabase.findOne({ lookupId })
+        : null;
+    const tokenMatches = candidate
+        ? await verifyRawToken(context.rawToken, candidate.token)
+        : false;
+
+    if (!lookupId || !candidate || !tokenMatches) {
+        await logAuditEvent({
+            action: 'token_refresh',
+            status: 'failure',
+            ip: context.ip,
+            userAgent: context.userAgent,
+            metadata: { reason: 'Invalid or already consumed refresh token' },
+        }, { auditDatabase: deps.auditDatabase });
+        throw new AuthError('REFRESH_TOKEN_NOT_FOUND', "Invalid token.", 401)
+    }
+
+    const claimed = await deps.refreshTokenDatabase.findOneAndUpdate({ lookupId, consumed: false }, { consumed: true })
     if (!claimed) {
-        const existing = await deps.refreshTokenDatabase.findOne({ token: hashedToken })
+        const existing = await deps.refreshTokenDatabase.findOne({ lookupId })
         if (existing) {
             await deps.refreshTokenDatabase.deleteMany({ family: existing.family, user: existing.user })
             await logAuditEvent({
@@ -308,8 +369,9 @@ export async function refresh(
         }, { auditDatabase: deps.auditDatabase });
         throw new AuthError('UNEXPECTED_ERROR_OCCURED', "User not found.", 500)
     }
-    const rtData = generateRefreshTokenData();
+    const rtData = await generateRefreshTokenData();
     const successor = await deps.refreshTokenDatabase.create({
+        lookupId: rtData.lookupId,
         user: user.id,
         family: claimed.family,
         token: rtData.hashedToken,
@@ -324,7 +386,7 @@ export async function refresh(
     // The successor is issued into that same family, so the revocation deletes it
     // as well. Re-check the predecessor after issuing the successor to close the
     // window where a replay removed the family before the successor was written.
-    const predecessor = await deps.refreshTokenDatabase.findOne({ token: hashedToken })
+    const predecessor = await deps.refreshTokenDatabase.findOne({ lookupId })
     if (!predecessor) {
         await deps.refreshTokenDatabase.delete(rtData.hashedToken).catch(() => {})
         throw new AuthError('REFRESH_TOKEN_REUSE_DETECTED', "Refresh token reuse detected. All sessions revoked.", 401)
@@ -381,16 +443,23 @@ export async function forgotPassword(
         }, { auditDatabase: deps.auditDatabase });
         throw new AuthError('UNEXPECTED_ERROR_OCCURED', 'If an account exists, a password reset link has been sent.', 500)
     }
-    const token = crypto.randomBytes(32).toString('hex');
-    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
-    const updateUser = await deps.userDatabase.update(user.id, { resetPasswordToken: hashedToken, resetPasswordExpires: new Date(Date.now() + 3600000) })
+    const { rawToken: token, hashedToken, lookupId } = await generateToken(32);
+    const updateUser = await deps.userDatabase.update(user.id, {
+        resetPasswordToken: hashedToken,
+        resetPasswordExpires: new Date(Date.now() + 3600000),
+        resetPasswordTokenLookup: lookupId,
+    })
     if (!updateUser) {
         throw new AuthError('UNEXPECTED_ERROR_OCCURED', 'If an account exists, a password reset link has been sent.', 500)
     }
     try {
         await deps.email.sendPasswordReset(user.email, token);
     } catch {
-        await deps.userDatabase.update(user.id, { resetPasswordToken: null, resetPasswordExpires: null })
+        await deps.userDatabase.update(user.id, {
+            resetPasswordToken: null,
+            resetPasswordExpires: null,
+            resetPasswordTokenLookup: null,
+        })
         await logAuditEvent({
             user: user.id,
             action: 'password_reset_request',
@@ -418,20 +487,50 @@ export async function resetPassword(
     deps: { userDatabase: UserDatabaseAdapter, refreshTokenDatabase: RefreshTokenDatabaseAdapter, auditDatabase?: AuditDatabaseAdapter },
     context: { ip?: string, userAgent?: string } = {}
 ) {
-    const hashedToken = crypto.createHash('sha256').update(input.token).digest('hex')
+    const lookupId = parseTokenLookupId(input.token);
+    const user = lookupId
+        ? await deps.userDatabase.findOne({ resetPasswordTokenLookup: lookupId })
+        : null;
+    const tokenMatches = user?.resetPasswordToken
+        ? await verifyRawToken(input.token, user.resetPasswordToken)
+        : false;
+
+    if (
+        !user ||
+        !user.resetPasswordToken ||
+        !user.resetPasswordExpires ||
+        user.resetPasswordExpires <= new Date() ||
+        !tokenMatches
+    ) {
+        await logAuditEvent({
+            action: 'password_reset',
+            status: 'failure',
+            ip: context.ip,
+            userAgent: context.userAgent,
+            metadata: { reason: 'Invalid or expired token' },
+        }, { auditDatabase: deps.auditDatabase });
+        throw new AuthError('INVALID_TOKEN', 'Invalid or expired token', 400);
+    }
+
     const hashedPassword = await bcrypt.hash(input.newPassword, 10);
+
+    // Revoke sessions before consuming the reset token. If revocation fails the
+    // password and token are untouched, so the same reset link can be retried.
+    await deps.refreshTokenDatabase.deleteMany({ user: user.id })
 
     // Consume the token and replace the password in one conditional update so
     // concurrent/replayed resets cannot both succeed and expired tokens are rejected.
     const updateUser = await deps.userDatabase.findOneAndUpdate(
         {
-            resetPasswordToken: hashedToken,
+            id: user.id,
+            resetPasswordToken: user.resetPasswordToken,
             resetPasswordExpires: { $gt: new Date() }
         },
         {
             password: hashedPassword,
             resetPasswordToken: null,
             resetPasswordExpires: null,
+            resetPasswordTokenLookup: null,
             loginAttempts: 0,
             lockoutUntil: null
         }

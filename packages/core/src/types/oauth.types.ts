@@ -11,8 +11,24 @@ export interface OAuthUser {
     provider?: OAuthProvider;
 }
 
+export interface FindOrCreateOAuthUserInput {
+    provider: 'google' | 'github';
+    profileId: string;
+    email?: string;
+    displayName?: string;
+    avatar?: string;
+    /**
+     * Whether the provider has verified ownership of `email`. Email-based
+     * linking is only allowed when this is true; unverified addresses must go
+     * through a separate authenticated link flow or a new account.
+     */
+    isEmailVerified: boolean;
+}
+
 export interface OAuthCallbackInput {
     user?: OAuthUser | null;
+    /** The provider used for the current login, which may differ from the linked account's stored provider. */
+    provider: 'google' | 'github';
 }
 
 export interface OAuthCallbackResult {

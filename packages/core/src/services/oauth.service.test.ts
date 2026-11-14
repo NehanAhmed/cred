@@ -35,14 +35,14 @@ describe('oauthCallback', () => {
     );
 
     const result = await oauthCallback(
-      { user: oauthUser },
+      { user: oauthUser, provider: 'google' },
       callbackDeps(),
       { jwtSecret: TEST_JWT_SECRET },
       { ip: '127.0.0.1', userAgent: 'test-agent' },
     );
 
     expect(result.user).toEqual(oauthUser);
-    expect(result.refreshToken).toMatch(/^[a-f0-9]{80}$/);
+    expect(result.refreshToken).toMatch(/^[a-f0-9]{32}\.[a-f0-9]{64}$/);
 
     const decoded = jwt.verify(result.accessToken, TEST_JWT_SECRET) as {
       id: string;
@@ -69,7 +69,7 @@ describe('oauthCallback', () => {
 
   it('audits a successful oauth login with the provider', async () => {
     await oauthCallback(
-      { user: oauthUser },
+      { user: oauthUser, provider: 'google' },
       callbackDeps(),
       { jwtSecret: TEST_JWT_SECRET },
       { ip: '127.0.0.1' },
@@ -85,9 +85,45 @@ describe('oauthCallback', () => {
     ]);
   });
 
+  it('audits the current provider while preserving the stored account provider', async () => {
+    deps.users.users.push(
+      buildUser(
+        {
+          username: 'githubuser',
+          email: 'github@example.com',
+          password: 'hashed-password',
+          isVerified: true,
+          provider: 'github',
+          githubId: 'github-1',
+        },
+        'user-1',
+      ),
+    );
+
+    const result = await oauthCallback(
+      {
+        user: { id: 'user-1', email: 'github@example.com', username: 'githubuser', provider: 'github' },
+        provider: 'google',
+      },
+      callbackDeps(),
+      { jwtSecret: TEST_JWT_SECRET },
+      { ip: '127.0.0.1' },
+    );
+
+    expect(result.user.provider).toBe('github');
+    expect(deps.audit.logs).toEqual([
+      expect.objectContaining({
+        user: 'user-1',
+        action: 'oauth_login',
+        status: 'success',
+        provider: 'google',
+      }),
+    ]);
+  });
+
   it('throws OAUTH_FAILED and audits the failure when no user is returned', async () => {
     await expect(
-      oauthCallback({ user: null }, callbackDeps(), { jwtSecret: TEST_JWT_SECRET }, { ip: '127.0.0.1' }),
+      oauthCallback({ user: null, provider: 'google' }, callbackDeps(), { jwtSecret: TEST_JWT_SECRET }, { ip: '127.0.0.1' }),
     ).rejects.toMatchObject({ code: 'OAUTH_FAILED', statusCode: 401 });
 
     expect(deps.tokens.tokens).toHaveLength(0);
@@ -103,7 +139,7 @@ describe('oauthCallback', () => {
   it('throws OAUTH_INVALID_USER and audits the failure when fields are missing', async () => {
     await expect(
       oauthCallback(
-        { user: { id: 'user-1', email: undefined, username: 'oauthuser' } },
+        { user: { id: 'user-1', email: undefined, username: 'oauthuser' }, provider: 'google' },
         callbackDeps(),
         { jwtSecret: TEST_JWT_SECRET },
         {},
@@ -126,7 +162,7 @@ describe('oauthCallback', () => {
     deps.tokens.createFails = true;
 
     await expect(
-      oauthCallback({ user: oauthUser }, callbackDeps(), { jwtSecret: TEST_JWT_SECRET }, {}),
+      oauthCallback({ user: oauthUser, provider: 'google' }, callbackDeps(), { jwtSecret: TEST_JWT_SECRET }, {}),
     ).rejects.toMatchObject({ code: 'REFRESH_TOKEN_CREATION_FAILED', statusCode: 500 });
   });
 });
@@ -154,7 +190,7 @@ describe('findOrCreateOAuthUser', () => {
     });
 
     const result = await findOrCreateOAuthUser(
-      { provider: 'google', profileId: 'google-123', email: 'new@example.com', displayName: 'New' },
+      { provider: 'google', profileId: 'google-123', email: 'new@example.com', displayName: 'New', isEmailVerified: true },
       depsWithAudit(),
     );
 
@@ -172,7 +208,7 @@ describe('findOrCreateOAuthUser', () => {
     });
 
     const result = await findOrCreateOAuthUser(
-      { provider: 'google', profileId: 'google-123', email: 'local@example.com', avatar: 'https://avatar' },
+      { provider: 'google', profileId: 'google-123', email: '  LOCAL@Example.COM ', avatar: 'https://avatar', isEmailVerified: true },
       depsWithAudit(),
     );
 
@@ -203,7 +239,7 @@ describe('findOrCreateOAuthUser', () => {
     });
 
     const result = await findOrCreateOAuthUser(
-      { provider: 'google', profileId: 'google-123', email: 'github@example.com' },
+      { provider: 'google', profileId: 'google-123', email: 'github@example.com', isEmailVerified: true },
       depsWithAudit(),
     );
 
@@ -213,9 +249,35 @@ describe('findOrCreateOAuthUser', () => {
     expect(deps.audit.logs).toHaveLength(0);
   });
 
+  it('does not link an existing account when the provider has not verified the email', async () => {
+    await deps.users.create({
+      username: 'localuser',
+      email: 'local@example.com',
+      password: 'hashed-password',
+      isVerified: true,
+    });
+
+    await expect(
+      findOrCreateOAuthUser(
+        {
+          provider: 'google',
+          profileId: 'google-123',
+          email: '  LOCAL@Example.COM ',
+          isEmailVerified: false,
+        },
+        depsWithAudit(),
+      ),
+    ).rejects.toMatchObject({ name: 'DuplicateKeyError' });
+
+    expect(deps.users.users).toHaveLength(1);
+    expect(deps.users.users[0].provider).toBe('local');
+    expect(deps.users.users[0].googleId).toBeUndefined();
+    expect(deps.audit.logs).toHaveLength(0);
+  });
+
   it('creates a new user with a sanitized username and a fallback email', async () => {
     const result = await findOrCreateOAuthUser(
-      { provider: 'github', profileId: 'github-9', displayName: 'Display Name!', avatar: 'https://avatar' },
+      { provider: 'github', profileId: 'github-9', displayName: 'Display Name!', avatar: 'https://avatar', isEmailVerified: false },
       depsWithAudit(),
     );
 
@@ -238,7 +300,7 @@ describe('findOrCreateOAuthUser', () => {
     });
 
     const result = await findOrCreateOAuthUser(
-      { provider: 'github', profileId: 'github-9', displayName: 'Display Name!' },
+      { provider: 'github', profileId: 'github-9', displayName: 'Display Name!', isEmailVerified: false },
       depsWithAudit(),
     );
 
@@ -248,7 +310,7 @@ describe('findOrCreateOAuthUser', () => {
 
   it('falls back to a random username when nothing sanitizable remains', async () => {
     const result = await findOrCreateOAuthUser(
-      { provider: 'github', profileId: 'github-9', displayName: '@@@###' },
+      { provider: 'github', profileId: 'github-9', displayName: '@@@###', isEmailVerified: false },
       depsWithAudit(),
     );
 
