@@ -1,3 +1,4 @@
+import { AuditLogInterface, AuditLogParams } from "./audit.types.js";
 import { RefreshToken, RegisterRequest, User } from "./auth.types.js";
 
 /**
@@ -26,6 +27,7 @@ export interface UserDatabaseAdapter {
     findOneAndUpdate(condition: UserQuery, updates: Partial<User>): Promise<User | null>;
 }
 
+
 export interface RefreshTokenDatabaseAdapter {
     findOne(filter: Partial<RefreshToken>): Promise<RefreshToken | null>;
     create(token: RefreshToken): Promise<RefreshToken>;
@@ -44,4 +46,8 @@ export interface RefreshTokenDatabaseAdapter {
 export interface EmailAdapter {
     sendEmailVerification(email: string, rawToken: string): Promise<void>;
     sendPasswordReset(email: string, rawToken: string): Promise<void>;
+}
+
+export interface AuditDatabaseAdapter {
+    create(audit: Partial<AuditLogInterface>): Promise<AuditLogInterface>
 }
