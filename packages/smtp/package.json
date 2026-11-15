@@ -1,0 +1,66 @@
+{
+  "name": "@cred/smtp",
+  "version": "1.0.0",
+  "description": "Nodemailer SMTP email adapter for Cred authentication flows.",
+  "keywords": [
+    "cred",
+    "auth",
+    "authentication",
+    "smtp",
+    "nodemailer",
+    "email",
+    "adapter"
+  ],
+  "author": "",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NehanAhmed/cred.git",
+    "directory": "packages/smtp"
+  },
+  "homepage": "https://github.com/NehanAhmed/cred/tree/main/packages/smtp#readme",
+  "bugs": {
+    "url": "https://github.com/NehanAhmed/cred/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "packageManager": "pnpm@10.33.2",
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@cred/core": "workspace:*",
+    "nodemailer": "^9.0.3"
+  },
+  "devDependencies": {
+    "@cred/config": "workspace:*",
+    "@types/node": "^26.6.6",
+    "@types/nodemailer": "^8.0.1",
+    "eslint": "^10.15.0",
+    "tsdown": "^0.23.7",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.2",
+    "vitest": "^5.1.0"
+  }
+}
