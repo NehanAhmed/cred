@@ -1,5 +1,4 @@
 import { emailVerification, passwordReset, type EmailAdapter } from '@cred/core';
-import type nodemailer from 'nodemailer';
 
 const PREFIX = '@cred/smtp';
 
@@ -9,9 +8,20 @@ const DEFAULT_RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 const EMAIL_VERIFICATION_SUBJECT = 'Email Verification';
 const PASSWORD_RESET_SUBJECT = 'Password Reset Link';
 
+/** Transport-neutral message handed to an email transport. */
+export type OutboundEmail = {
+  from: string;
+  to: string;
+  subject: string;
+  html: string;
+};
+
+/** The one operation a transport (SMTP, Resend, ...) must provide. */
+export type EmailSender = (message: OutboundEmail) => Promise<void>;
+
 export type emailAdapterOptions = {
   /** Envelope sender used for every message. */
-  SMTP_FROM: string;
+  EMAIL_FROM: string;
   /** Public base URL used to build the verification and reset links. */
   BACKEND_URL: string;
   /** IANA time zone used for the reset-link expiry. Defaults to `UTC`. */
@@ -22,7 +32,7 @@ export type emailAdapterOptions = {
 
 const parseFromAddress = (value: string): string => {
   if (typeof value !== 'string' || value.trim() === '') {
-    throw new Error(`${PREFIX}: "SMTP_FROM" is required`);
+    throw new Error(`${PREFIX}: "EMAIL_FROM" is required`);
   }
 
   return value.trim();
@@ -85,18 +95,22 @@ const createExpiryFormatter = (timeZone: string): ((date: Date) => string) => {
 };
 
 /**
- * Maps core's `EmailAdapter` contract onto Nodemailer.
+ * Maps core's `EmailAdapter` contract onto a transport supplied by the caller.
+ *
+ * Both built-in transports (SMTP and Resend) go through this function so email
+ * copy, link building and expiry formatting can never drift apart.
  *
  * Every send is awaited: core deletes a freshly registered user when
- * `sendEmailVerification` rejects, so swallowing the SMTP error would leave an
- * unverifiable account behind. Failures are re-thrown with the transport error
- * preserved as `cause`; the raw token never appears in the message.
+ * `sendEmailVerification` rejects, so swallowing the transport error would
+ * leave an unverifiable account behind. Failures are re-thrown with the
+ * transport error preserved as `cause`; the raw token never appears in the
+ * message.
  */
-export const emailAdapter = (
-  transporter: nodemailer.Transporter,
+export const createEmailAdapter = (
+  send: EmailSender,
   options: emailAdapterOptions
 ): EmailAdapter => {
-  const from = parseFromAddress(options.SMTP_FROM);
+  const from = parseFromAddress(options.EMAIL_FROM);
   const backendUrl = parseBackendUrl(options.BACKEND_URL);
   const formatExpiry = createExpiryFormatter(options.timeZone?.trim() || 'UTC');
   const resetTokenTtlMs = assertPositiveInteger(
@@ -104,18 +118,9 @@ export const emailAdapter = (
     options.resetTokenTtlMs ?? DEFAULT_RESET_TOKEN_TTL_MS
   );
 
-  const send = async (to: string, subject: string, html: string): Promise<void> => {
+  const sendMessage = async (to: string, subject: string, html: string): Promise<void> => {
     try {
-      await transporter.sendMail({
-        from,
-        to,
-        subject,
-        html,
-        // Messages only contain inline HTML; loading remote or local
-        // resources would be an SSRF/arbitrary-file-read primitive.
-        disableFileAccess: true,
-        disableUrlAccess: true
-      });
+      await send({ from, to, subject, html });
     } catch (error) {
       throw new Error(`${PREFIX}: failed to send "${subject}" to ${to}`, { cause: error });
     }
@@ -125,13 +130,13 @@ export const emailAdapter = (
     sendEmailVerification: async (email: string, rawToken: string): Promise<void> => {
       const verificationLink = `${backendUrl}/api/auth/verify-email/${encodeURIComponent(rawToken)}`;
 
-      await send(email, EMAIL_VERIFICATION_SUBJECT, emailVerification(verificationLink));
+      await sendMessage(email, EMAIL_VERIFICATION_SUBJECT, emailVerification(verificationLink));
     },
     sendPasswordReset: async (email: string, rawToken: string): Promise<void> => {
       const resetLink = `${backendUrl}/api/auth/reset-password/${encodeURIComponent(rawToken)}`;
       const expiresAt = formatExpiry(new Date(Date.now() + resetTokenTtlMs));
 
-      await send(email, PASSWORD_RESET_SUBJECT, passwordReset(resetLink, expiresAt));
+      await sendMessage(email, PASSWORD_RESET_SUBJECT, passwordReset(resetLink, expiresAt));
     }
   };
 };

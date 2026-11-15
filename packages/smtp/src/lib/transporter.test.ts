@@ -1,13 +1,13 @@
-import { describe, expect, it } from 'vitest';
-import { getTransporter, type smtpConnectionOptions } from './transporter.js';
+import { describe, expect, it, vi } from 'vitest';
+import type nodemailer from 'nodemailer';
+import { getTransporter, smtpSend, type smtpOptions } from './transporter.js';
 
-const baseOptions: smtpConnectionOptions = {
+const baseOptions: smtpOptions = {
   SMTP_HOST: 'smtp.example.com'
 };
 
 type TransportInternals = {
   options: Record<string, unknown>;
-  _defaults: Record<string, unknown>;
 };
 
 const readInternals = (transporter: ReturnType<typeof getTransporter>): TransportInternals =>
@@ -78,6 +78,29 @@ describe('getTransporter', () => {
     ['out of range port', { ...baseOptions, SMTP_PORT: 70_000 }, /SMTP_PORT/],
     ['unknown secure flag', { ...baseOptions, SMTP_SECURE: 'maybe' }, /SMTP_SECURE/]
   ])('rejects an invalid configuration: %s', (_label, options, expected) => {
-    expect(() => getTransporter(options as smtpConnectionOptions)).toThrow(expected);
+    expect(() => getTransporter(options as smtpOptions)).toThrow(expected);
+  });
+});
+
+describe('smtpSend', () => {
+  it('maps the transport-neutral message onto Nodemailer', async () => {
+    const sendMail = vi.fn(async () => ({ messageId: 'message-1' }));
+    const send = smtpSend({ sendMail } as unknown as nodemailer.Transporter);
+
+    await send({
+      from: 'no-reply@example.com',
+      to: 'user@example.com',
+      subject: 'Email Verification',
+      html: '<p>Hello</p>'
+    });
+
+    expect(sendMail).toHaveBeenCalledWith({
+      from: 'no-reply@example.com',
+      to: 'user@example.com',
+      subject: 'Email Verification',
+      html: '<p>Hello</p>',
+      disableFileAccess: true,
+      disableUrlAccess: true
+    });
   });
 });

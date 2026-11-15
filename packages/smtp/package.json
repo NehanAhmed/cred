@@ -1,13 +1,14 @@
 {
   "name": "@cred/smtp",
   "version": "1.0.0",
-  "description": "Nodemailer SMTP email adapter for Cred authentication flows.",
+  "description": "SMTP (Nodemailer) and Resend email adapter for Cred authentication flows.",
   "keywords": [
     "cred",
     "auth",
     "authentication",
     "smtp",
     "nodemailer",
+    "resend",
     "email",
     "adapter"
   ],

@@ -1,41 +1,26 @@
-import { describe, expect, it, vi } from 'vitest';
-import type nodemailer from 'nodemailer';
-import { emailAdapter, type emailAdapterOptions } from './email.helper.js';
-
-type SentMessage = {
-  from: string;
-  to: string;
-  subject: string;
-  html: string;
-  disableFileAccess: boolean;
-  disableUrlAccess: boolean;
-};
+import { describe, expect, it } from 'vitest';
+import { createEmailAdapter, type EmailSender, type OutboundEmail } from './email.helper.js';
 
 const BACKEND_URL = 'https://api.example.com';
-const SMTP_FROM = 'no-reply@example.com';
+const EMAIL_FROM = 'no-reply@example.com';
 
-const createFakeTransporter = () => {
-  const sent: SentMessage[] = [];
-  const sendMail = vi.fn(async (message: SentMessage) => {
+const createCapturingSender = () => {
+  const sent: OutboundEmail[] = [];
+  const send: EmailSender = async (message) => {
     sent.push(message);
-    return { messageId: `message-${sent.length}` };
-  });
-
-  return {
-    transporter: { sendMail } as unknown as nodemailer.Transporter,
-    sent,
-    sendMail
   };
+
+  return { send, sent };
 };
 
-const buildAdapter = (overrides: Partial<emailAdapterOptions> = {}) => {
-  const fake = createFakeTransporter();
-  const adapter = emailAdapter(fake.transporter, { BACKEND_URL, SMTP_FROM, ...overrides });
+const buildAdapter = (overrides: Partial<Parameters<typeof createEmailAdapter>[1]> = {}) => {
+  const fake = createCapturingSender();
+  const adapter = createEmailAdapter(fake.send, { EMAIL_FROM, BACKEND_URL, ...overrides });
 
   return { ...fake, adapter };
 };
 
-describe('emailAdapter', () => {
+describe('createEmailAdapter', () => {
   it('sends a verification email whose link points at the API', async () => {
     const { adapter, sent } = buildAdapter();
 
@@ -43,34 +28,20 @@ describe('emailAdapter', () => {
 
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({
-      from: SMTP_FROM,
+      from: EMAIL_FROM,
       to: 'user@example.com',
       subject: 'Email Verification'
     });
     expect(sent[0].html).toContain(`${BACKEND_URL}/api/auth/verify-email/raw-token`);
   });
 
-  it('hardens the message against remote and local resource loading', async () => {
-    const { adapter, sent } = buildAdapter();
-
-    await adapter.sendPasswordReset('user@example.com', 'raw-token');
-
-    expect(sent[0].disableFileAccess).toBe(true);
-    expect(sent[0].disableUrlAccess).toBe(true);
-  });
-
-  it('does not resolve before the SMTP server accepts the message', async () => {
+  it('does not resolve before the transport accepts the message', async () => {
     let release: (() => void) | undefined;
-    const sendMail = vi.fn(
-      () =>
-        new Promise((resolve) => {
-          release = () => resolve({ messageId: 'pending' });
-        })
-    );
-    const adapter = emailAdapter({ sendMail } as unknown as nodemailer.Transporter, {
-      SMTP_FROM,
-      BACKEND_URL
-    });
+    const send: EmailSender = () =>
+      new Promise((resolve) => {
+        release = resolve;
+      });
+    const adapter = createEmailAdapter(send, { EMAIL_FROM, BACKEND_URL });
 
     let settled = false;
     const pending = adapter.sendEmailVerification('user@example.com', 'raw-token').then(() => {
@@ -86,23 +57,19 @@ describe('emailAdapter', () => {
   });
 
   it('propagates delivery failures with the transport error as cause', async () => {
-    const transporter = {
-      sendMail: vi.fn(async () => {
-        throw new Error('connection refused');
-      })
-    } as unknown as nodemailer.Transporter;
-    const adapter = emailAdapter(transporter, { SMTP_FROM, BACKEND_URL });
+    const transportError = new Error('connection refused');
+    const failing: EmailSender = async () => {
+      throw transportError;
+    };
+    const adapter = createEmailAdapter(failing, { EMAIL_FROM, BACKEND_URL });
 
-    await expect(
-      adapter.sendEmailVerification('user@example.com', 'raw-token')
-    ).rejects.toMatchObject({
-      message: expect.stringContaining('failed to send "Email Verification"'),
-      cause: expect.objectContaining({ message: 'connection refused' })
-    });
+    const error = await adapter
+      .sendEmailVerification('user@example.com', 'raw-token')
+      .catch((caught: unknown) => caught);
 
-    await expect(adapter.sendPasswordReset('user@example.com', 'raw-token')).rejects.toMatchObject({
-      cause: expect.objectContaining({ message: 'connection refused' })
-    });
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain('failed to send "Email Verification"');
+    expect((error as Error).cause).toBe(transportError);
   });
 
   it('builds the reset link and states the expiry in UTC by default', async () => {
@@ -148,32 +115,32 @@ describe('emailAdapter', () => {
     ['non http scheme', 'ftp://api.example.com'],
     ['query string', 'https://api.example.com/?tenant=cred']
   ])('rejects an invalid BACKEND_URL: %s', (_label, backendUrl) => {
-    const { transporter } = createFakeTransporter();
+    const { send } = createCapturingSender();
 
-    expect(() => emailAdapter(transporter, { SMTP_FROM, BACKEND_URL: backendUrl })).toThrow(
+    expect(() => createEmailAdapter(send, { EMAIL_FROM, BACKEND_URL: backendUrl })).toThrow(
       /BACKEND_URL/
     );
   });
 
   it('rejects a missing sender address', () => {
-    const { transporter } = createFakeTransporter();
+    const { send } = createCapturingSender();
 
-    expect(() => emailAdapter(transporter, { SMTP_FROM: '  ', BACKEND_URL })).toThrow(/SMTP_FROM/);
+    expect(() => createEmailAdapter(send, { EMAIL_FROM: '  ', BACKEND_URL })).toThrow(/EMAIL_FROM/);
   });
 
   it('rejects an unknown time zone instead of silently using the server zone', () => {
-    const { transporter } = createFakeTransporter();
+    const { send } = createCapturingSender();
 
     expect(() =>
-      emailAdapter(transporter, { SMTP_FROM, BACKEND_URL, timeZone: 'Mars/Olympus' })
+      createEmailAdapter(send, { EMAIL_FROM, BACKEND_URL, timeZone: 'Mars/Olympus' })
     ).toThrow(/timeZone/);
   });
 
-  it('rejects a non positive reset token lifetime', () => {
-    const { transporter } = createFakeTransporter();
+  it.each([0, -1, 1.5])('rejects a non positive reset token lifetime: %s', (ttl) => {
+    const { send } = createCapturingSender();
 
-    expect(() => emailAdapter(transporter, { SMTP_FROM, BACKEND_URL, resetTokenTtlMs: 0 })).toThrow(
-      /resetTokenTtlMs/
-    );
+    expect(() =>
+      createEmailAdapter(send, { EMAIL_FROM, BACKEND_URL, resetTokenTtlMs: ttl })
+    ).toThrow(/resetTokenTtlMs/);
   });
 });

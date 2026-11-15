@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import type { EmailSender } from '../helpers/email.helper.js';
 
 /** Operational defaults applied when the caller does not override them. */
 export const SMTP_DEFAULTS = {
@@ -21,22 +22,21 @@ export type smtpTimeouts = {
 };
 
 /**
- * SMTP connection settings.
+ * SMTP connection settings. Only used when the SMTP transport is selected, so
+ * every field is optional here and validated at construction time.
  *
  * These values commonly come straight from environment variables, so ports and
  * booleans are parsed defensively (`'false'` stays `false`) and invalid values
  * throw instead of silently degrading the transport.
  */
 export type smtpOptions = {
-  SMTP_HOST: string;
+  SMTP_HOST?: string;
   /** Defaults to 587. */
   SMTP_PORT?: number | string;
   /** Implicit TLS (SMTPS). Defaults to `true` when `SMTP_PORT` is 465. */
   SMTP_SECURE?: boolean | string;
   SMTP_USER?: string;
   SMTP_PASS?: string;
-  /** Envelope sender applied to every message by `emailAdapter`. */
-  SMTP_FROM: string;
   /** Refuse plaintext delivery. Defaults to `true` unless `SMTP_SECURE` is enabled. */
   requireTLS?: boolean | string;
   /** Pooled connections kept open. Defaults to 5. */
@@ -56,7 +56,7 @@ const isBlank = (value: unknown): boolean =>
 
 const readRequiredString = (name: string, value: string | undefined): string => {
   if (typeof value !== 'string' || value.trim() === '') {
-    throw new Error(`${PREFIX}: "${name}" is required`);
+    throw new Error(`${PREFIX}: "${name}" is required for the SMTP provider`);
   }
 
   return value.trim();
@@ -115,16 +115,10 @@ const readInteger = (
 };
 
 /**
- * Everything the transport needs except the envelope sender, which the email
- * adapter applies per message.
- */
-export type smtpConnectionOptions = Omit<smtpOptions, 'SMTP_FROM'>;
-
-/**
  * Builds a pooled SMTP transport. Connections are opened lazily on the first
  * send (or on `verify()`), so constructing a transport never blocks startup.
  */
-export const getTransporter = (options: smtpConnectionOptions): nodemailer.Transporter => {
+export const getTransporter = (options: smtpOptions): nodemailer.Transporter => {
   if (options === null || typeof options !== 'object') {
     throw new Error(`${PREFIX}: SMTP options are required`);
   }
@@ -142,7 +136,9 @@ export const getTransporter = (options: smtpConnectionOptions): nodemailer.Trans
   const pass = readOptionalString(options.SMTP_PASS, false);
 
   if ((user === undefined) !== (pass === undefined)) {
-    throw new Error(`${PREFIX}: "SMTP_USER" and "SMTP_PASS" must be configured together`);
+    throw new Error(
+      `${PREFIX}: "SMTP_USER" and "SMTP_PASS" must be configured together for the SMTP provider`
+    );
   }
 
   const timeouts = options.timeouts ?? {};
@@ -173,3 +169,22 @@ export const getTransporter = (options: smtpConnectionOptions): nodemailer.Trans
     tls: { minVersion: SMTP_DEFAULTS.tlsMinVersion }
   });
 };
+
+/**
+ * Adapts a Nodemailer transporter to the transport-neutral `EmailSender`
+ * contract used by `createEmailAdapter`.
+ */
+export const smtpSend =
+  (transporter: nodemailer.Transporter): EmailSender =>
+  async (message) => {
+    await transporter.sendMail({
+      from: message.from,
+      to: message.to,
+      subject: message.subject,
+      html: message.html,
+      // Messages only contain inline HTML; loading remote or local resources
+      // would be an SSRF/arbitrary-file-read primitive.
+      disableFileAccess: true,
+      disableUrlAccess: true
+    });
+  };
