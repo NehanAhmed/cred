@@ -1,5 +1,5 @@
 import { AuditLogInterface } from "./audit.types.js";
-import { RefreshToken, User } from "./auth.types.js";
+import { RefreshToken, RegisterRequest, User } from "./auth.types.js";
 
 /**
  * A filter value that also supports the comparison operators needed for
