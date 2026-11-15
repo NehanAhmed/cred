@@ -1,9 +1,9 @@
-import nodemailer from 'nodemailer';
+import nodemailer, { type Transporter } from 'nodemailer';
 import { emailVerification, passwordReset } from '../templates/email.templates.js';
 
-let transporter: nodemailer.Transporter | null = null;
+let transporter: Transporter | null = null;
 let fromAddress: string;
-let initPromise: Promise<nodemailer.Transporter> | null = null;
+let initPromise: Promise<Transporter> | null = null;
 
 const getTransporter = async () => {
   if (transporter) return transporter;

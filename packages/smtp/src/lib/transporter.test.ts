@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type nodemailer from 'nodemailer';
+import type { Transporter } from 'nodemailer';
 import { getTransporter, smtpSend, type smtpOptions } from './transporter.js';
 
 const baseOptions: smtpOptions = {
@@ -85,7 +85,7 @@ describe('getTransporter', () => {
 describe('smtpSend', () => {
   it('maps the transport-neutral message onto Nodemailer', async () => {
     const sendMail = vi.fn(async () => ({ messageId: 'message-1' }));
-    const send = smtpSend({ sendMail } as unknown as nodemailer.Transporter);
+    const send = smtpSend({ sendMail } as unknown as Transporter);
 
     await send({
       from: 'no-reply@example.com',

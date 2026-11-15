@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import nodemailer, { type Transporter } from 'nodemailer';
 import type { EmailSender } from '../helpers/email.helper.js';
 
 /** Operational defaults applied when the caller does not override them. */
@@ -118,7 +118,7 @@ const readInteger = (
  * Builds a pooled SMTP transport. Connections are opened lazily on the first
  * send (or on `verify()`), so constructing a transport never blocks startup.
  */
-export const getTransporter = (options: smtpOptions): nodemailer.Transporter => {
+export const getTransporter = (options: smtpOptions): Transporter => {
   if (options === null || typeof options !== 'object') {
     throw new Error(`${PREFIX}: SMTP options are required`);
   }
@@ -175,7 +175,7 @@ export const getTransporter = (options: smtpOptions): nodemailer.Transporter => 
  * contract used by `createEmailAdapter`.
  */
 export const smtpSend =
-  (transporter: nodemailer.Transporter): EmailSender =>
+  (transporter: Transporter): EmailSender =>
   async (message) => {
     await transporter.sendMail({
       from: message.from,
