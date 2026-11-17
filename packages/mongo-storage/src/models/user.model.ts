@@ -41,12 +41,20 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    verificationTokenLookup: {
+      type: String,
+      default: null,
+    },
     resetPasswordToken: {
       type: String,
       default: null,
     },
     resetPasswordExpires: {
       type: Date,
+      default: null,
+    },
+    resetPasswordTokenLookup: {
+      type: String,
       default: null,
     },
     googleId: {
@@ -84,8 +92,18 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-userSchema.index({ verificationToken: 1, verificationTokenExpires: 1 });
-userSchema.index({ resetPasswordToken: 1, resetPasswordExpires: 1 });
+// The legacy hashed-token lookups moved to the opaque `*Lookup` ids, so the
+// old compound indexes are dropped. The lookup fields are only ever compared
+// by equality and are `null` for most users, hence the partial unique indexes
+// (a sparse index would still collide on explicit `null` values).
+userSchema.index(
+  { verificationTokenLookup: 1 },
+  { unique: true, partialFilterExpression: { verificationTokenLookup: { $type: 'string' } } },
+);
+userSchema.index(
+  { resetPasswordTokenLookup: 1 },
+  { unique: true, partialFilterExpression: { resetPasswordTokenLookup: { $type: 'string' } } },
+);
 userSchema.index({ googleId: 1 }, { unique: true, sparse: true });
 userSchema.index({ githubId: 1 }, { unique: true, sparse: true });
 

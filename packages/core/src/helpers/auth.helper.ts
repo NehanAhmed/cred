@@ -3,10 +3,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { JWTPayload, RefreshTokenData } from '../types/auth.types.js';
 import { AuthError } from '../errors/auth-error.js';
-
-const ACCESS_TOKEN_EXPIRY = '15m';
-const REFRESH_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
-const TOKEN_HASH_ROUNDS = 10;
+import { defaultConfig, resolveConfig, type CredConfig } from '../config.js';
 
 export interface GeneratedToken {
   rawToken: string;
@@ -40,8 +37,8 @@ export const parseTokenLookupId = (rawToken: string): string | null => {
  * Hashes a token with bcrypt. Unlike a plain digest, a bcrypt hash is salted,
  * so callers must use `verifyToken` rather than comparing hashes for equality.
  */
-export const hashToken = async (token: string): Promise<string> => {
-  return bcrypt.hash(token, TOKEN_HASH_ROUNDS);
+export const hashToken = async (token: string, config: Partial<CredConfig> = {}): Promise<string> => {
+  return bcrypt.hash(token, resolveConfig(config).tokenHashRounds);
 };
 
 export const verifyToken = async (token: string, hashedToken: string): Promise<boolean> => {
@@ -57,31 +54,51 @@ export const verifyRawToken = async (rawToken: string, hashedToken: string): Pro
   return parsed ? verifyToken(parsed.secret, hashedToken) : false;
 };
 
-export const generateToken = async (secretBytes = 32): Promise<GeneratedToken> => {
+export const generateToken = async (
+  secretBytes = 32,
+  config: Partial<CredConfig> = {},
+): Promise<GeneratedToken> => {
   const lookupId = crypto.randomBytes(16).toString('hex');
   const secret = crypto.randomBytes(secretBytes).toString('hex');
   const rawToken = `${lookupId}.${secret}`;
   // Hash only the secret: bcrypt truncates inputs at 72 bytes, while the full
   // raw token is longer. The random lookup id already identifies the record.
-  const hashedToken = await hashToken(secret);
+  const hashedToken = await hashToken(secret, config);
 
   return { rawToken, hashedToken, lookupId };
 };
 
-export const generateRefreshTokenData = async (): Promise<RefreshTokenData> => {
-  const { rawToken, hashedToken, lookupId } = await generateToken(32);
+export const generateRefreshTokenData = async (
+  config: Partial<CredConfig> = {},
+): Promise<RefreshTokenData> => {
+  const { rawToken, hashedToken, lookupId } = await generateToken(32, config);
   const family = crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS);
+  const expiresAt = new Date(Date.now() + resolveConfig(config).refreshTokenTtlMs);
 
   return { rawToken, family, hashedToken, expiresAt, lookupId };
 };
 
 
-export const generateAccessToken = (user: { id: string | string; email: string; username: string },secret: string): string => {
+export function assertJwtSecret(secret: unknown): asserts secret is string {
+  if (typeof secret !== 'string' || secret.length === 0) {
+    throw new Error('Cred: jwtSecret is required and must be a non-empty string');
+  }
+  // HS256 keys should carry at least 256 bits of entropy (RFC 7518 §3.2).
+  if (secret.length < 32) {
+    throw new Error('Cred: jwtSecret must be at least 32 characters');
+  }
+}
+export const generateAccessToken = (
+  user: { id: string; email: string; username: string },
+  secret: string,
+  config: Partial<CredConfig> = {},
+): string => {
+  assertJwtSecret(secret);
+
   return jwt.sign(
-    { id: user.id.toString(), email: user.email, username: user.username, tokenType: 'access' } satisfies JWTPayload,
-    secret  ,
-    { expiresIn: ACCESS_TOKEN_EXPIRY }
+    { id: user.id, email: user.email, username: user.username, tokenType: 'access' } satisfies JWTPayload,
+    secret,
+    { expiresIn: resolveConfig(config).accessTokenExpiry as jwt.SignOptions['expiresIn'], algorithm: 'HS256' },
   );
 };
 
@@ -96,7 +113,7 @@ export const verifyAccessToken = (token: string, secret: string): JWTPayload => 
   }
 
   try {
-    const decoded = jwt.verify(token, secret) as JWTPayload;
+    const decoded = jwt.verify(token, secret, { algorithms: ['HS256'] }) as JWTPayload;
 
     if (decoded.tokenType !== 'access' || !decoded.id || !decoded.email || !decoded.username) {
       throw new AuthError('INVALID_TOKEN', 'Invalid token', 401);

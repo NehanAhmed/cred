@@ -4,6 +4,23 @@ import { DuplicateKeyError } from "../errors/duplicate-key-error.js";
 import { ProfileUpdateRequest, User, UserWithoutPassword } from "../types/auth.types.js";
 import { AuditDatabaseAdapter, RefreshTokenDatabaseAdapter, UserDatabaseAdapter } from "../types/deps.types.js";
 import { logAuditEvent } from "../helpers/audit.helper.js";
+import { resolveConfig, type CredConfig } from "../config.js";
+
+/**
+ * Fields a user may see about themselves. Everything else (password, token
+ * hashes, login counters, lockout deadline) is internal state and is stripped
+ * from every public return value.
+ */
+const PUBLIC_PROFILE_FIELDS = [
+    'id', 'username', 'email', 'bio', 'phoneNumber', 'gender', 'avatar',
+    'provider', 'isVerified', 'googleId', 'githubId',
+    'lastLogin', 'lastIp', 'createdAt', 'updatedAt',
+] as const satisfies ReadonlyArray<keyof UserWithoutPassword>;
+
+const toPublicUser = (user: User): UserWithoutPassword =>
+    Object.fromEntries(
+        PUBLIC_PROFILE_FIELDS.map((field) => [field, user[field]]),
+    ) as unknown as UserWithoutPassword;
 
 export async function getProfile(
     context: { userId: string },
@@ -14,15 +31,16 @@ export async function getProfile(
         throw new AuthError('USER_NOT_FOUND', 'User not found', 404);
     }
 
-    const { password: _password, ...userWithoutPassword } = user;
-    return userWithoutPassword;
+    return toPublicUser(user);
 }
 
 export async function updatePassword(
     input: import("../types/auth.types.js").PasswordChangeRequest,
     context: { userId: string, ip?: string, userAgent?: string },
-    deps: { userDatabase: UserDatabaseAdapter, refreshTokenDatabase: RefreshTokenDatabaseAdapter, auditDatabase?: AuditDatabaseAdapter }
+    deps: { userDatabase: UserDatabaseAdapter, refreshTokenDatabase: RefreshTokenDatabaseAdapter, auditDatabase?: AuditDatabaseAdapter },
+    config: Partial<CredConfig> = {}
 ): Promise<UserWithoutPassword> {
+    const cfg = resolveConfig(config);
     const user = await deps.userDatabase.findOne({ id: context.userId });
 
     if (!user) {
@@ -62,18 +80,35 @@ export async function updatePassword(
         throw new AuthError('INVALID_CURRENT_PASSWORD', 'Current password is incorrect', 400);
     }
 
-    const hashedPassword = await bcrypt.hash(input.newPassword, 10);
+    const hashedPassword = await bcrypt.hash(input.newPassword, cfg.passwordHashRounds);
 
     // Revoke sessions before changing the credential. If revocation fails the
     // password is still unchanged, so the caller can retry with the same
     // current password instead of being locked out of the revocation step.
     await deps.refreshTokenDatabase.deleteMany({ user: user.id });
 
-    const _updatedUser = await deps.userDatabase.update(user.id, {
-        password: hashedPassword,
-        loginAttempts: 0,
-        lockoutUntil: null,
-    });
+    try {
+        await deps.userDatabase.update(user.id, {
+            password: hashedPassword,
+            loginAttempts: 0,
+            lockoutUntil: null,
+        });
+    } catch (error: unknown) {
+        if (error instanceof DuplicateKeyError) {
+            const field = error.field || 'field';
+            await logAuditEvent({
+                user: context.userId,
+                action: 'profile_update',
+                status: 'failure',
+                ip: context.ip,
+                userAgent: context.userAgent,
+                metadata: { reason: `${field} is already taken` },
+            }, { auditDatabase: deps.auditDatabase });
+            throw new AuthError('DUPLICATE_KEY', `${field} is already taken`, 400);
+        }
+        throw error;
+    }
+
 
     await logAuditEvent({
         user: user.id,
@@ -85,7 +120,6 @@ export async function updatePassword(
 
     return await getProfile(context, deps);
 }
-
 export async function updateProfile(
     input: ProfileUpdateRequest,
     context: { userId: string, ip?: string, userAgent?: string },
@@ -137,8 +171,7 @@ export async function updateProfile(
         userAgent: context.userAgent,
     }, { auditDatabase: deps.auditDatabase });
 
-    const { password: _, ...userWithoutPassword } = updatedUser;
-    return userWithoutPassword;
+    return toPublicUser(updatedUser);
 }
 
 export async function deleteAccount(

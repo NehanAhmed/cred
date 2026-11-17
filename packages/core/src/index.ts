@@ -8,6 +8,7 @@ export * from './types/auth.types.js';
 export * from './types/oauth.types.js';
 export * from './types/audit.types.js';
 export * from './types/deps.types.js';
+export * from './config.js';
 export * from './helpers/auth.helper.js';
 export * from './helpers/audit.helper.js';
 export * from './templates/email.templates.js';

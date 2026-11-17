@@ -1,19 +1,13 @@
-export const AUDIT_ACTIONS = [
-  'register',
-  'login',
-  'logout',
-  'token_refresh',
-  'email_verification',
-  'password_reset_request',
-  'password_reset',
-  'oauth_login',
-  'profile_update',
-  'password_change',
-  'account_deletion',
-] as const;
+import type { AuditAction } from '@cred/core';
 
-export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+export { AUDIT_ACTIONS } from '@cred/core';
+export type { AuditAction } from '@cred/core';
 
+/**
+ * HTTP-layer audit parameters. Distinct from core's storage-level
+ * `AuditLogInterface`: controllers pass a `userId`, and the storage adapter
+ * maps it onto the nullable `user` reference.
+ */
 export interface AuditLogParams {
   userId?: string;
   action: AuditAction;

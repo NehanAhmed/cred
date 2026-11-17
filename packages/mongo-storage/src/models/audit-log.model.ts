@@ -1,5 +1,5 @@
 import mongoose, { Connection, Model } from 'mongoose';
-import { AUDIT_ACTIONS } from '../types/audit.types.js';
+import { AUDIT_ACTIONS } from '@cred/core';
 
 const auditLogSchema = new mongoose.Schema(
   {
@@ -42,6 +42,6 @@ const auditLogSchema = new mongoose.Schema(
 auditLogSchema.index({ user: 1, createdAt: -1 });
 auditLogSchema.index({ createdAt: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 });
 
-export function getAuditModel(connection: Connection, name = 'CredUser', collection = 'AuditLog') {
+export function getAuditModel(connection: Connection, name = 'CredAuditLog', collection = 'AuditLog') {
   return (connection.models[name] as Model<any>) ?? connection.model(name, auditLogSchema, collection);
 }

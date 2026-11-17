@@ -11,6 +11,7 @@ import {
   resetPassword,
 } from './auth.service.js';
 import { AuthError } from '../errors/auth-error.js';
+import { DuplicateKeyError } from '../errors/duplicate-key-error.js';
 import { hashToken, parseToken, parseTokenLookupId, verifyRawToken } from '../helpers/auth.helper.js';
 import { makeDeps, TEST_JWT_SECRET } from '../__tests__/fakes.js';
 import type { RegisterRequest } from '../types/auth.types.js';
@@ -142,6 +143,27 @@ describe('register', () => {
     expect(deps.email.verifications).toHaveLength(0);
   });
 
+  it('maps a unique-index race lost after the pre-check to USER_EXISTS', async () => {
+    const createSpy = vi.spyOn(deps.users, 'create').mockRejectedValue(new DuplicateKeyError('email'));
+
+    try {
+      await expect(
+        register(validInput, { userDatabase: deps.users, email: deps.email, auditDatabase: deps.audit }),
+      ).rejects.toMatchObject({ code: 'USER_EXISTS', statusCode: 400 });
+    } finally {
+      createSpy.mockRestore();
+    }
+
+    expect(deps.email.verifications).toHaveLength(0);
+    expect(deps.audit.logs).toEqual([
+      expect.objectContaining({
+        action: 'register',
+        status: 'failure',
+        metadata: { reason: 'User already exists', email: 'john@example.com', username: 'johndoe' },
+      }),
+    ]);
+  });
+
   it('rolls back the user and throws EMAIL_SEND_FAILED when the email fails', async () => {
     deps.email.verificationFails = true;
 
@@ -241,7 +263,7 @@ describe('login', () => {
   it('throws INVALID_CREDENTIALS for an unknown user and audits the failure', async () => {
     await expect(
       login({ email: 'ghost@example.com', password }, loginDeps(), { jwtSecret: TEST_JWT_SECRET }),
-    ).rejects.toMatchObject({ code: 'INVALID_CREDENTIALS', statusCode: 400 });
+    ).rejects.toMatchObject({ code: 'INVALID_CREDENTIALS', statusCode: 401 });
 
     expect(deps.audit.logs).toEqual([
       expect.objectContaining({
@@ -329,7 +351,7 @@ describe('login', () => {
 
   it('throws ACCOUNT_LOCKED for a locked account and audits the failure', async () => {
     for (let i = 0; i < 5; i++) {
-      await login({ email: 'test@example.com', password: 'WrongPass1' }, loginDeps(), { jwtSecret: TEST_JWT_SECRET }).catch(() => {});
+      await login({ email: 'test@example.com', password: 'WrongPass1' }, loginDeps(), { jwtSecret: TEST_JWT_SECRET }).catch(() => { });
     }
 
     await expect(
@@ -347,7 +369,7 @@ describe('login', () => {
 
   it('allows login after the lock duration expires', async () => {
     for (let i = 0; i < 5; i++) {
-      await login({ email: 'test@example.com', password: 'WrongPass1' }, loginDeps(), { jwtSecret: TEST_JWT_SECRET }).catch(() => {});
+      await login({ email: 'test@example.com', password: 'WrongPass1' }, loginDeps(), { jwtSecret: TEST_JWT_SECRET }).catch(() => { });
     }
     const user = deps.users.users.find((u) => u.id === userId)!;
     user.lockoutUntil = new Date(Date.now() - 1000);
@@ -357,8 +379,8 @@ describe('login', () => {
   });
 
   it('resets loginAttempts and lockout on a successful login', async () => {
-    await login({ email: 'test@example.com', password: 'WrongPass1' }, loginDeps(), { jwtSecret: TEST_JWT_SECRET }).catch(() => {});
-    await login({ email: 'test@example.com', password: 'WrongPass1' }, loginDeps(), { jwtSecret: TEST_JWT_SECRET }).catch(() => {});
+    await login({ email: 'test@example.com', password: 'WrongPass1' }, loginDeps(), { jwtSecret: TEST_JWT_SECRET }).catch(() => { });
+    await login({ email: 'test@example.com', password: 'WrongPass1' }, loginDeps(), { jwtSecret: TEST_JWT_SECRET }).catch(() => { });
 
     await login(
       { email: 'test@example.com', password },
@@ -419,14 +441,17 @@ describe('logout', () => {
     ]);
   });
 
-  it('throws MISSING_TOKEN when no token is present', async () => {
+  it('succeeds idempotently when no token is present', async () => {
     const deps = makeDeps();
 
-    await expect(
-      logout({ rawToken: '', userId: 'user-1' }, { refreshTokenDatabase: deps.tokens }),
-    ).rejects.toMatchObject({ code: 'MISSING_TOKEN' });
+    // Logout is idempotent: no cookie simply means nothing to delete, so the
+    // call resolves instead of throwing (matching the legacy silent 200).
+    await logout({ rawToken: '', userId: 'user-1' }, { refreshTokenDatabase: deps.tokens, auditDatabase: deps.audit });
 
     expect(deps.tokens.tokens).toHaveLength(0);
+    expect(deps.audit.logs).toEqual([
+      expect.objectContaining({ user: 'user-1', action: 'logout', status: 'success' }),
+    ]);
   });
 });
 
@@ -468,10 +493,10 @@ describe('refresh', () => {
     });
   };
 
-  it('throws MISSING_TOKEN and audits the failure when no token is given', async () => {
+  it('throws MISSING_TOKEN with 401 and audits the failure when no token is given', async () => {
     await expect(
       refresh({ rawToken: '' }, refreshDeps(), { jwtSecret: TEST_JWT_SECRET }),
-    ).rejects.toMatchObject({ code: 'MISSING_TOKEN' });
+    ).rejects.toMatchObject({ code: 'MISSING_TOKEN', statusCode: 401 });
 
     expect(deps.audit.logs).toEqual([
       expect.objectContaining({
@@ -561,13 +586,13 @@ describe('refresh', () => {
     ]);
   });
 
-  it('throws UNEXPECTED_ERROR_OCCURED and audits the failure when the user is gone', async () => {
+  it('throws UNEXPECTED_ERROR_OCCURRED and audits the failure when the user is gone', async () => {
     await seedToken();
     await deps.users.delete(userId);
 
     await expect(
       refresh({ rawToken }, refreshDeps(), { jwtSecret: TEST_JWT_SECRET }),
-    ).rejects.toMatchObject({ code: 'UNEXPECTED_ERROR_OCCURED' });
+    ).rejects.toMatchObject({ code: 'UNEXPECTED_ERROR_OCCURRED' });
 
     expect(deps.audit.logs).toEqual([
       expect.objectContaining({
@@ -723,18 +748,9 @@ describe('forgotPassword', () => {
   });
 
   it('audits the failure for an unknown email', async () => {
-    await expect(
-      forgotPassword({ email: 'ghost@example.com' }, forgotDeps(), {}),
-    ).rejects.toMatchObject({ code: 'USER_NOT_FOUND', statusCode: 404 });
+    const result = await forgotPassword({ email: "not-existing@gmail.com" }, forgotDeps())
+    expect(result.message).toBe('If an account exists, a password reset link has been sent');
 
-    expect(deps.audit.logs).toEqual([
-      expect.objectContaining({
-        action: 'password_reset_request',
-        status: 'failure',
-        user: null,
-        metadata: { reason: 'User not found', email: 'ghost@example.com' },
-      }),
-    ]);
   });
 
   it('audits the failure for a social login account', async () => {
@@ -747,10 +763,8 @@ describe('forgotPassword', () => {
       googleId: 'google123',
     });
 
-    await expect(
-      forgotPassword({ email: 'google@example.com' }, forgotDeps(), {}),
-    ).rejects.toMatchObject({ code: 'UNEXPECTED_ERROR_OCCURED' });
-
+    const result = await forgotPassword({ email: 'google@example.com' }, forgotDeps(), {})
+    expect(result.message).toBe('If an account exists, a password reset link has been sent')
     expect(deps.audit.logs).toEqual([
       expect.objectContaining({
         user: expect.any(String),

@@ -73,10 +73,20 @@ const buildUserCondition = (condition: UserQuery): Record<string, unknown> => {
  * `id`, `createdAt` and `updatedAt` are managed by the adapter/database. Strip
  * them so a caller cannot reassign the document identity or immutable
  * timestamp fields.
+ *
+ * A `null`/empty `password` is also stripped: the "local accounts need a
+ * password" rule lives in a pre-save hook, which does not run on the update
+ * paths below, so clearing the password must be impossible here too.
  */
 const buildUserUpdate = (updates: Partial<User>): Record<string, unknown> => {
-    const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...rest } = updates;
-    return omitUndefined(rest);
+    const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, password, ...rest } = updates;
+    const clean = omitUndefined(rest as Record<string, unknown>);
+
+    if (typeof password === 'string' && password.length > 0) {
+        clean.password = password;
+    }
+
+    return clean;
 };
 
 const isDuplicateKeyError = (error: unknown): error is MongoErrorLike =>
@@ -128,18 +138,28 @@ export const createUserAdapter = (UserModel: MongooseModel): UserDatabaseAdapter
         },
 
         update: async (id, updates) => {
-            const document = await UserModel.findByIdAndUpdate(
-                id,
-                { $set: buildUserUpdate(updates) },
-                { new: true, runValidators: true, strict: false },
-            )
-                .lean()
-                .exec();
+            try {
 
-            // The core interface declares a non-null result; a missing user
-            // here is a concurrent-deletion race, which the existing fake
-            // adapters also surface as `null`.
-            return toUserOrNull(document) as User;
+                const document = await UserModel.findByIdAndUpdate(
+                    id,
+                    { $set: buildUserUpdate(updates) },
+                    { new: true, runValidators: true, strict: false },
+                )
+                    .lean()
+                    .exec();
+
+                // The core interface declares a non-null result; a missing user
+                // here is a concurrent-deletion race, which the existing fake
+                // adapters also surface as `null`.
+                return toUserOrNull(document) as User;
+            } catch (error) {
+                if (isDuplicateKeyError(error)) {
+                    throw new DuplicateKeyError(duplicateKeyField(error));
+                }
+
+                throw error;
+            }
+
         },
 
         findOneByTwoConditions: async (filter1, filter2) => {

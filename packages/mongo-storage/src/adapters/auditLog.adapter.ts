@@ -27,7 +27,10 @@ const toPlainObject = (value: unknown): Record<string, unknown> => {
 };
 
 const toAuditLog = (value: unknown): AuditLogInterface => {
-    const { __v: _version, user, ...rest } = toPlainObject(value);
+    // `_id` and `__v` are storage internals; the core contract exposes plain
+    // objects without them. Consumers needing a stable id can read `createdAt`
+    // alongside the deterministic `_id` tie-breaker used for pagination.
+    const { _id: _documentId, __v: _version, user, ...rest } = toPlainObject(value);
 
     return {
         ...rest,

@@ -10,6 +10,12 @@ configuration decision rather than a code change.
 pnpm add @cred/smtp @cred/core
 ```
 
+> **Dependency contract:** `@cred/core` is declared as a regular (runtime)
+> dependency on purpose — this adapter imports the email HTML templates
+> (`emailVerification`, `passwordReset`) from core at runtime, not just its
+> types. `nodemailer` is a peer dependency so the host application supplies
+> its own single copy.
+
 ## Usage
 
 ```ts

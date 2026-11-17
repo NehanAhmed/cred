@@ -130,7 +130,7 @@ describe('generateAccessToken + verifyAccessToken round trip', () => {
   it('throws INVALID_TOKEN when signed with a different secret', () => {
     const token = generateAccessToken(
       { id: 'user-1', email: 'user@example.com', username: 'user' },
-      'another-secret',
+      'another-jwt-secret-0123456789abcdef-0123456789abcdef',
     );
 
     expectAuthError(() => verifyAccessToken(token, TEST_JWT_SECRET), { code: 'INVALID_TOKEN', statusCode: 401 });

@@ -1,26 +1,10 @@
-export interface RegisterRequest {
-  username: string;
-  email: string;
-  password: string;
-  bio?: string;
-  phoneNumber?: string;
-  gender?: 'male' | 'female' | 'other';
-}
-
-export interface LoginRequest {
-  email?: string;
-  username?: string;
-  password: string;
-}
-
-export interface PasswordChangeRequest {
-  currentPassword: string;
-  newPassword: string;
-}
-
-export interface ProfileUpdateRequest {
-  username?: string;
-  bio?: string;
-  phoneNumber?: string;
-  gender?: 'male' | 'female' | 'other';
-}
+/**
+ * `@cred/core` is the single home for the auth-facing request types; this file
+ * only re-exports them so existing `@cred/shared` consumers keep working.
+ */
+export type {
+  RegisterRequest,
+  LoginRequest,
+  PasswordChangeRequest,
+  ProfileUpdateRequest,
+} from '@cred/core';

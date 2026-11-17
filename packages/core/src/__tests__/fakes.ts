@@ -11,18 +11,50 @@ import type {
   UserDatabaseAdapter,
 } from '../types/deps.types.js';
 
-export const TEST_JWT_SECRET = 'test-jwt-secret';
+// `generateAccessToken` rejects secrets shorter than 32 characters, so the
+// shared test secret must satisfy the same policy as a production secret.
+export const TEST_JWT_SECRET = 'test-jwt-secret-0123456789abcdef-0123456789abcdef';
 
 /**
  * Matches an in-memory record against an adapter filter, including the
- * `{ $gt }` comparison form used for time-based conditional updates.
+ * comparison-operator form (`$gt`, `$gte`, `$lt`, `$lte`, `$ne`) used for
+ * time-based conditional updates.
  */
 export function matchesFilter(record: unknown, filter: unknown): boolean {
   const rec = record as Record<string, unknown>;
   return Object.entries(filter as Record<string, unknown>).every(([key, value]) => {
     const current = rec[key];
-    if (value !== null && typeof value === 'object' && '$gt' in (value as Record<string, unknown>)) {
-      return current instanceof Date && current > (value as { $gt: Date }).$gt;
+    if (value !== null && typeof value === 'object') {
+      const ops = value as Record<string, unknown>;
+      return Object.entries(ops).every(([op, operand]) => {
+        switch (op) {
+          case '$ne': return current !== operand;
+          case '$gt':
+          case '$gte':
+          case '$lt':
+          case '$lte':
+            // Mirrors MongoDB's type bracketing: range operators only match
+            // values of the same kind as the operand (dates or numbers).
+            if (current instanceof Date && operand instanceof Date) {
+              switch (op) {
+                case '$gt': return current > operand;
+                case '$gte': return current >= operand;
+                case '$lt': return current < operand;
+                case '$lte': return current <= operand;
+              }
+            }
+            if (typeof current === 'number' && typeof operand === 'number') {
+              switch (op) {
+                case '$gt': return current > operand;
+                case '$gte': return current >= operand;
+                case '$lt': return current < operand;
+                case '$lte': return current <= operand;
+              }
+            }
+            return false;
+          default: return false;
+        }
+      });
     }
     return current === value;
   });
