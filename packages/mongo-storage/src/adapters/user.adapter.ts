@@ -128,24 +128,33 @@ export const createUserAdapter = (UserModel: MongooseModel): UserDatabaseAdapter
         },
 
         update: async (id, updates) => {
-            const document = await UserModel.findByIdAndUpdate(
-                id,
-                { $set: buildUserUpdate(updates) },
-                { new: true, runValidators: true, strict: false },
-            )
-                .lean()
-                .exec();
+            try {
+                const document = await UserModel.findByIdAndUpdate(
+                    id,
+                    { $set: buildUserUpdate(updates) },
+                    { returnDocument: 'after', runValidators: true, strict: false },
+                )
+                    .lean()
+                    .exec();
 
-            // The core interface declares a non-null result; a missing user
-            // here is a concurrent-deletion race, which the existing fake
-            // adapters also surface as `null`.
-            return toUserOrNull(document) as User;
+                // The core interface declares a non-null result; a missing user
+                // here is a concurrent-deletion race, which the existing fake
+                // adapters also surface as `null`.
+                return toUserOrNull(document) as User;
+            } catch (error) {
+                if (isDuplicateKeyError(error)) {
+                    throw new DuplicateKeyError(duplicateKeyField(error));
+                }
+
+                throw error;
+            }
         },
 
         findOneByTwoConditions: async (filter1, filter2) => {
             const filters = [filter1, filter2]
                 .map((filter) => omitUndefined(filter as Record<string, unknown>))
-                .filter((filter) => Object.keys(filter).length > 0);
+                .filter((filter) => Object.keys(filter).length > 0)
+                .map((filter) => buildUserFilter(filter as Partial<User>));
 
             if (filters.length === 0) {
                 return null;
@@ -164,7 +173,7 @@ export const createUserAdapter = (UserModel: MongooseModel): UserDatabaseAdapter
             const document = await UserModel.findByIdAndUpdate(
                 id,
                 { $inc: { loginAttempts: 1 } },
-                { new: true },
+                { returnDocument: 'after' },
             )
                 .lean()
                 .exec();
@@ -178,15 +187,28 @@ export const createUserAdapter = (UserModel: MongooseModel): UserDatabaseAdapter
         },
 
         findOneAndUpdate: async (condition, updates) => {
-            const document = await UserModel.findOneAndUpdate(
-                buildUserCondition(condition),
-                { $set: buildUserUpdate(updates) },
-                { new: true, runValidators: true, strict: false, strictQuery: false },
-            )
-                .lean()
-                .exec();
+            try {
+                const document = await UserModel.findOneAndUpdate(
+                    buildUserCondition(condition),
+                    { $set: buildUserUpdate(updates) },
+                    {
+                        returnDocument: 'after',
+                        runValidators: true,
+                        strict: false,
+                        strictQuery: false,
+                    },
+                )
+                    .lean()
+                    .exec();
 
-            return toUserOrNull(document);
+                return toUserOrNull(document);
+            } catch (error) {
+                if (isDuplicateKeyError(error)) {
+                    throw new DuplicateKeyError(duplicateKeyField(error));
+                }
+
+                throw error;
+            }
         },
     };
 };

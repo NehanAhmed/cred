@@ -125,33 +125,54 @@ export const createRefreshTokenAdapter = (
         },
 
         update: async (id, updates) => {
-            const document = await RefreshTokenModel.findByIdAndUpdate(
-                id,
-                { $set: buildTokenUpdate(updates) },
-                { new: true, runValidators: true, strict: false },
-            )
-                .lean()
-                .exec();
+            try {
+                const document = await RefreshTokenModel.findByIdAndUpdate(
+                    id,
+                    { $set: buildTokenUpdate(updates) },
+                    { returnDocument: 'after', runValidators: true, strict: false },
+                )
+                    .lean()
+                    .exec();
 
-            // The core interface declares a non-null result; a missing token
-            // here is a concurrent-deletion race, which the existing fake
-            // adapters also surface as `null`.
-            return toRefreshTokenOrNull(document) as RefreshToken;
+                // The core interface declares a non-null result; a missing token
+                // here is a concurrent-deletion race, which the existing fake
+                // adapters also surface as `null`.
+                return toRefreshTokenOrNull(document) as RefreshToken;
+            } catch (error) {
+                if (isDuplicateKeyError(error)) {
+                    throw new DuplicateKeyError(duplicateKeyField(error));
+                }
+
+                throw error;
+            }
         },
 
         findOneAndUpdate: async (condition, updation) => {
             // Atomic compare-and-set: only the caller that matches the
             // condition receives the document, which is what makes refresh
             // token rotation and reuse detection race-free.
-            const document = await RefreshTokenModel.findOneAndUpdate(
-                buildTokenFilter(condition),
-                { $set: buildTokenUpdate(updation) },
-                { new: true, runValidators: true, strict: false, strictQuery: false },
-            )
-                .lean()
-                .exec();
+            try {
+                const document = await RefreshTokenModel.findOneAndUpdate(
+                    buildTokenFilter(condition),
+                    { $set: buildTokenUpdate(updation) },
+                    {
+                        returnDocument: 'after',
+                        runValidators: true,
+                        strict: false,
+                        strictQuery: false,
+                    },
+                )
+                    .lean()
+                    .exec();
 
-            return toRefreshTokenOrNull(document);
+                return toRefreshTokenOrNull(document);
+            } catch (error) {
+                if (isDuplicateKeyError(error)) {
+                    throw new DuplicateKeyError(duplicateKeyField(error));
+                }
+
+                throw error;
+            }
         },
 
         deleteMany: async (filter) => {

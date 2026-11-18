@@ -32,6 +32,6 @@ refreshTokenSchema.index({ token: 1 });
 refreshTokenSchema.index({ user: 1, family: 1 });
 refreshTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-export function getRefreshModel(connection: Connection, name = 'CredUser', collection = 'RefreshToken') {
+export function getRefreshModel(connection: Connection, name = 'CredRefreshToken', collection = 'RefreshToken') {
   return (connection.models[name] as Model<any>) ?? connection.model(name, refreshTokenSchema, collection);
 }
