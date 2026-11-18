@@ -46,15 +46,16 @@ const toRefreshTokenOrNull = (value: unknown): RefreshToken | null =>
 const omitUndefined = (input: object): Record<string, unknown> =>
     Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
 
-const buildTokenFilter = (filter: Partial<RefreshToken>): Record<string, unknown> => {
-    const query = omitUndefined(filter);
-
-    if (Object.keys(query).length === 0) {
-        throw new Error('A refresh-token query requires at least one filter field');
-    }
-
-    return query;
-};
+/**
+ * Translate a storage-neutral refresh-token filter into a Mongo query.
+ *
+ * An empty result is intentional: Mongo treats `{}` as "match any document",
+ * which keeps `findOne` and conditional updates consistent with the driver.
+ * `deleteMany` adds an explicit guard because an unbounded delete is
+ * destructive.
+ */
+const buildTokenFilter = (filter: Partial<RefreshToken>): Record<string, unknown> =>
+    omitUndefined(filter);
 
 /**
  * `id` and the timestamp columns are managed by the database. Strip them so a
@@ -105,9 +106,9 @@ export const createRefreshTokenAdapter = (
 
         create: async (token) => {
             try {
-                // `lookupId` is part of the core contract but may not exist in
-                // every schema revision. Writing with `strict: false` keeps it
-                // persisted so lookups by opaque token id keep working.
+                // Token lookup fields are part of the core contract. Writing
+                // with `strict: false` keeps older host schemas that predate
+                // them working without dropping the values.
                 const document = new RefreshTokenModel(token, undefined, { strict: false });
                 const saved = await document.save();
                 return toRefreshToken(saved);
@@ -176,7 +177,16 @@ export const createRefreshTokenAdapter = (
         },
 
         deleteMany: async (filter) => {
-            await RefreshTokenModel.deleteMany(buildTokenFilter(filter)).exec();
+            const query = buildTokenFilter(filter);
+
+            // Deleting without a filter would wipe every refresh token, so the
+            // adapter refuses the unbounded form while reads and conditional
+            // updates keep Mongo's match-any semantics.
+            if (Object.keys(query).length === 0) {
+                throw new Error('deleteMany requires at least one filter field');
+            }
+
+            await RefreshTokenModel.deleteMany(query).exec();
         },
     };
 };

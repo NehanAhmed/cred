@@ -93,23 +93,29 @@ describe('createUserAdapter', () => {
       });
     });
 
-    it('finds fields that exist in the core contract but not in the schema', async () => {
+    it('finds users by verification and password-reset token lookups', async () => {
       const created = await adapter.create(
-        createInput({ verificationTokenLookup: 'verification-lookup-1' })
+        createInput({
+          verificationTokenLookup: 'verification-lookup-1',
+          resetPasswordTokenLookup: 'reset-lookup-1'
+        })
       );
 
       await expect(
         adapter.findOne({ verificationTokenLookup: 'verification-lookup-1' })
+      ).resolves.toMatchObject({ id: created.id });
+      await expect(
+        adapter.findOne({ resetPasswordTokenLookup: 'reset-lookup-1' })
       ).resolves.toMatchObject({ id: created.id });
     });
 
     it.each([
       ['an empty filter', {}],
       ['a filter made only of undefined values', { bio: undefined }]
-    ])('rejects %s', async (_label, filter) => {
-      await expect(adapter.findOne(filter)).rejects.toThrow(
-        'findOne requires at least one filter field'
-      );
+    ])('matches the first document for %s', async (_label, filter) => {
+      const created = await adapter.create(createInput());
+
+      await expect(adapter.findOne(filter)).resolves.toMatchObject({ id: created.id });
     });
   });
 
@@ -580,10 +586,13 @@ describe('createUserAdapter', () => {
     it.each([
       ['an empty condition', {} as UserQuery],
       ['a condition made only of undefined values', { id: undefined } as UserQuery]
-    ])('rejects %s', async (_label, condition) => {
-      await expect(adapter.findOneAndUpdate(condition, { bio: 'x' })).rejects.toThrow(
-        'A conditional user update requires at least one condition'
-      );
+    ])('updates the first matching document for %s', async (_label, condition) => {
+      const created = await adapter.create(createInput());
+
+      await expect(adapter.findOneAndUpdate(condition, { bio: 'updated' })).resolves.toMatchObject({
+        id: created.id,
+        bio: 'updated'
+      });
     });
   });
 });

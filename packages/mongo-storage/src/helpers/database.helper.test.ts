@@ -73,7 +73,7 @@ describe('toMongoFilter', () => {
   it.each([
     ['an empty object', {}],
     ['only undefined values', { id: undefined, email: undefined, bio: undefined }]
-  ])('rejects %s because an unbounded lookup is never intentional', (_label, filter) => {
-    expect(() => toMongoFilter(filter)).toThrow('findOne requires at least one filter field');
+  ])('returns an empty query for %s so Mongo can match any document', (_label, filter) => {
+    expect(toMongoFilter(filter)).toEqual({});
   });
 });

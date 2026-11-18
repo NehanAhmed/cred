@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import mongoose, { type Connection, type Model } from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 
@@ -26,11 +27,13 @@ export function hasSchemaIndex(
     .indexes()
     .some(
       ([candidateFields, candidateOptions]: [Record<string, unknown>, Record<string, unknown>]) => {
-        if (JSON.stringify(candidateFields) !== JSON.stringify(fields)) {
+        if (!isDeepStrictEqual(candidateFields, fields)) {
           return false;
         }
 
-        return Object.entries(options).every(([key, value]) => candidateOptions[key] === value);
+        return Object.entries(options).every(([key, value]) =>
+          isDeepStrictEqual(candidateOptions[key], value)
+        );
       }
     );
 }

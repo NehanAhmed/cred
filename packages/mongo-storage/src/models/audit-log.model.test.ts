@@ -130,6 +130,26 @@ describe('getAuditModel', () => {
     expect(log.metadata).toEqual(metadata);
   });
 
+  it('references the registered user model so populate resolves', async () => {
+    const user = await User.create({
+      username: 'audit-owner',
+      email: 'audit-owner@example.com',
+      password: 'hashed-password'
+    });
+    const log = await AuditLog.create({
+      user: user._id,
+      action: 'login',
+      status: 'success'
+    });
+
+    const populated = await AuditLog.findById(log._id).populate('user').lean();
+
+    expect(populated?.user).toMatchObject({
+      username: 'audit-owner',
+      email: 'audit-owner@example.com'
+    });
+  });
+
   it('declares the per-user lookup and 90-day retention indexes', () => {
     expect(hasSchemaIndex(AuditLog, { user: 1, createdAt: -1 })).toBe(true);
     expect(

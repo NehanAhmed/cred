@@ -55,8 +55,10 @@ describe('getUserModel', () => {
     expect(user.avatar).toBeNull();
     expect(user.verificationToken).toBeNull();
     expect(user.verificationTokenExpires).toBeNull();
+    expect(user.verificationTokenLookup).toBeNull();
     expect(user.resetPasswordToken).toBeNull();
     expect(user.resetPasswordExpires).toBeNull();
+    expect(user.resetPasswordTokenLookup).toBeNull();
     expect(user.loginAttempts).toBe(0);
     expect(user.lockoutUntil).toBeNull();
     expect(user.lastLogin).toBeNull();
@@ -194,6 +196,46 @@ describe('getUserModel', () => {
     ).rejects.toThrow(/duplicate key/i);
   });
 
+  it('declares the token lookup fields required by the core contract', () => {
+    expect(User.schema.path('verificationTokenLookup')).toBeDefined();
+    expect(User.schema.path('resetPasswordTokenLookup')).toBeDefined();
+  });
+
+  it('enforces unique token lookup values while allowing many unset values', async () => {
+    const base = { password: 'hashed-password', isVerified: true };
+
+    await User.create({
+      ...base,
+      username: 'lookup-one',
+      email: 'lookup-one@example.com',
+      verificationTokenLookup: 'verification-lookup',
+      resetPasswordTokenLookup: 'reset-lookup'
+    });
+
+    // A null lookup never participates in the unique index, so accounts
+    // without a pending token can coexist.
+    await User.create({ ...base, username: 'lookup-two', email: 'lookup-two@example.com' });
+    await User.create({ ...base, username: 'lookup-three', email: 'lookup-three@example.com' });
+
+    await expect(
+      User.create({
+        ...base,
+        username: 'lookup-four',
+        email: 'lookup-four@example.com',
+        verificationTokenLookup: 'verification-lookup'
+      })
+    ).rejects.toThrow(/duplicate key/i);
+
+    await expect(
+      User.create({
+        ...base,
+        username: 'lookup-five',
+        email: 'lookup-five@example.com',
+        resetPasswordTokenLookup: 'reset-lookup'
+      })
+    ).rejects.toThrow(/duplicate key/i);
+  });
+
   it('declares the indexes required for lookups and OAuth uniqueness', () => {
     expect(hasSchemaIndex(User, { username: 1 }, { unique: true })).toBe(true);
     expect(hasSchemaIndex(User, { email: 1 }, { unique: true })).toBe(true);
@@ -208,6 +250,26 @@ describe('getUserModel', () => {
         resetPasswordToken: 1,
         resetPasswordExpires: 1
       })
+    ).toBe(true);
+    expect(
+      hasSchemaIndex(
+        User,
+        { verificationTokenLookup: 1 },
+        {
+          unique: true,
+          partialFilterExpression: { verificationTokenLookup: { $type: 'string' } }
+        }
+      )
+    ).toBe(true);
+    expect(
+      hasSchemaIndex(
+        User,
+        { resetPasswordTokenLookup: 1 },
+        {
+          unique: true,
+          partialFilterExpression: { resetPasswordTokenLookup: { $type: 'string' } }
+        }
+      )
     ).toBe(true);
     expect(hasSchemaIndex(User, { googleId: 1 }, { unique: true, sparse: true })).toBe(true);
     expect(hasSchemaIndex(User, { githubId: 1 }, { unique: true, sparse: true })).toBe(true);

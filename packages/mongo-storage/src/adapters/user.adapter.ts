@@ -53,6 +53,10 @@ const buildUserFilter = (filter: Partial<User>): Record<string, unknown> =>
  * `UserQuery` values may be comparison operators (`$gt`, `$lte`, ...) rather
  * than plain scalars. Mongoose receives them untouched so time-based
  * conditional updates stay atomic.
+ *
+ * An empty condition maps to `{}`, which Mongo treats as "match any document".
+ * That mirrors `findOne` instead of rejecting filters that only contain
+ * undefined values.
  */
 const buildUserCondition = (condition: UserQuery): Record<string, unknown> => {
     const { id, ...rest } = condition;
@@ -60,10 +64,6 @@ const buildUserCondition = (condition: UserQuery): Record<string, unknown> => {
 
     if (id !== undefined) {
         query._id = id;
-    }
-
-    if (Object.keys(query).length === 0) {
-        throw new Error('A conditional user update requires at least one condition');
     }
 
     return query;

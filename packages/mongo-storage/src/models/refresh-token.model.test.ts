@@ -102,23 +102,18 @@ describe('getRefreshModel', () => {
     ).rejects.toThrow(/Cast to ObjectId failed/);
   });
 
-  it('persists adapter-managed fields that are not part of the schema', async () => {
-    const token = new RefreshToken(
-      {
-        token: 'hashed-token',
-        user: userId,
-        family: 'family-1',
-        expiresAt,
-        lookupId: 'lookup-1'
-      },
-      undefined,
-      { strict: false }
-    );
-    await token.save();
+  it('persists the opaque lookup id used before hash verification', async () => {
+    const token = await RefreshToken.create({
+      token: 'hashed-token',
+      user: userId,
+      family: 'family-1',
+      expiresAt,
+      lookupId: 'lookup-1'
+    });
 
-    const stored = await RefreshToken.findOne({ lookupId: 'lookup-1' })
-      .setOptions({ strictQuery: false })
-      .lean();
+    expect(token.lookupId).toBe('lookup-1');
+
+    const stored = await RefreshToken.findOne({ lookupId: 'lookup-1' }).lean();
 
     expect(stored).toMatchObject({
       token: 'hashed-token',
@@ -127,8 +122,79 @@ describe('getRefreshModel', () => {
     });
   });
 
+  it('defaults the lookup id to null when no token is issued', async () => {
+    const token = await RefreshToken.create({
+      token: 'hashed-token',
+      user: userId,
+      family: 'family-1',
+      expiresAt
+    });
+
+    expect(token.lookupId).toBeNull();
+  });
+
+  it('references the registered user model so populate resolves', async () => {
+    const user = await User.create({
+      username: 'token-owner',
+      email: 'token-owner@example.com',
+      password: 'hashed-password'
+    });
+    const token = await RefreshToken.create({
+      token: 'hashed-token',
+      user: user._id,
+      family: 'family-1',
+      expiresAt
+    });
+
+    const populated = await RefreshToken.findById(token._id).populate('user').lean();
+
+    expect(populated?.user).toMatchObject({
+      username: 'token-owner',
+      email: 'token-owner@example.com'
+    });
+  });
+
+  it('enforces unique token hashes', async () => {
+    const input = { token: 'hashed-token', user: userId, family: 'family-1', expiresAt };
+    await RefreshToken.create(input);
+
+    await expect(RefreshToken.create(input)).rejects.toThrow(/duplicate key/i);
+  });
+
+  it('enforces unique lookup ids while allowing many unset values', async () => {
+    await RefreshToken.create({
+      token: 'token-1',
+      user: userId,
+      family: 'family-1',
+      expiresAt,
+      lookupId: 'lookup-1'
+    });
+    await RefreshToken.create({ token: 'token-2', user: userId, family: 'family-1', expiresAt });
+    await RefreshToken.create({ token: 'token-3', user: userId, family: 'family-1', expiresAt });
+
+    await expect(
+      RefreshToken.create({
+        token: 'token-4',
+        user: userId,
+        family: 'family-1',
+        expiresAt,
+        lookupId: 'lookup-1'
+      })
+    ).rejects.toThrow(/duplicate key/i);
+  });
+
   it('declares the lookup and TTL indexes used by refresh-token rotation', () => {
-    expect(hasSchemaIndex(RefreshToken, { token: 1 })).toBe(true);
+    expect(hasSchemaIndex(RefreshToken, { token: 1 }, { unique: true })).toBe(true);
+    expect(
+      hasSchemaIndex(
+        RefreshToken,
+        { lookupId: 1 },
+        {
+          unique: true,
+          partialFilterExpression: { lookupId: { $type: 'string' } }
+        }
+      )
+    ).toBe(true);
     expect(hasSchemaIndex(RefreshToken, { user: 1, family: 1 })).toBe(true);
     expect(hasSchemaIndex(RefreshToken, { expiresAt: 1 }, { expireAfterSeconds: 0 })).toBe(true);
   });

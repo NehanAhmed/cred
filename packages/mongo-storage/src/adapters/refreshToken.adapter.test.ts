@@ -21,37 +21,14 @@ const tokenInput = (overrides: Partial<RefreshToken> = {}): RefreshToken => ({
 describe('createRefreshTokenAdapter', () => {
   let database: TestDatabase;
   let RefreshTokenModel: Model<any>;
-  let UniqueRefreshTokenModel: Model<any>;
   let adapter: ReturnType<typeof createRefreshTokenAdapter>;
-  let uniqueAdapter: ReturnType<typeof createRefreshTokenAdapter>;
 
   beforeAll(async () => {
     database = await startTestDatabase();
     RefreshTokenModel = getRefreshModel(database.connection);
     await RefreshTokenModel.init();
 
-    // The production schema intentionally has no unique constraint on `token`,
-    // but the adapter must still translate native uniqueness violations when a
-    // host schema (or a future revision) declares one.
-    const uniqueSchema = new mongoose.Schema(
-      {
-        token: { type: String, required: true, unique: true },
-        user: { type: mongoose.Schema.Types.ObjectId, required: true },
-        family: { type: String, required: true },
-        expiresAt: { type: Date, required: true },
-        consumed: { type: Boolean, default: false }
-      },
-      { timestamps: true }
-    );
-    UniqueRefreshTokenModel = database.connection.model(
-      'UniqueCredRefreshToken',
-      uniqueSchema,
-      'UniqueRefreshTokens'
-    );
-    await UniqueRefreshTokenModel.init();
-
     adapter = createRefreshTokenAdapter(RefreshTokenModel);
-    uniqueAdapter = createRefreshTokenAdapter(UniqueRefreshTokenModel);
   }, 120_000);
 
   afterEach(async () => {
@@ -127,10 +104,12 @@ describe('createRefreshTokenAdapter', () => {
     it.each([
       ['an empty filter', {}],
       ['a filter made only of undefined values', { token: undefined, family: undefined }]
-    ])('rejects %s', async (_label, filter) => {
-      await expect(adapter.findOne(filter)).rejects.toThrow(
-        'A refresh-token query requires at least one filter field'
-      );
+    ])('matches the first document for %s', async (_label, filter) => {
+      await adapter.create(tokenInput());
+
+      await expect(adapter.findOne(filter)).resolves.toMatchObject({
+        token: 'hashed-token'
+      });
     });
   });
 
@@ -165,12 +144,10 @@ describe('createRefreshTokenAdapter', () => {
       expect(created.user).toBe(userOne);
     });
 
-    it('persists contract fields that are absent from the schema', async () => {
+    it('persists the opaque lookup id used before hash verification', async () => {
       await adapter.create({ ...tokenInput(), lookupId: 'lookup-1' });
 
-      const raw = await RefreshTokenModel.findOne({ lookupId: 'lookup-1' })
-        .setOptions({ strictQuery: false })
-        .lean();
+      const raw = await RefreshTokenModel.findOne({ lookupId: 'lookup-1' }).lean();
 
       expect(raw).toMatchObject({ token: 'hashed-token', lookupId: 'lookup-1' });
     });
@@ -193,9 +170,9 @@ describe('createRefreshTokenAdapter', () => {
     });
 
     it('translates a duplicate token into DuplicateKeyError', async () => {
-      await uniqueAdapter.create({ ...tokenInput(), token: 'unique-token' });
+      await adapter.create({ ...tokenInput(), token: 'unique-token' });
 
-      const error = await uniqueAdapter
+      const error = await adapter
         .create({ ...tokenInput(), token: 'unique-token' })
         .catch((caught: unknown) => caught);
 
@@ -296,14 +273,12 @@ describe('createRefreshTokenAdapter', () => {
     });
 
     it('translates duplicate key violations on update', async () => {
-      await uniqueAdapter.create({ ...tokenInput(), token: 'unique-token-1' });
-      await uniqueAdapter.create({ ...tokenInput(), token: 'unique-token-2' });
-      const raw = await UniqueRefreshTokenModel.findOne({
-        token: 'unique-token-2'
-      }).lean();
+      await adapter.create({ ...tokenInput(), token: 'unique-token-1' });
+      await adapter.create({ ...tokenInput(), token: 'unique-token-2' });
+      const id = await idOf('unique-token-2');
 
-      const error = await uniqueAdapter
-        .update(String(raw?._id), { token: 'unique-token-1' })
+      const error = await adapter
+        .update(id, { token: 'unique-token-1' })
         .catch((caught: unknown) => caught);
 
       expect(error).toBeInstanceOf(DuplicateKeyError);
@@ -361,7 +336,7 @@ describe('createRefreshTokenAdapter', () => {
       ).resolves.toBeNull();
     });
 
-    it('persists contract fields that are absent from the schema', async () => {
+    it('can clear the opaque lookup id on rotation', async () => {
       await adapter.create({ ...tokenInput(), lookupId: 'lookup-1' });
 
       const updated = await adapter.findOneAndUpdate({ lookupId: 'lookup-1' }, {
@@ -406,17 +381,19 @@ describe('createRefreshTokenAdapter', () => {
     it.each([
       ['an empty condition', {}],
       ['a condition made only of undefined values', { token: undefined }]
-    ])('rejects %s', async (_label, condition) => {
-      await expect(adapter.findOneAndUpdate(condition, { consumed: true })).rejects.toThrow(
-        'A refresh-token query requires at least one filter field'
-      );
+    ])('updates the first matching document for %s', async (_label, condition) => {
+      await adapter.create(tokenInput());
+
+      await expect(
+        adapter.findOneAndUpdate(condition, { consumed: true })
+      ).resolves.toMatchObject({ token: 'hashed-token', consumed: true });
     });
 
     it('translates duplicate key violations on update', async () => {
-      await uniqueAdapter.create({ ...tokenInput(), token: 'unique-token-1' });
-      await uniqueAdapter.create({ ...tokenInput(), token: 'unique-token-2' });
+      await adapter.create({ ...tokenInput(), token: 'unique-token-1' });
+      await adapter.create({ ...tokenInput(), token: 'unique-token-2' });
 
-      const error = await uniqueAdapter
+      const error = await adapter
         .findOneAndUpdate({ token: 'unique-token-2' }, { token: 'unique-token-1' })
         .catch((caught: unknown) => caught);
 
@@ -491,7 +468,7 @@ describe('createRefreshTokenAdapter', () => {
 
     it('rejects an empty filter', async () => {
       await expect(adapter.deleteMany({})).rejects.toThrow(
-        'A refresh-token query requires at least one filter field'
+        'deleteMany requires at least one filter field'
       );
     });
   });
