@@ -1,0 +1,75 @@
+{
+  "name": "@cred/express",
+  "version": "0.1.0",
+  "description": "Express adapter for Cred: mount one router to expose registration, login, OAuth, profile, and audit endpoints backed by @cred/core.",
+  "keywords": [
+    "cred",
+    "auth",
+    "authentication",
+    "express",
+    "router",
+    "adapter",
+    "oauth",
+    "jwt"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NehanAhmed/cred.git",
+    "directory": "packages/express"
+  },
+  "homepage": "https://github.com/NehanAhmed/cred/tree/main/packages/express#readme",
+  "bugs": {
+    "url": "https://github.com/NehanAhmed/cred/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "pnpm@10.33.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@cred/core": "workspace:*",
+    "cookie-parser": "^1.4.7",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.5.2"
+  },
+  "devDependencies": {
+    "@cred/config": "workspace:*",
+    "@cred/core": "workspace:*",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.6",
+    "cookie-parser": "^1.4.7",
+    "eslint": "^10.15.0",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.5.2",
+    "tsdown": "^0.23.7",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.2"
+  }
+}

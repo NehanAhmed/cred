@@ -166,6 +166,45 @@ importers:
         specifier: ^5.1.0
         version: 5.1.0(@types/node@26.6.6)(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(tsx@4.23.15))
 
+  packages/express:
+    devDependencies:
+      '@cred/config':
+        specifier: workspace:*
+        version: link:../config
+      '@cred/core':
+        specifier: workspace:*
+        version: link:../core
+      '@types/cookie-parser':
+        specifier: ^1.4.10
+        version: 1.4.10(@types/express@5.0.6)
+      '@types/express':
+        specifier: ^5.0.6
+        version: 5.0.6
+      '@types/node':
+        specifier: ^26.6.6
+        version: 26.6.6
+      cookie-parser:
+        specifier: ^1.4.7
+        version: 1.4.7
+      eslint:
+        specifier: ^10.15.0
+        version: 10.15.0
+      express:
+        specifier: ^5.2.1
+        version: 5.2.1
+      express-rate-limit:
+        specifier: ^8.5.2
+        version: 8.5.2(express@5.2.1)
+      tsdown:
+        specifier: ^0.23.7
+        version: 0.23.7(tsx@4.23.15)(typescript@6.0.3)
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      typescript-eslint:
+        specifier: ^8.72.2
+        version: 8.72.2(eslint@10.15.0)(typescript@6.0.3)
+
   packages/mongo-storage:
     devDependencies:
       '@cred/config':

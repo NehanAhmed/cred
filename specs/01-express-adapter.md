@@ -7,7 +7,7 @@ Our goal is to convert the apps/api into a express adapter that will be a coveri
 The user doesn’t define routes at all. The route table lives inside @cred/express, and the user mounts the whole router at one path:
 
 ts
-app.use('/api', credExpress({ ...config }));
+- "app.use('/api', credExpress({ ...config }));
 
 /auth/login, /auth/refresh, /profile/me and the rest are already defined in the package. Each route is wired to its controller, and each controller calls the right core function. There’s no discovery or matching by name. It’s an explicit table you write once.
 
@@ -91,7 +91,23 @@ Using app.use('/api', ...) reproduces your current URLs exactly (/api/auth/login
 The refresh cookie path: '/api/auth'. If someone mounts at /v1, the cookie is scoped wrong and refresh breaks. Derive it from req.baseUrl + '/auth' inside the handler, or take a basePath option.
 OAuth callback URLs ({BACKEND_URL}/api/auth/google/callback) and email links (verify and reset). These are built from the public URL, so config needs backendUrl and basePath (default /api). Tell users the mount path must match basePath.
 
-Simplest for v0.1 is a basePath: '/api' option that you use for cookies, email links and OAuth callbacks. Document that it must match where they mount.
+Simplest for v0.1 is a basePath: '/api' option that you use for cookies, email links and OAuth callbacks. Document that it must match where they mount."
+
+This is just a example code that i used to reference just how the code should work. 
+
+# Scaffolding package
+
+Create a express typescript app and add eslint along with tsdown and full commands in the package.json. Add linting build commands and eslint command. Make the folder structure as same as other packages (e.g: @cred/core and @cred/mongo-storage). Follow the same code structure as the other packages and it should be following the same code patterns. 
+
+# Building the project 
+
+Be professional while building the packages. Act as a senior developer and write production-ready code and be professional. Do not go off limit and do only what you are assigned which is to just create the package. You will not write any tests or any other things off scope. Do not write code that you dont understand and do not remove anything that you not understand. 
+
+# Checkpoint.md
+ 
+Write a file that contains all the project state and project list that will serve as a checkpoint so that you never go off-track. After each task completion tick it in the file.  
+
+
 
 # notes
 
@@ -99,3 +115,5 @@ Simplest for v0.1 is a basePath: '/api' option that you use for cookies, email l
 - follow modern world practices and always stay in limits and dont go off track.
 - write production-ready code
 - Do not remove anything untill necessary.
+- Be reminded that this will be a pacakage that user will import and use it in their routes. This app will not serve http server or anything but just provide the express router and controllers.
+- You will have to make the controller to be thin like just they will use the core functions in the controller and just handle the redirects and other things that core could'nt due to it's functions-only state and limits.
