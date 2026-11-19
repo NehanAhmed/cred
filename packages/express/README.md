@@ -1,36 +1,87 @@
 # @cred/express
 
-Express 5 adapter for [Cred](https://github.com/NehanAhmed/cred). It exposes the complete
-authentication, profile, and audit API as a single mountable router backed by
-[`@cred/core`](../core). The adapter owns HTTP concerns — routing, validation, cookies,
-redirects, rate limiting, OAuth redirects, and error responses — and delegates every auth
-decision to core.
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/NehanAhmed/cred/blob/main/LICENSE)
+[![Node.js >= 20](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://github.com/NehanAhmed/cred/blob/main/packages/express/package.json)
 
-- ESM-only, TypeScript, Express 5
-- Builds the official MongoDB (`@cred/mongo-storage`) and SMTP/Resend (`@cred/smtp`)
-  adapters from your config, while still accepting prebuilt adapters for custom backends
-- Rotating refresh tokens in `httpOnly` cookies with reuse detection
-- Google and GitHub OAuth authorization-code flow (no Passport global state)
-- Rate limits identical to the shipped Cred API
-- Router-scoped JSON parsing and cookie parsing; the rest of your app is untouched
+Express 5 transport adapter for Cred: one mountable router for registration, login, OAuth, profiles, and audit logs.
 
----
+> **Pre-1.0:** this package is version `0.1.0`. Its public API may change between minor versions.
 
-## Install
+## Overview
+
+`@cred/express` is the Express adapter for Cred. It returns an Express `Router` that implements the HTTP endpoints for authentication, profiles, and audit logs. The router owns routing, JSON and cookie parsing, request validation, cookies, redirects, rate limiting, and HTTP error mapping.
+
+Authentication logic, token issuance, password and token hashing, refresh-token rotation, and audit writes are delegated to `@cred/core`. When configured with MongoDB and email options, the adapter constructs the official `@cred/mongo-storage` and `@cred/smtp` implementations at startup. It can also accept prebuilt `@cred/core` adapters for another backend.
+
+What this package does not do:
+
+- It does not create or start an HTTP server. You mount the returned router in your own Express app.
+- It does not implement storage or email delivery itself. It constructs the sibling adapters or accepts yours.
+- It does not provide CORS, helmet, HTTPS, or `trust proxy` configuration.
+- It does not provide a health endpoint.
+- It does not build email verification or password reset links.
+- It does not export an auth guard for your own routes, and it does not augment `Express.Request` with a `user` property.
+
+## Contents
+
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Quick start](#quick-start)
+- [How it works](#how-it-works)
+- [Configuration reference](#configuration-reference)
+- [Mounting and base path](#mounting-and-base-path)
+- [Routes reference](#routes-reference)
+- [Response and error format](#response-and-error-format)
+- [Cookies and sessions](#cookies-and-sessions)
+- [OAuth setup](#oauth-setup)
+- [Rate limiting](#rate-limiting)
+- [Security notes](#security-notes)
+- [Limitations and known constraints](#limitations-and-known-constraints)
+- [TypeScript](#typescript)
+- [Troubleshooting](#troubleshooting)
+- [Testing and development](#testing-and-development)
+- [Related packages](#related-packages)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Features
+
+- A single `credExpress(config)` factory that returns a mountable Express 5 `Router` with a `close()` method.
+- Registration, login, logout, refresh, email verification, forgot-password, and reset-password routes.
+- Google and GitHub OAuth authorization-code flows implemented with `fetch`, without Passport.
+- Profile read, update, password change, account deletion, and paginated audit-log routes.
+- Startup configuration validation with descriptive errors before any request is served.
+- Built-in construction of `@cred/mongo-storage` and `@cred/smtp` from configuration, or injection of prebuilt `@cred/core` adapters.
+- Rotating refresh tokens in `httpOnly` cookies, with cookie clearing when core reports an invalid, expired, or replayed refresh token.
+- Router-scoped `express.json()` and `cookieParser()` middleware.
+- Configurable rate limits with a broad limiter per route group and tighter per-route limiters.
+- JSON success and error envelopes, a single `AuthError` boundary, and JSON responses for malformed or oversized request bodies.
+- ESM-only package with bundled TypeScript declarations.
+
+## Requirements
+
+| Requirement | Version | Evidence |
+|---|---|---|
+| Node.js | `>=20.0.0` | `engines.node`; build target `node20.0.0` |
+| Express | `^5.2.1` | `peerDependencies`; the router uses Express 5 |
+| `@cred/core` | `0.1.0` in this repository (workspace-linked) | `peerDependencies` |
+| `cookie-parser` | `^1.4.7` | `peerDependencies`; imported by the router |
+| `express-rate-limit` | `^8.5.2` | `peerDependencies`; imported by the middleware |
+| `mongoose` | `^9.7.0` | `peerDependencies`; used by the bundled MongoDB adapter |
+| `nodemailer` | `^10.5.0` | `peerDependencies`; used by the bundled email adapter |
+
+The package is ESM-only (`"type": "module"`, build format `esm`). The published `exports` map has `types`, `import`, and `default` conditions and no CommonJS `require` condition.
+
+## Installation
+
+Install the adapter and its peer dependencies:
 
 ```bash
 pnpm add @cred/express @cred/core express cookie-parser express-rate-limit mongoose nodemailer
 ```
 
-`@cred/express` depends on `@cred/mongo-storage` and `@cred/smtp` to build the default
-adapters. `@cred/core`, `express`, `cookie-parser`, `express-rate-limit`, `mongoose`, and
-`nodemailer` are peer dependencies, so the host application supplies a single copy of each.
-
-The Mongoose and Nodemailer peers are required because the package loads the official
-adapters. If you use prebuilt adapters for another backend, those libraries are installed but
-never contacted.
-
----
+`@cred/mongo-storage` and `@cred/smtp` are dependencies of `@cred/express` and are installed automatically. `mongoose` and `nodemailer` are declared peers because the bundled adapters use those libraries. Install all peers in the host application; do not rely on a transitive copy.
 
 ## Quick start
 
@@ -40,179 +91,638 @@ import { credExpress } from '@cred/express';
 
 const app = express();
 
-// Cred reads the forwarded client IP for auditing and rate limiting.
+// Only needed when the app runs behind a proxy. The router reads req.ip for
+// audit context and rate limiting.
 app.set('trust proxy', 1);
 
-const router = await credExpress({
+const cred = await credExpress({
   database: { uri: process.env.MONGO_URI! },
   email: {
     EMAIL_FROM: 'no-reply@example.com',
     BACKEND_URL: 'https://api.example.com',
-    // RESEND_API_KEY: process.env.RESEND_API_KEY, // omit to use SMTP
   },
-  jwtSecret: process.env.JWT_SECRET!, // >= 32 characters
+  jwtSecret: process.env.JWT_SECRET!, // at least 32 characters
   clientUrl: 'https://app.example.com',
   backendUrl: 'https://api.example.com',
 });
 
-app.use('/api', router);
+app.use('/api', cred);
 
-// During graceful shutdown: closes the MongoDB connection and mail transport.
-process.on('SIGTERM', async () => {
-  await router.close();
-  process.exit(0);
-});
+const server = app.listen(3000);
 
-app.listen(3000);
-```
+const shutdown = async (): Promise<void> => {
+  server.close();
+  await cred.close();
+};
 
-`credExpress` is asynchronous because the email service is built asynchronously, and it waits
-for the MongoDB connection before returning. Mount the resolved router; do not mount the
-promise.
-
-That single mount exposes `POST /api/auth/login`, `GET /api/profile/me`,
-`GET /api/auth/google/callback`, and every other route listed below. Cred does not create an
-HTTP server and does not define routes outside the returned router.
-
----
-
-## Adapters and lifecycle
-
-By default the adapter constructs both dependencies from the supplied options and injects
-them into `@cred/core`:
-
-- `database: { uri }` creates a connection with `mongooseStorage` and exposes its user,
-  refresh-token, and audit adapters. `database: { connection }` uses an existing
-  `mongoose.Connection` instead and does not close it.
-- `email: { EMAIL_FROM, BACKEND_URL, ... }` creates an `@cred/smtp` service using SMTP or
-  Resend. Additional fields are the same as `@cred/smtp`'s `emailServiceOptions`
-  (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `RESEND_API_KEY`, `provider`,
-  `verifyOnStart`, ...).
-
-Resources created this way are released by `router.close()`, which is idempotent. A connection
-you pass in through `{ connection }`, and any prebuilt adapters you supply, remain owned by
-your application and are never closed by Cred.
-
-### Custom adapters
-
-To use another database or mail provider, pass prebuilt implementations of core's adapter
-interfaces instead of options:
-
-```ts
-const router = await credExpress({
-  database: {
-    user: myUserAdapter,
-    refreshToken: myRefreshTokenAdapter,
-    audit: myAuditAdapter, // optional
-  },
-  email: myEmailAdapter,
-  jwtSecret: process.env.JWT_SECRET!,
-  clientUrl: 'https://app.example.com',
-  backendUrl: 'https://api.example.com',
+process.on('SIGTERM', () => {
+  void shutdown();
 });
 ```
 
-Custom adapters must implement the interfaces exported by `@cred/core`
-(`UserDatabaseAdapter`, `RefreshTokenDatabaseAdapter`, `AuditDatabaseAdapter`,
-`EmailAdapter`). Cred does not close them; manage their lifecycle in the host application.
+`credExpress` is asynchronous. It resolves the configuration, builds the configured database and email adapters, and waits for the MongoDB connection before returning when it builds the MongoDB adapter. Mount the resolved router, not the promise.
 
----
+The mount path must match the configured `basePath` (default `/api`). See [Mounting and base path](#mounting-and-base-path).
 
-## Mount path and `basePath`
+## How it works
 
-The path passed to `app.use` **must** match `basePath` (default `/api`):
-
-```ts
-app.use('/api', await credExpress({ /* basePath: '/api' (default) */ }));
-// or
-app.use('/v1', await credExpress({ /* ... */, basePath: '/v1' }));
+```text
+request
+  -> mounted Cred router
+     -> express.json({ limit }) and cookieParser()
+     -> /auth/* or /profile/*
+        -> rate limiter(s)
+        -> Zod validation where a body is accepted
+        -> requireAuth for protected routes
+        -> controller
+           -> @cred/core service
+              -> user / refresh-token / audit adapters
+              -> email adapter
+  -> error handler
 ```
 
-`basePath` has three effects:
+| Layer | Responsibility |
+|---|---|
+| Host Express app | HTTP server, `trust proxy`, CORS, helmet, HTTPS, global middleware order, 404 handling outside the router |
+| `@cred/express` router | Route table, request parsing, validation wiring, cookies, redirects, rate limiters, response envelopes, `AuthError` and body-parser error mapping |
+| `@cred/express` runtime | Constructs `@cred/mongo-storage` and `@cred/smtp` from config, or passes prebuilt adapters through; owns `close()` |
+| `@cred/core` | Registration, login, token issuance and verification, refresh rotation, OAuth user creation/linking, profile and audit operations |
+| Storage and email adapters | Persistence and delivery |
 
-1. It scopes the refresh-token cookie to `${basePath}/auth` and the OAuth state cookie to the
-   same path.
-2. It appears in the OAuth callback URLs registered with Google/GitHub.
-3. It is the path prefix that verification and reset email links must target.
+Controllers are thin. They read the request, call a core service with the dependency bundle, set or clear cookies, and send a response. Controllers do not query the database directly.
 
-> **Email links:** `@cred/express` passes the raw token to the email adapter; link building
-> belongs to that adapter. The bundled `@cred/smtp` service builds
-> `${BACKEND_URL}/api/auth/...` links, so use the default `basePath: '/api'` with it (or a
-> custom email adapter that targets your base path).
+## Configuration reference
 
-`clientUrl` and `backendUrl` must be absolute `http(s)` origins without a query string,
-fragment, or Cred route path. `backendUrl` is the public API origin only; `basePath` is
-appended by the adapter.
+```ts
+interface CredExpressConfig {
+  database: CredDatabaseInput;
+  email: CredEmailInput;
+  jwtSecret: string;
+  clientUrl: string;
+  backendUrl: string;
+  basePath?: string;
+  oauth?: CredOAuthConfig;
+  cookies?: CredCookieConfig;
+  rateLimits?: CredRateLimitsInput;
+  core?: Partial<CredConfig>;
+  jsonBodyLimit?: string;
+  logger?: CredErrorLogger;
+}
+```
 
----
-
-## Configuration
-
-| Option | Required | Default | Description |
-|---|---|---|---|
-| `database` | yes | — | `{ uri }` or `{ connection }` to build `@cred/mongo-storage`; or `{ user, refreshToken, audit? }` prebuilt adapters |
-| `email` | yes | — | `@cred/smtp` options (`EMAIL_FROM`, `BACKEND_URL`, ...); or a prebuilt `EmailAdapter` |
-| `jwtSecret` | yes | — | HS256 secret, at least 32 characters |
-| `clientUrl` | yes | — | Frontend origin used for login, verification, and OAuth redirects |
-| `backendUrl` | yes | — | Public API origin used for OAuth callback URLs |
-| `basePath` | no | `/api` | Public mount path; must match `app.use(...)` |
-| `oauth.google` | no | — | `{ clientId, clientSecret }` |
-| `oauth.github` | no | — | `{ clientId, clientSecret }` |
-| `cookies` | no | see below | Cookie names, paths, lifetime, flags |
-| `rateLimits` | no | see below | Partial overrides per limiter |
-| `core` | no | core defaults | `Partial<CredConfig>`: token lifetimes, bcrypt rounds, lockout policy |
-| `jsonBodyLimit` | no | `10kb` | JSON body limit for the mounted router |
-| `logger` | no | `console` | Object with `error(...args)` for unexpected errors |
-
-With the built-in MongoDB adapter, audit storage is always available. With prebuilt adapters,
-`database.audit` is optional: without it, audit writes are dropped and
-`GET /profile/me/audit-logs` returns `503`.
-
-Configuration is validated when `credExpress(...)` is called, and the MongoDB/email adapters
-are built before the router is returned. Invalid URLs, a short JWT secret, missing adapter
-options, or malformed rate limits throw at startup, before any request is served.
-
-### Cookies
-
-| Cookie | Default name | Path | Lifetime | Flags |
+| Option | Type | Required | Default | Description |
 |---|---|---|---|---|
-| Access token | `token` | `/` | 15 minutes | `httpOnly`, `sameSite=strict`, `secure` in production |
-| Refresh token | `refreshToken` | `${basePath}/auth` | `core.refreshTokenTtlMs` (7 days) | `httpOnly`, `sameSite=strict`, `secure` in production |
-| OAuth state | `oauth_state` | `${basePath}/auth` | 10 minutes | `httpOnly`, `sameSite=lax`, `secure` in production |
+| `database` | `CredDatabaseInput` | yes | — | Mongo options (`{ uri }` or `{ connection }`) or prebuilt `{ user, refreshToken, audit? }` adapters |
+| `email` | `CredEmailInput` | yes | — | Email service options (`EMAIL_FROM`, `BACKEND_URL`, plus adapter options) or a prebuilt `EmailAdapter` |
+| `jwtSecret` | `string` | yes | — | JWT signing secret; core requires at least 32 characters |
+| `clientUrl` | `string` | yes | — | Absolute `http`/`https` URL used as the prefix for verification and OAuth redirects |
+| `backendUrl` | `string` | yes | — | Absolute `http`/`https` public API URL used to build OAuth callback URLs |
+| `basePath` | `string` | no | `/api` | Public path where the router is mounted; must match `app.use(...)` |
+| `oauth` | `CredOAuthConfig` | no | `{}` | Optional Google and GitHub credentials |
+| `cookies` | `CredCookieConfig` | no | see [Cookies and sessions](#cookies-and-sessions) | Cookie names, paths, lifetimes, and flags |
+| `rateLimits` | `CredRateLimitsInput` | no | `defaultCredRateLimits` | Per-limiter partial overrides |
+| `core` | `Partial<CredConfig>` | no | core defaults | Token lifetimes, bcrypt rounds, lockout policy, audit page sizes |
+| `jsonBodyLimit` | `string` | no | `10kb` | JSON body limit for the mounted router |
+| `logger` | `CredErrorLogger` | no | `console` | Object with an `error(...args)` method for unexpected errors |
 
-OAuth callbacks write the auth cookies with `sameSite=lax` because they run during a
-cross-site redirect. If the frontend is on a different site and needs cross-site cookies in
-other flows, set `cookies.sameSite: 'none'` together with `cookies.secure: true`.
+### Database
+
+`database` accepts one of three shapes:
 
 ```ts
-cookies: {
-  accessTokenName: 'token',
-  refreshTokenName: 'refreshToken',
-  accessTokenPath: '/',
-  accessTokenMaxAgeMs: 15 * 60 * 1000,
-  refreshTokenMaxAgeMs: 7 * 24 * 60 * 60 * 1000,
-  secure: true,
-  sameSite: 'strict',
-  domain: '.example.com',
+// 1. Build the bundled MongoDB adapter from a URI.
+database: { uri: process.env.MONGO_URI! }
+
+// 2. Build it from an existing Mongoose connection.
+database: { connection: existingMongooseConnection }
+
+// 3. Supply prebuilt core adapters.
+database: {
+  user: myUserAdapter,
+  refreshToken: myRefreshTokenAdapter,
+  audit: myAuditAdapter, // optional
 }
 ```
 
-### OAuth
+For `{ uri }`, the adapter creates a `@cred/mongo-storage` instance and awaits `ready()` before returning the router. For `{ connection }`, it uses the existing Mongoose connection. Only the `uri` or `connection` property is passed to the storage adapter; other properties on that object are ignored.
 
-Set both fields for each provider you want to enable:
+Prebuilt adapters must implement the `@cred/core` interfaces `UserDatabaseAdapter` and `RefreshTokenDatabaseAdapter`; `audit` is optional and must implement `AuditDatabaseAdapter`. The resolver checks the required methods at startup.
+
+`database` cannot combine `uri`/`connection` with prebuilt adapters, and it cannot set both `uri` and `connection`.
+
+If no audit adapter is supplied, core drops audit writes and `GET /profile/me/audit-logs` responds with `503`.
+
+### Email
+
+`email` accepts either email service options or a prebuilt `@cred/core` `EmailAdapter`:
 
 ```ts
-oauth: {
-  google: {
-    clientId: process.env.GOOGLE_OAUTH_CLIENT_ID!,
-    clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET!,
-  },
-  github: {
-    clientId: process.env.GITHUB_OAUTH_CLIENT_ID!,
-    clientSecret: process.env.GITHUB_OAUTH_CLIENT_SECRET!,
-  },
+// Build the bundled @cred/smtp service.
+email: {
+  EMAIL_FROM: 'no-reply@example.com',
+  BACKEND_URL: 'https://api.example.com',
+  // Additional fields are forwarded to @cred/smtp's emailServiceOptions.
+}
+
+// Or supply a prebuilt adapter.
+email: myEmailAdapter
+```
+
+When using service options, `EMAIL_FROM` must be a non-empty string and `BACKEND_URL` must be an absolute `http`/`https` URL without a query string or fragment. Other fields are forwarded to the email service. An object with `sendEmailVerification` or `sendPasswordReset` is treated as a prebuilt adapter, and both methods are required.
+
+### Core tunables
+
+`core` is a `Partial<CredConfig>` merged over core's defaults:
+
+| Field | Default | Meaning |
+|---|---|---|
+| `accessTokenExpiry` | `'15m'` | Access-token lifetime passed to the JWT signer |
+| `refreshTokenTtlMs` | `604800000` (7 days) | Refresh-token lifetime |
+| `tokenHashRounds` | `10` | bcrypt rounds for token secrets |
+| `passwordHashRounds` | `10` | bcrypt rounds for passwords |
+| `lockoutThreshold` | `5` | Failed logins before lockout |
+| `lockoutDurationMs` | `900000` (15 minutes) | Lockout duration |
+| `verificationTokenTtlMs` | `86400000` (24 hours) | Email-verification token lifetime |
+| `resetTokenTtlMs` | `3600000` (1 hour) | Password-reset token lifetime |
+| `auditMaxLimit` | `100` | Maximum audit-log page size |
+| `auditDefaultLimit` | `20` | Default audit-log page size |
+
+### Validation and startup errors
+
+Configuration is resolved before the router is built. Because `credExpress` is an async function, invalid configuration rejects the returned promise and no router is returned. Any resources already created during adapter setup are released before the error is rethrown.
+
+Common messages:
+
+| Condition | Error |
+|---|---|
+| Missing config object | `@cred/express: configuration object is required` |
+| Missing database | `@cred/express: "database" is required` |
+| Unrecognized database shape | `@cred/express: "database" must provide MongoDB options ("uri" or "connection") or prebuilt adapters ("user" and "refreshToken")` |
+| Mixed database input | `@cred/express: "database" cannot combine "uri"/"connection" options with prebuilt adapters` |
+| Both `uri` and `connection` | `@cred/express: "database" must set either "uri" or "connection", not both` |
+| Missing email | `@cred/express: "email" is required` |
+| Unrecognized email shape | `@cred/express: "email" must provide email service options ("EMAIL_FROM" and "BACKEND_URL") or a prebuilt EmailAdapter` |
+| Missing or non-string secret | `@cred/express: "jwtSecret" is required and must be a string` |
+| Secret shorter than 32 characters | `@cred/express: Cred: jwtSecret must be at least 32 characters` |
+| Bad URL | `@cred/express: "clientUrl" must be an absolute URL, received "..."` |
+| Non-HTTP URL | `@cred/express: "clientUrl" must use http or https, received "..."` |
+| URL with query or fragment | `@cred/express: "clientUrl" must not contain a query string or fragment` |
+| Bad base path | `@cred/express: "basePath" must start with "/", received "..."` |
+| Invalid same-site value | `@cred/express: "cookies.sameSite" must be "strict", "lax", or "none", received "..."` |
+| `sameSite: 'none'` without secure | `@cred/express: "cookies.sameSite" cannot be "none" while "cookies.secure" is false` |
+| Invalid body limit | `@cred/express: "jsonBodyLimit" must be a size such as "10kb" or "1mb", received "..."` |
+| Invalid rate limit | `@cred/express: "rateLimits.login.max" must be a positive integer, received "0"` |
+| Invalid logger | `@cred/express: "logger" must expose an error(...args) method` |
+
+`clientUrl` and `backendUrl` are normalized by removing trailing slashes. `basePath` also has trailing slashes removed; `basePath: '/'` becomes an empty string, so the refresh cookie path becomes `/auth`.
+
+### Environment variables
+
+The package reads only `process.env.NODE_ENV`. It is used for one decision: the default value of `cookies.secure` (`NODE_ENV === 'production'`). The package does not read `MONGO_URI`, `JWT_SECRET`, `CLIENT_URL`, `BACKEND_URL`, or any other variable. Reading environment variables and passing them into `credExpress` is the host application's job.
+
+## Mounting and base path
+
+Mount the router at the same path you configure as `basePath`. The default is `/api`.
+
+Correct:
+
+```ts
+const cred = await credExpress({
+  // ...
+  basePath: '/v1',
+});
+
+app.use('/v1', cred);
+```
+
+Incorrect:
+
+```ts
+// basePath stays at its default `/api`, but the router is mounted at `/v1`.
+const cred = await credExpress({
+  // ...
+});
+
+app.use('/v1', cred);
+```
+
+`basePath` has two effects:
+
+1. It scopes the refresh-token cookie and the OAuth state cookie to `${basePath}/auth`.
+2. It is appended to `backendUrl` to build the OAuth callback URL: `${backendUrl}${basePath}/auth/{provider}/callback`.
+
+It does not build email verification or reset links. The email adapter receives the recipient and the raw token; link construction is that adapter's responsibility.
+
+A mount at `/` works with `basePath: '/'`:
+
+```ts
+const cred = await credExpress({ /* ... */ basePath: '/' });
+app.use('/', cred);
+// Refresh and OAuth-state cookie path: /auth
+```
+
+> **Warning:** If the mount path and `basePath` differ, the refresh cookie is scoped to a path the browser will not send to your routes. Refresh then fails with `401 Refresh token not found.` The OAuth callback URL registered with the provider will also point at the wrong path.
+
+`backendUrl` is the public API base. Do not include `basePath` in it, because the adapter appends `basePath`:
+
+```ts
+// Correct: callback is https://api.example.com/api/auth/google/callback
+backendUrl: 'https://api.example.com',
+basePath: '/api',
+
+// Wrong: callback becomes https://api.example.com/api/api/auth/google/callback
+backendUrl: 'https://api.example.com/api',
+basePath: '/api',
+```
+
+`clientUrl` is used verbatim as the redirect prefix after trailing slashes are removed. Email verification redirects to `${clientUrl}/login?verified=...`, OAuth success redirects to `${clientUrl}/auth/callback`, and OAuth failures redirect to `${clientUrl}/login?error=...`.
+
+## Routes reference
+
+All paths are relative to the mount point. With the default configuration, the full paths are `/api/auth/...` and `/api/profile/...`.
+
+| Method | Path | Access | Limiters | Description |
+|---|---|---|---|---|
+| `POST` | `/auth` | Public | `auth`, `register` | Register a user; sends a verification email; `201` |
+| `POST` | `/auth/login` | Public | `auth`, `login` | Log in with email or username plus password; sets cookies |
+| `POST` | `/auth/logout` | Access cookie | `auth`, `logout` | Delete the presented refresh token and clear cookies |
+| `POST` | `/auth/refresh` | Refresh cookie | `auth`, `refresh` | Rotate the refresh token and issue a new access token |
+| `GET` | `/auth/verify-email/:token` | Public | `auth`, `verifyEmail` | Verify an email address; always redirects |
+| `POST` | `/auth/forgot-password` | Public | `auth`, `forgotPassword` | Request a reset link; always returns the same message |
+| `POST` | `/auth/reset-password/:token` | Public | `auth`, `resetPassword` | Reset a password with a one-time token |
+| `GET` | `/auth/google` | Public | `auth`, `oauth` | Start Google OAuth |
+| `GET` | `/auth/google/callback` | Public | `auth`, `oauth` | Finish Google OAuth |
+| `GET` | `/auth/github` | Public | `auth`, `oauth` | Start GitHub OAuth |
+| `GET` | `/auth/github/callback` | Public | `auth`, `oauth` | Finish GitHub OAuth |
+| `GET` | `/profile/me` | Access cookie | `profile` | Return the current profile without `password` |
+| `PUT` | `/profile/me` | Access cookie | `profile`, `profileUpdate` | Update profile fields |
+| `DELETE` | `/profile/me` | Access cookie | `profile` | Delete the account and refresh tokens; clear cookies |
+| `POST` | `/profile/me/change-password` | Access cookie | `profile`, `profileUpdate` | Change the password using the current password |
+| `GET` | `/profile/me/audit-logs` | Access cookie | `profile` | Return paginated audit logs, newest first |
+
+There is no health route in this package. Unmatched paths are not handled by the Cred router; they fall through to the host app's 404 handler and Express's default HTML response.
+
+The OAuth routes are always mounted. Configuring `oauth.google` or `oauth.github` determines whether the flow can start; an unconfigured provider redirects to a login error.
+
+### Request bodies
+
+| Route | Fields | Rules |
+|---|---|---|
+| `POST /auth` | `username`, `email`, `password`, `bio?`, `phoneNumber?`, `gender?` | `username` 3–30 characters; valid email; password at least 8 characters with one uppercase letter and one digit; `bio` 3–200 characters; `phoneNumber` 10–15 digits; `gender` is `male`, `female`, or `other` |
+| `POST /auth/login` | `email?`, `username?`, `password` | At least one of `email` or `username`; non-empty password |
+| `POST /auth/forgot-password` | `email` | Valid email |
+| `POST /auth/reset-password/:token` | `password` | Same password rules as registration |
+| `PUT /profile/me` | `username?`, `bio?`, `phoneNumber?`, `gender?` | Same field rules as registration; all fields optional |
+| `POST /profile/me/change-password` | `currentPassword`, `newPassword` | Non-empty current password; new password follows the password rules |
+
+Schemas come from `@cred/core` (`registerSchema`, `loginSchema`, `passwordForgotSchema`, `passwordResetSchema`, `profileSchema`, `passwordChangeSchema`). Unknown fields are stripped. Validation runs with a middleware that accepts any object with `safeParse`; the adapter does not import Zod directly.
+
+`logout` and `refresh` accept no body validation. The OAuth routes accept no JSON body.
+
+### Auth examples
+
+Register:
+
+```http
+POST /api/auth
+Content-Type: application/json
+
+{
+  "username": "alice",
+  "email": "alice@example.com",
+  "password": "Password1"
 }
 ```
+
+```json
+{
+  "success": true,
+  "message": "User registered successfully. Verify your email first.",
+  "data": {}
+}
+```
+
+Status: `201`.
+
+Login:
+
+```http
+POST /api/auth/login
+Content-Type: application/json
+
+{ "email": "alice@example.com", "password": "Password1" }
+```
+
+```json
+{
+  "success": true,
+  "message": "Logged in successfully",
+  "data": {
+    "user": {
+      "id": "user-id",
+      "email": "alice@example.com",
+      "username": "alice",
+      "provider": "local",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-01T00:00:00.000Z"
+    }
+  }
+}
+```
+
+The response also sets the access and refresh cookies.
+
+Refresh:
+
+```json
+{ "success": true, "message": "Token refreshed successfully", "data": null }
+```
+
+Logout:
+
+```json
+{ "success": true, "message": "Logged out successfully", "data": null }
+```
+
+Email verification always redirects:
+
+```text
+GET /api/auth/verify-email/:token
+302 Location: https://app.example.com/login?verified=true
+```
+
+A malformed, expired, or already-used token redirects to `https://app.example.com/login?verified=false`. The route never returns a JSON error for a bad token.
+
+Forgot password always returns the same response, whether or not the account exists:
+
+```json
+{
+  "success": true,
+  "message": "If an account exists, a password reset link has been sent",
+  "data": null
+}
+```
+
+Reset password:
+
+```json
+{ "success": true, "message": "Password reset successfully", "data": null }
+```
+
+If the reset token is invalid or expired, the response is `400` with `Invalid or expired token`.
+
+### Profile and audit examples
+
+Get profile:
+
+```json
+{
+  "success": true,
+  "message": "Profile fetched successfully",
+  "data": {
+    "id": "user-id",
+    "username": "alice",
+    "email": "alice@example.com",
+    "provider": "local",
+    "isVerified": true,
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "updatedAt": "2026-01-01T00:00:00.000Z"
+  }
+}
+```
+
+Update profile:
+
+```http
+PUT /api/profile/me
+Content-Type: application/json
+
+{ "bio": "hello there" }
+```
+
+```json
+{
+  "success": true,
+  "message": "Profile updated successfully",
+  "data": { "id": "user-id", "username": "alice", "email": "alice@example.com", "bio": "hello there" }
+}
+```
+
+Change password returns `{ "success": true, "message": "Password updated successfully", "data": ... }`. A wrong current password returns `400` with `Current password is incorrect`.
+
+Delete account returns:
+
+```json
+{ "success": true, "message": "Account deleted successfully", "data": null }
+```
+
+Audit logs accept `page` and `limit` query parameters. Non-numeric values are ignored, and core clamps the range (maximum 100, default 20). The response shape is:
+
+```json
+{
+  "success": true,
+  "message": "Audit logs fetched successfully",
+  "data": {
+    "logs": [],
+    "pagination": { "page": 1, "limit": 20, "total": 0, "totalPages": 0 }
+  }
+}
+```
+
+Without an audit adapter, the route returns:
+
+```json
+{ "success": false, "message": "Audit logging is not configured", "error": "Audit logging is not configured" }
+```
+
+Status: `503`.
+
+### OAuth routes
+
+The four OAuth routes redirect rather than returning JSON. See [OAuth setup](#oauth-setup) for configuration, callback URLs, and outcomes.
+
+## Response and error format
+
+Successful JSON responses use:
+
+```ts
+interface ApiResponse<T = null> {
+  success: boolean;
+  message: string;
+  data?: T;
+  error?: string;
+}
+```
+
+```json
+{
+  "success": true,
+  "message": "Logged in successfully",
+  "data": { "user": { "id": "user-id" } }
+}
+```
+
+Errors use the same envelope, with `message` and `error` set to the same string:
+
+```json
+{
+  "success": false,
+  "message": "Invalid Credentials",
+  "error": "Invalid Credentials"
+}
+```
+
+### AuthError handling
+
+Controllers do not translate error codes. An `AuthError` thrown by `@cred/core` is sent with the status code and message carried by the error:
+
+```ts
+sendError(res, error.message, error.statusCode);
+```
+
+The `AuthError.code` is not included in the HTTP body. The same code can carry different messages and statuses depending on where core throws it.
+
+Observed responses:
+
+| Core error code | Status | Message | Trigger |
+|---|---|---|---|
+| `INVALID_CREDENTIALS` | `401` | `Invalid Credentials` | Login failure |
+| `USER_EXISTS` | `400` | `User already exists` | Duplicate registration |
+| `MISSING_TOKEN` | `401` | `Refresh token not found.` | Refresh with no refresh cookie |
+| `REFRESH_TOKEN_NOT_FOUND` | `401` | `Invalid token.` | Refresh with a malformed or unknown token |
+| `REFRESH_TOKEN_REUSE_DETECTED` | `401` | `Refresh token reuse detected. All sessions revoked.` | Replaying a rotated refresh token |
+| `INVALID_CURRENT_PASSWORD` | `400` | `Current password is incorrect` | Wrong password on change-password |
+| `INVALID_TOKEN` | `400` | `Invalid or expired token` | Invalid password-reset token |
+
+The auth middleware handles missing and invalid access tokens itself:
+
+| Condition | Status | Message |
+|---|---|---|
+| No access-token cookie | `401` | `Unauthorized` |
+| Invalid, expired, or non-access token | `401` | `Invalid token` |
+
+Other errors:
+
+| Condition | Status | Body |
+|---|---|---|
+| Zod validation failure | `400` | `{ "errors": [ ...issues ] }` |
+| Malformed JSON | `400` | `{ "success": false, "message": "Invalid JSON body", "error": "Invalid JSON body" }` |
+| Body over `jsonBodyLimit` | `413` | `{ "success": false, "message": "Request body too large", "error": "Request body too large" }` |
+| Unhandled error | `500` | `{ "success": false, "message": "Internal server error", "error": "Internal server error" }` |
+| No audit adapter | `503` | `{ "success": false, "message": "Audit logging is not configured", ... }` |
+
+Unhandled errors are logged through `logger.error('@cred/express: unhandled request error', error)` and reduced to a generic `500`. Error details are not sent to the client. If response headers have already been sent, the error is passed to the host app's error handler.
+
+### Validation errors
+
+Validation failures are the one response that does not use the success/error envelope:
+
+```json
+{
+  "errors": [
+    {
+      "code": "invalid_type",
+      "path": ["username"],
+      "message": "Invalid input: expected string, received undefined"
+    }
+  ]
+}
+```
+
+Status: `400`. The body is the `issues` array from the schema's `safeParse` result.
+
+### Rate-limit responses
+
+Rate-limit responses are not JSON. The body is the limiter's configured `message` string and the status is `429`:
+
+```text
+Too many login attempts, please try again in 15 minutes.
+```
+
+Express sends this as `text/html; charset=utf-8` with the default string response. `Retry-After` is present. Clients should not assume the normal JSON envelope on `429`.
+
+### Redirects
+
+| Flow | Condition | Redirect |
+|---|---|---|
+| Email verification | Success | `${clientUrl}/login?verified=true` |
+| Email verification | Invalid, expired, or used token | `${clientUrl}/login?verified=false` |
+| OAuth start | Provider not configured | `${clientUrl}/login?error={provider}_auth_failed` |
+| OAuth callback | State missing or mismatched | `${clientUrl}/login?error=oauth_state_mismatch` |
+| OAuth callback | Provider error, missing code, or profile fetch failure | `${clientUrl}/login?error={provider}_auth_failed` |
+| OAuth callback | Core could not create or link the user | `${clientUrl}/login?error=oauth_failed` |
+| OAuth success | User created or linked | `${clientUrl}/auth/callback` |
+
+## Cookies and sessions
+
+| Cookie | Default name | Path | Max-Age | Flags |
+|---|---|---|---|---|
+| Access token | `token` | `cookies.accessTokenPath` (default `/`) | `cookies.accessTokenMaxAgeMs` (default 15 minutes) | `httpOnly`, `sameSite` from config (default `strict`), `secure` from config |
+| Refresh token | `refreshToken` | `${basePath}/auth` | `cookies.refreshTokenMaxAgeMs` (default `core.refreshTokenTtlMs`, 7 days) | `httpOnly`, `sameSite` from config (default `strict`), `secure` from config |
+| OAuth state | `oauth_state` | `${basePath}/auth` | 10 minutes | `httpOnly`, `sameSite=lax`, `secure` from config |
+
+`secure` defaults to `NODE_ENV === 'production'`. It is not automatically enabled for HTTPS in other environments; set `cookies.secure: true` explicitly when serving over HTTPS outside production.
+
+Cookie options:
+
+| Option | Default | Notes |
+|---|---|---|
+| `accessTokenName` | `token` | Must be a non-empty string |
+| `refreshTokenName` | `refreshToken` | Must be a non-empty string |
+| `secure` | `NODE_ENV === 'production'` | Boolean |
+| `sameSite` | `strict` | `strict`, `lax`, or `none` |
+| `domain` | unset | Optional cookie domain |
+| `accessTokenPath` | `/` | Must start with `/` |
+| `accessTokenMaxAgeMs` | `900000` | Positive integer |
+| `refreshTokenMaxAgeMs` | `core.refreshTokenTtlMs` | Positive integer |
+
+> **Warning:** `cookies.sameSite: 'none'` requires `cookies.secure: true`. Configuration rejects the combination otherwise.
+
+The refresh token and OAuth state cookies are scoped to `${basePath}/auth`, so they are not sent on profile requests and are not shared with the rest of your app. The access token defaults to path `/`, so it is sent to all paths on the host.
+
+OAuth callbacks set the auth cookies with `sameSite=lax` instead of the configured policy because the request arrives through a cross-site redirect. All other successful login and refresh responses use `cookies.sameSite`.
+
+Logout clears both auth cookies. Account deletion clears both auth cookies. A refresh failure with a token present clears both cookies when core reports one of these codes:
+
+- `REFRESH_TOKEN_NOT_FOUND`
+- `REFRESH_TOKEN_EXPIRED`
+- `REFRESH_TOKEN_REUSE_DETECTED`
+- `UNEXPECTED_ERROR_OCCURRED`
+
+Other refresh errors leave the cookies in place so the client can retry.
+
+The token lifetimes and cookie lifetimes are configured separately:
+
+- The JWT's lifetime comes from `core.accessTokenExpiry` (default `15m`).
+- The access cookie's lifetime comes from `cookies.accessTokenMaxAgeMs` (default `900000`).
+- The refresh token's lifetime comes from `core.refreshTokenTtlMs` (default 7 days).
+- The refresh cookie's lifetime comes from `cookies.refreshTokenMaxAgeMs`, which defaults to `core.refreshTokenTtlMs`.
+
+If you override one side, keep the other side consistent. Setting `cookies.accessTokenMaxAgeMs` does not change the JWT expiry, and setting `core.accessTokenExpiry` does not change the cookie max-age.
+
+Refresh rotation and replay detection are performed by `@cred/core`. This adapter stores the returned tokens in cookies. A replayed refresh token produces `401 Refresh token reuse detected. All sessions revoked.` and clears the cookies.
+
+## OAuth setup
+
+Google and GitHub are implemented with `fetch`; Passport is not used and there is no global strategy registry.
+
+```ts
+const cred = await credExpress({
+  // ...
+  oauth: {
+    google: {
+      clientId: process.env.GOOGLE_OAUTH_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET!,
+    },
+    github: {
+      clientId: process.env.GITHUB_OAUTH_CLIENT_ID!,
+      clientSecret: process.env.GITHUB_OAUTH_CLIENT_SECRET!,
+    },
+  },
+});
+```
+
+A provider is enabled only when both `clientId` and `clientSecret` are non-empty strings.
 
 Register these callback URLs with the providers:
 
@@ -221,124 +731,272 @@ Register these callback URLs with the providers:
 {backendUrl}{basePath}/auth/github/callback
 ```
 
-A provider that is not configured still has routes, but starting its flow redirects to
-`{clientUrl}/login?error={provider}_auth_failed`.
+With the defaults, that is:
+
+```text
+https://api.example.com/api/auth/google/callback
+https://api.example.com/api/auth/github/callback
+```
+
+Provider details:
+
+| Provider | Authorization endpoint | Scope/parameters |
+|---|---|---|
+| Google | `https://accounts.google.com/o/oauth2/v2/auth` | `openid email profile`, `access_type=online`, `prompt=select_account` |
+| GitHub | `https://github.com/login/oauth/authorize` | `user:email` |
+
+State handling:
+
+1. `GET /auth/{provider}` generates 32 random bytes as a hex state value.
+2. The state is stored in the `oauth_state` cookie (`httpOnly`, `sameSite=lax`, path `${basePath}/auth`, 10 minutes).
+3. The state is sent to the provider as the `state` query parameter.
+4. `GET /auth/{provider}/callback` compares the cookie with the query value. Missing or unequal values redirect to `${clientUrl}/login?error=oauth_state_mismatch`.
+5. On a match, the state cookie is cleared before the code exchange.
 
 OAuth outcomes:
 
 | Outcome | Redirect |
 |---|---|
-| Success | `{clientUrl}/auth/callback` |
-| State missing/mismatched | `{clientUrl}/login?error=oauth_state_mismatch` |
-| Provider denied or token/profile exchange failed | `{clientUrl}/login?error={provider}_auth_failed` |
-| Core could not create/link the user | `{clientUrl}/login?error=oauth_failed` |
+| Success | `${clientUrl}/auth/callback` |
+| State missing or mismatched | `${clientUrl}/login?error=oauth_state_mismatch` |
+| Provider not configured | `${clientUrl}/login?error={provider}_auth_failed` |
+| Provider returned an error, no code, or the token/profile exchange failed | `${clientUrl}/login?error={provider}_auth_failed` |
+| Core could not create or link the user | `${clientUrl}/login?error=oauth_failed` |
 
-Emails are only used to link an existing account when the provider reports them as verified.
+On success, the callback sets the access and refresh cookies with `sameSite=lax` and redirects to `${clientUrl}/auth/callback`.
 
-### Rate limits
+The profile passed to core contains `provider`, `profileId`, `email`, `displayName`, `avatar`, and `isEmailVerified`.
 
-Every rule accepts a partial override: `{ windowMs?, max?, message? }`.
+- Google sets `isEmailVerified` to true only when an email is present and Google reports `email_verified: true`.
+- GitHub reads `/user/emails` and selects a verified primary address, falling back to any verified address. It ignores the unverified public email from `/user`. `isEmailVerified` is true when a verified email was found.
+
+Core only uses an OAuth email to link an existing account when `isEmailVerified` is true.
+
+Provider requests time out after 10 seconds. Provider and core failures are logged through `logger` with the provider name, and the client receives a redirect rather than a JSON error.
+
+## Rate limiting
+
+Rate limiters are created from `rateLimits` merged over `defaultCredRateLimits`.
 
 | Key | Window | Max | Applies to |
 |---|---|---|---|
-| `auth` | 15 min | 20 | All `/auth/*`, including OAuth |
-| `login` | 15 min | 5 | `POST /auth/login` |
-| `register` | 60 min | 3 | `POST /auth` |
-| `forgotPassword` | 60 min | 3 | `POST /auth/forgot-password` |
-| `refresh` | 15 min | 10 | `POST /auth/refresh` |
-| `verifyEmail` | 15 min | 10 | `GET /auth/verify-email/:token` |
-| `resetPassword` | 15 min | 5 | `POST /auth/reset-password/:token` |
-| `logout` | 15 min | 20 | `POST /auth/logout` |
-| `oauth` | 15 min | 10 | All OAuth routes |
-| `profile` | 15 min | 50 | All `/profile/*` |
-| `profileUpdate` | 15 min | 50 | `PUT /profile/me`, `POST /profile/me/change-password` |
+| `auth` | 15 minutes | 20 | Every `/auth/*` request, including OAuth |
+| `login` | 15 minutes | 5 | `POST /auth/login` |
+| `register` | 60 minutes | 3 | `POST /auth` |
+| `forgotPassword` | 60 minutes | 3 | `POST /auth/forgot-password` |
+| `refresh` | 15 minutes | 10 | `POST /auth/refresh` |
+| `verifyEmail` | 15 minutes | 10 | `GET /auth/verify-email/:token` |
+| `resetPassword` | 15 minutes | 5 | `POST /auth/reset-password/:token` |
+| `logout` | 15 minutes | 20 | `POST /auth/logout` |
+| `oauth` | 15 minutes | 10 | All OAuth routes |
+| `profile` | 15 minutes | 50 | Every `/profile/*` request |
+| `profileUpdate` | 15 minutes | 50 | `PUT /profile/me`, `POST /profile/me/change-password` |
+
+Each rule accepts a partial override:
 
 ```ts
 rateLimits: {
   login: { max: 10, windowMs: 10 * 60 * 1000 },
+  register: { message: 'Registration is temporarily limited.' },
 }
 ```
 
-Rate-limit responses are `express-rate-limit`'s plain-text body, not the JSON envelope.
+A route passes through the broad group limiter and its route-specific limiter, so the tighter budget applies. For example, login is counted by both `auth` (20 per 15 minutes) and `login` (5 per 15 minutes).
 
----
+The limiters use `express-rate-limit` with `standardHeaders: true` and `legacyHeaders: false`. No custom store is configured, so each limiter uses `express-rate-limit`'s default in-memory store. Counters are not shared across processes or hosts. If you run multiple instances, each instance enforces its own counters.
 
-## Routes
+> **Note:** Rate-limit keys are based on `req.ip`. The router does not set `trust proxy`. If the app runs behind a proxy, set `app.set('trust proxy', ...)` on the host so limits and audit IPs see the client address rather than the proxy address.
 
-All paths are relative to the mount (`{basePath}`).
+## Security notes
 
-### Auth
+What the package does:
 
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| POST | `/auth` | No | Register; sends a verification email; `201` |
-| POST | `/auth/login` | No | Email **or** username + password; sets cookies |
-| POST | `/auth/logout` | Yes | Deletes the presented refresh token and clears cookies |
-| POST | `/auth/refresh` | Refresh cookie | Rotates the refresh token and issues a new access token |
-| GET | `/auth/verify-email/:token` | No | Always redirects to `{clientUrl}/login?verified=true|false` |
-| POST | `/auth/forgot-password` | No | Same response for known and unknown emails |
-| POST | `/auth/reset-password/:token` | No | One-time reset token; revokes all refresh tokens |
-| GET | `/auth/google`, `/auth/google/callback` | No | Google OAuth |
-| GET | `/auth/github`, `/auth/github/callback` | No | GitHub OAuth |
+- Rejects invalid configuration at startup, including a JWT secret shorter than 32 characters.
+- Stores access and refresh tokens in `httpOnly` cookies. `secure` defaults to production and can be enabled explicitly; `sameSite` defaults to `strict`.
+- Uses `sameSite=lax` for OAuth state and OAuth callback cookies because those requests cross sites.
+- Generates a random 32-byte OAuth state value and verifies it against an `httpOnly` cookie.
+- Applies rate limits to every auth and profile route.
+- Forwards `req.ip` and the `user-agent` header to core for audit logging.
+- Returns a generic `500 Internal server error` for unhandled errors and does not include internal error details in the response.
+- Returns the canonical forgot-password message for unknown emails and email-send failures.
 
-### Profile and audit
+What remains the host application's responsibility:
 
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| GET | `/profile/me` | Yes | Returns the current user without `password` |
-| PUT | `/profile/me` | Yes | Partial update; omitted fields are untouched |
-| DELETE | `/profile/me` | Yes | Deletes the user and all refresh tokens; clears cookies |
-| POST | `/profile/me/change-password` | Yes | Requires the current password; revokes all refresh tokens |
-| GET | `/profile/me/audit-logs` | Yes | Paginated (`page`, `limit` 1–100), newest first |
+- Serving the API over HTTPS and setting `cookies.secure` appropriately.
+- Configuring `trust proxy` when behind a proxy.
+- CORS. The package does not add a CORS middleware.
+- Helmet or other security headers. The package does not add helmet.
+- Storing `JWT_SECRET`, OAuth client secrets, database credentials, and SMTP credentials securely.
+- Keeping the JWT secret at least 32 characters long.
+- CSRF protection beyond the cookie `sameSite` policy and OAuth state. The package does not mount a separate CSRF middleware.
+- Database security, backups, and email deliverability.
 
----
+The 10 KB default JSON body limit applies to the whole mounted router. Increase `jsonBodyLimit` only if a Cred request body actually needs it.
 
-## Responses and errors
+## Limitations and known constraints
 
-Successful JSON responses use the shared envelope:
+- **ESM-only.** The build produces `dist/index.mjs` and `dist/index.d.mts`; `exports` has no `require` condition.
+- **Manual base path.** `basePath` is not derived from `req.baseUrl`. You must pass the mount path or use the default `/api`.
+- **No exported auth guard.** `requireAuth` is internal. Protected routes are the ones inside the router. Your own routes must verify the access token themselves if they need the same check.
+- **No `req.user` augmentation.** The middleware stores the JWT payload in `res.locals.credUser` for its own controllers. `CredLocals` is exported, but the package does not declare a global `Express.Request.user`.
+- **No health endpoint.** Health checks belong to the host app.
+- **No email link construction.** The adapter passes the raw token to the email adapter; `basePath` is not used to build verification or reset links.
+- **OAuth routes always exist.** A provider that is not configured redirects to `${clientUrl}/login?error={provider}_auth_failed` instead of returning 404.
+- **Database option pass-through is narrow.** For `{ uri }` and `{ connection }`, only that property is passed to `@cred/mongo-storage`; other properties on the same object are ignored.
+- **No custom rate-limit store.** The limiters always use `express-rate-limit`'s default store. Multi-process deployments do not share counters.
+- **No configurable OAuth scopes, endpoints, or timeout.** Google and GitHub use fixed endpoints, scopes, and a 10-second timeout.
+- **No CORS, helmet, CSRF middleware, or proxy configuration.** These are host responsibilities.
+- **No catch-all route.** Unmatched paths fall through to the host app's 404 handling.
+- **Audit logs depend on the audit adapter.** Without one, writes are dropped and the audit route returns `503`.
+- **Separate token and cookie lifetimes.** `core.accessTokenExpiry` and `cookies.accessTokenMaxAgeMs` are independent, as are `core.refreshTokenTtlMs` and `cookies.refreshTokenMaxAgeMs`.
+- **JSON only.** The router mounts `express.json()` and `cookie-parser`; it does not mount a URL-encoded body parser.
+- **No test suite in this package.** There is no `test` script and no test files in `packages/express`.
+- **Pre-1.0.** The public API may change between minor versions.
 
-```json
-{ "success": true, "message": "Logged in successfully", "data": { "user": {} } }
+## TypeScript
+
+The package ships declarations for every export. Run the build before typechecking against `dist`, or rely on the published package.
+
+Runtime exports:
+
+```ts
+import {
+  credExpress,
+  createCoreRuntime,
+  resolveCredConfig,
+  resolveCredRateLimits,
+  createCoreAuthConfig,
+  defaultCredRateLimits,
+} from '@cred/express';
 ```
 
-Errors use:
+Type exports:
 
-```json
-{ "success": false, "message": "Invalid Credentials", "error": "Invalid Credentials" }
+```ts
+import type {
+  CredExpressConfig,
+  ResolvedCredExpressConfig,
+  CredExpressRouter,
+  CredDatabaseConfig,
+  CredDatabaseInput,
+  CredMongoStorageOptions,
+  CredEmailInput,
+  CredEmailServiceOptions,
+  CredOAuthConfig,
+  CredOAuthProviderConfig,
+  CredCookieConfig,
+  ResolvedCredCookieConfig,
+  CredRateLimitRule,
+  CredRateLimits,
+  CredRateLimitsInput,
+  CredSameSite,
+  CredErrorLogger,
+  CredCoreDeps,
+  CredCoreRuntime,
+  CredLocals,
+  CredOAuthProvider,
+  CredRequestContext,
+  ResolvedCredDatabase,
+  ResolvedCredEmail,
+} from '@cred/express';
 ```
 
-`AuthError` from `@cred/core` supplies the status code and message, so auth failures keep
-core's semantics (`401`, `400`, `404`, `500`, ...). The one exception is body validation,
-which returns `400` with Zod issues:
+Example:
 
-```json
-{ "errors": [{ "code": "too_small", "path": ["password"], "message": "..." }] }
+```ts
+import { credExpress, type CredExpressConfig, type CredExpressRouter } from '@cred/express';
+
+const config: CredExpressConfig = {
+  database: { uri: process.env.MONGO_URI! },
+  email: {
+    EMAIL_FROM: 'no-reply@example.com',
+    BACKEND_URL: 'https://api.example.com',
+  },
+  jwtSecret: process.env.JWT_SECRET!,
+  clientUrl: 'https://app.example.com',
+  backendUrl: 'https://api.example.com',
+};
+
+const router: CredExpressRouter = await credExpress(config);
+await router.close();
 ```
 
-Malformed JSON returns `400 { success: false, ... }` and an oversized body returns `413`.
-Unhandled errors are logged via `logger` and reduced to `500 Internal server error`; internal
-details are never sent to the client.
+`CredExpressRouter` extends Express's `Router` with a `close(): Promise<void>` method. `close()` is idempotent. It closes the `@cred/mongo-storage` instance created from `{ uri }` or `{ connection }`, and the `@cred/smtp` service created from email options. Prebuilt adapters supplied by the host are not closed.
 
----
+The package does not augment the global Express request type. If you need the authenticated payload outside the router, verify the access-token cookie yourself with `verifyAccessToken` from `@cred/core` and use your own request typing.
 
-## Implementation notes
+## Troubleshooting
 
-- **Scope:** `express.json({ limit })` and `cookieParser()` are mounted inside the returned
-  router, so they only affect Cred routes.
-- **Security middleware:** helmet, CORS, and `app.set('trust proxy', ...)` are host
-  responsibilities. Set `trust proxy` whenever the API runs behind a proxy so audit IPs and
-  rate limits see the client address.
-- **Dependency construction:** the adapter builds `@cred/mongo-storage` and `@cred/smtp` from
-  your options and passes only core's adapter interfaces into core. Core never imports a
-  concrete driver or mailer.
-- **Lifecycle:** `await router.close()` releases connections and transports created by the
-  adapter. Prebuilt adapters and caller-owned Mongo connections are left untouched.
-- **Stateless instances:** OAuth is implemented with `fetch` rather than Passport, so there is
-  no global strategy registry. Multiple routers (for example one per tenant) do not share
-  state; rate-limit memory stores are per instance.
-- **Testing:** this package intentionally ships without a test suite; its behavior is verified
-  against `@cred/core` and the reference API.
+| Symptom | Cause | Fix |
+|---|---|---|
+| `@cred/express: Cred: jwtSecret must be at least 32 characters` | Secret is too short | Use a secret of at least 32 characters |
+| `@cred/express: "jwtSecret" is required and must be a string` | Missing or non-string secret | Pass `jwtSecret` |
+| `@cred/express: "basePath" must start with "/"` | Path does not start with a slash | Use `/api`, `/v1`, or `/` |
+| `@cred/express: "clientUrl" must be an absolute URL` | Value is not an absolute URL | Use `https://app.example.com` |
+| `@cred/express: "clientUrl" must not contain a query string or fragment` | URL includes `?` or `#` | Pass only the base URL |
+| `@cred/express: "cookies.sameSite" cannot be "none" while "cookies.secure" is false` | Cross-site cookies without HTTPS | Set `cookies.secure: true` |
+| `@cred/express: "database" must provide MongoDB options ...` | Empty or unrecognized database object | Pass `{ uri }`, `{ connection }`, or `{ user, refreshToken }` |
+| `@cred/express: "email" must provide email service options ...` | Missing `EMAIL_FROM`/`BACKEND_URL` or adapter methods | Pass both options or a full `EmailAdapter` |
+| `401 Refresh token not found.` after login | Refresh cookie is missing or scoped to another path | Make the mount path match `basePath`; check cookie domain and `secure` |
+| `401 Invalid token` on profile routes | Access cookie is missing, expired, or is not an access token | Log in again or refresh |
+| OAuth redirects to `...?error=oauth_state_mismatch` | State cookie missing, expired, or path mismatch | Check `basePath`, cookie path, and the 10-minute window |
+| OAuth redirects to `...?error=google_auth_failed` or `...?error=github_auth_failed` | Provider not configured or provider exchange failed | Check credentials, callback URL, and logs |
+| OAuth redirects to `...?error=oauth_failed` | Core could not create or link the user | Check `logger.error` output and adapter data |
+| `429` with a plain-text body | A rate limit was exceeded | Wait for the window or raise the rule |
+| `503 Audit logging is not configured` | Prebuilt database adapters have no `audit` | Add an `AuditDatabaseAdapter` |
+| `413 Request body too large` | Body exceeds `jsonBodyLimit` | Send a smaller body or raise the limit |
+| `400 Invalid JSON body` | Malformed JSON | Send valid JSON |
+| `404` HTML page under the mount | Path is not part of the Cred router | Check the route table; the host handles 404s |
+| A CommonJS `require()` cannot load the package | The package is ESM-only and the export map has no `require` condition | Import it from an ES module |
+
+For unexpected errors, pass a `logger` and inspect its output. The router logs unhandled request errors, OAuth provider failures, OAuth callback failures, and adapter cleanup failures.
+
+## Testing and development
+
+From the repository root:
+
+```bash
+pnpm --filter @cred/express build
+pnpm --filter @cred/express typecheck
+pnpm --filter @cred/express lint
+pnpm --filter @cred/express pack --dry-run
+```
+
+Verified in this checkout:
+
+- `pnpm --filter @cred/express build` passes and produces `dist/index.mjs` (about 42 kB) and `dist/index.d.mts` (about 10 kB).
+- `pnpm --filter @cred/express typecheck` passes.
+- `pnpm --filter @cred/express lint` passes.
+- `pnpm --filter @cred/express pack --dry-run` lists `dist/index.d.mts`, `dist/index.mjs`, `package.json`, and `README.md`.
+
+Package scripts:
+
+| Script | Command |
+|---|---|
+| `build` | `tsdown` |
+| `dev` | `tsdown --watch` |
+| `lint` | `eslint .` |
+| `lint:fix` | `eslint . --fix` |
+| `typecheck` | `tsc --noEmit` |
+| `prepack` | `pnpm build` |
+
+There is no `test` script and there are no test files in this package, so no package-level test result is claimed here.
+
+## Related packages
+
+- `@cred/core` — core authentication services and adapter interfaces used by this router.
+- `@cred/mongo-storage` — MongoDB storage adapter constructed by default from `database` options.
+- `@cred/smtp` — email adapter constructed by default from `email` options.
+
+## Contributing
+
+Open an issue or pull request at [github.com/NehanAhmed/cred](https://github.com/NehanAhmed/cred). Keep changes scoped to the package and run the build, typecheck, and lint commands above before submitting.
 
 ## License
 
-MIT
+MIT. See the repository [LICENSE](https://github.com/NehanAhmed/cred/blob/main/LICENSE).
+
+Copyright (c) 2026 Nehan Ahmed — Cred
+
+
+

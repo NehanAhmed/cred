@@ -1,18 +1,35 @@
 {
   "name": "@cred/core",
   "version": "0.1.0",
-  "description": "Framework-agnostic, storage-agnostic authentication core: registration, login, token rotation, OAuth linking, profiles, and audit logging.",
+  "description": "Framework-agnostic, storage-agnostic authentication core for Node.js: registration, verified email login, rotating refresh tokens with reuse detection, OAuth account linking, profiles, and audit logging.",
   "keywords": [
     "cred",
     "auth",
     "authentication",
     "jwt",
-    "refresh-tokens",
+    "jsonwebtoken",
+    "refresh-token",
+    "refresh-token-rotation",
+    "token-rotation",
     "oauth",
-    "audit"
+    "oauth2",
+    "password-hashing",
+    "bcrypt",
+    "email-verification",
+    "password-reset",
+    "account-lockout",
+    "profile-management",
+    "audit-log",
+    "zod",
+    "typescript",
+    "esm",
+    "nodejs",
+    "framework-agnostic",
+    "storage-agnostic",
+    "adapter"
   ],
   "license": "MIT",
-  "author": "",
+  "author": "NehanAhmed (https://github.com/NehanAhmed)",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/NehanAhmed/cred.git",
@@ -28,10 +45,12 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
-    }
+    },
+    "./package.json": "./package.json"
   },
-  "files": ["dist"],
+  "files": ["dist","README.md"],
   "sideEffects": false,
   "engines": {
     "node": ">=20.0.0"
@@ -41,6 +60,7 @@
   },
   "scripts": {
     "test": "vitest run",
+    "test:watch": "vitest",
     "build": "tsdown",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"

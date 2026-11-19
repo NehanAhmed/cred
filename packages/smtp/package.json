@@ -10,9 +10,15 @@
     "nodemailer",
     "resend",
     "email",
+    "email-adapter",
+    "transactional-email",
+    "email-verification",
+    "password-reset",
+    "esm",
+    "typescript",
     "adapter"
   ],
-  "author": "",
+  "author": "Nehan Ahmed",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -32,11 +38,11 @@
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "files": [
-    "dist"
-  ],
+"dist","README.md"  ],
   "sideEffects": false,
   "engines": {
     "node": ">=20.0.0"
@@ -51,7 +57,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "peerDependencies": {
     "@cred/core": "workspace:*",

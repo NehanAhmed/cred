@@ -1,18 +1,26 @@
 {
   "name": "@cred/express",
   "version": "0.1.0",
-  "description": "Express adapter for Cred: mount one router to expose registration, login, OAuth, profile, and audit endpoints backed by @cred/core.",
+  "description": "Express 5 adapter for Cred: mount one router to expose registration, login, OAuth, profile, and audit endpoints backed by @cred/core.",
   "keywords": [
     "cred",
     "auth",
     "authentication",
     "express",
+    "express-middleware",
     "router",
     "adapter",
     "oauth",
-    "jwt"
+    "oauth2",
+    "jwt",
+    "refresh-token",
+    "cookies",
+    "rate-limiting",
+    "typescript",
+    "esm",
+    "nodejs"
   ],
-  "author": "",
+  "author": "Nehan Ahmed",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -32,10 +40,13 @@
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "sideEffects": false,
   "engines": {
@@ -50,7 +61,8 @@
     "dev": "tsdown --watch",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepack": "pnpm build"
   },
   "dependencies": {
     "@cred/mongo-storage": "workspace:*",

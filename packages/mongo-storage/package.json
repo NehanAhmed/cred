@@ -1,17 +1,28 @@
 {
   "name": "@cred/mongo-storage",
   "version": "0.1.0",
-  "description": "MongoDB/Mongoose storage adapter for Cred authentication data.",
+  "description": "MongoDB/Mongoose storage adapters for Cred authentication data: users, refresh tokens, and audit logs.",
   "keywords": [
     "cred",
     "auth",
     "authentication",
+    "authorization",
     "mongodb",
     "mongoose",
     "storage",
-    "adapter"
+    "adapter",
+    "database-adapter",
+    "user-storage",
+    "refresh-token",
+    "audit-log",
+    "typescript",
+    "esm",
+    "nodejs"
   ],
-  "author": "",
+  "author": {
+    "name": "Nehan Ahmed",
+    "url": "https://github.com/NehanAhmed"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -31,11 +42,11 @@
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "files": [
-    "dist"
-  ],
+"dist","README.md"  ],
   "sideEffects": false,
   "engines": {
     "node": ">=20.0.0"
@@ -49,7 +60,8 @@
     "dev": "tsdown --watch",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm build"
   },
   "peerDependencies": {
     "@cred/core": "workspace:*",
