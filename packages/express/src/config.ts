@@ -7,17 +7,22 @@ import {
   type RefreshTokenDatabaseAdapter,
   type UserDatabaseAdapter,
 } from '@cred/core';
-import type { CredCoreDeps } from './types.js';
+import type { MongooseStorageOptions } from '@cred/mongo-storage';
+import type { emailServiceOptions } from '@cred/smtp';
 
 const PREFIX = '@cred/express';
 
 /** Cookie `sameSite` values accepted by the adapter. */
 export type CredSameSite = 'strict' | 'lax' | 'none';
 
+/**
+ * Prebuilt storage adapters for hosts that implement the core storage
+ * contract themselves (for example a SQL backend).
+ */
 export interface CredDatabaseConfig {
-  /** User storage adapter (for example `mongooseStorage(...).user`). */
+  /** User storage adapter. */
   user: UserDatabaseAdapter;
-  /** Refresh-token storage adapter (for example `mongooseStorage(...).refreshToken`). */
+  /** Refresh-token storage adapter. */
   refreshToken: RefreshTokenDatabaseAdapter;
   /**
    * Optional audit-log storage adapter. Without it, audit writes are dropped
@@ -26,6 +31,34 @@ export interface CredDatabaseConfig {
    */
   audit?: AuditDatabaseAdapter;
 }
+
+/** Connection options for the bundled `@cred/mongo-storage` adapter. */
+export type CredMongoStorageOptions = MongooseStorageOptions;
+
+/**
+ * Storage configuration: either MongoDB options that the adapter builds into
+ * `@cred/mongo-storage`, or prebuilt core adapters for another backend.
+ */
+export type CredDatabaseInput = CredMongoStorageOptions | CredDatabaseConfig;
+
+/** Options for the bundled `@cred/smtp` email service. */
+export type CredEmailServiceOptions = emailServiceOptions;
+
+/**
+ * Email configuration: either `@cred/smtp` options that the adapter builds
+ * into a core `EmailAdapter`, or a prebuilt adapter.
+ */
+export type CredEmailInput = CredEmailServiceOptions | EmailAdapter;
+
+/** Resolved storage configuration, normalized for runtime construction. */
+export type ResolvedCredDatabase =
+  | { kind: 'mongoose'; options: CredMongoStorageOptions }
+  | { kind: 'custom'; adapters: CredDatabaseConfig };
+
+/** Resolved email configuration, normalized for runtime construction. */
+export type ResolvedCredEmail =
+  | { kind: 'email-service'; options: CredEmailServiceOptions }
+  | { kind: 'custom'; adapter: EmailAdapter };
 
 export interface CredOAuthProviderConfig {
   clientId: string;
@@ -95,12 +128,14 @@ export interface CredErrorLogger {
 /**
  * Host-supplied configuration for {@link credExpress}.
  *
- * Every database and email dependency is an adapter, so the adapter package
- * never imports Mongoose, Nodemailer, or any other concrete implementation.
+ * By default the adapter builds the official `@cred/mongo-storage` and
+ * `@cred/smtp` implementations from the supplied options and injects them
+ * into `@cred/core`. Prebuilt core adapters can be supplied instead when the
+ * host uses a different backend.
  */
 export interface CredExpressConfig {
-  database: CredDatabaseConfig;
-  email: EmailAdapter;
+  database: CredDatabaseInput;
+  email: CredEmailInput;
   /** HS256 signing secret. Must be at least 32 characters (enforced by core). */
   jwtSecret: string;
   /** Frontend origin used for email-verification and OAuth redirects. */
@@ -138,8 +173,8 @@ export interface ResolvedCredCookieConfig {
 
 /** Fully validated configuration used by the router and controllers. */
 export interface ResolvedCredExpressConfig {
-  database: CredDatabaseConfig;
-  email: EmailAdapter;
+  database: ResolvedCredDatabase;
+  email: ResolvedCredEmail;
   jwtSecret: string;
   clientUrl: string;
   backendUrl: string;
@@ -353,6 +388,108 @@ const assertAdapter = (
   }
 };
 
+const hasDatabaseOptions = (value: Record<string, unknown>): boolean =>
+  value.uri !== undefined || value.connection !== undefined;
+
+const hasDatabaseAdapters = (value: Record<string, unknown>): boolean =>
+  value.user !== undefined || value.refreshToken !== undefined || value.audit !== undefined;
+
+/**
+ * Normalizes the two supported storage inputs into a runtime instruction:
+ * build the bundled Mongo adapter, or use host-supplied core adapters.
+ */
+const resolveDatabase = (value: unknown): ResolvedCredDatabase => {
+  if (!isRecord(value)) {
+    throw new Error(`${PREFIX}: "database" is required`);
+  }
+
+  const hasOptions = hasDatabaseOptions(value);
+  const hasAdapters = hasDatabaseAdapters(value);
+
+  if (hasOptions && hasAdapters) {
+    throw new Error(
+      `${PREFIX}: "database" cannot combine "uri"/"connection" options with prebuilt adapters`,
+    );
+  }
+
+  if (hasOptions) {
+    if (value.uri !== undefined && value.connection !== undefined) {
+      throw new Error(`${PREFIX}: "database" must set either "uri" or "connection", not both`);
+    }
+
+    if (value.uri !== undefined) {
+      return {
+        kind: 'mongoose',
+        options: { uri: readRequiredString('database.uri', value.uri) },
+      };
+    }
+
+    if (!isRecord(value.connection) || typeof value.connection.asPromise !== 'function') {
+      throw new Error(`${PREFIX}: "database.connection" must be a Mongoose Connection`);
+    }
+
+    return {
+      kind: 'mongoose',
+      options: { connection: value.connection } as unknown as CredMongoStorageOptions,
+    };
+  }
+
+  if (hasAdapters) {
+    assertAdapter('database.user', value.user, USER_ADAPTER_METHODS);
+    assertAdapter('database.refreshToken', value.refreshToken, REFRESH_ADAPTER_METHODS);
+
+    if (value.audit !== undefined) {
+      assertAdapter('database.audit', value.audit, AUDIT_ADAPTER_METHODS);
+    }
+
+    return {
+      kind: 'custom',
+      adapters: {
+        user: value.user as UserDatabaseAdapter,
+        refreshToken: value.refreshToken as RefreshTokenDatabaseAdapter,
+        audit: value.audit as AuditDatabaseAdapter | undefined,
+      },
+    };
+  }
+
+  throw new Error(
+    `${PREFIX}: "database" must provide MongoDB options ("uri" or "connection") or prebuilt adapters ("user" and "refreshToken")`,
+  );
+};
+
+/**
+ * Normalizes the two supported email inputs into a runtime instruction: build
+ * the bundled `@cred/smtp` service, or use a host-supplied core adapter.
+ */
+const resolveEmail = (value: unknown): ResolvedCredEmail => {
+  if (!isRecord(value)) {
+    throw new Error(`${PREFIX}: "email" is required`);
+  }
+
+  const hasAdapterShape =
+    value.sendEmailVerification !== undefined || value.sendPasswordReset !== undefined;
+
+  if (hasAdapterShape) {
+    assertAdapter('email', value, EMAIL_ADAPTER_METHODS);
+    return { kind: 'custom', adapter: value as unknown as EmailAdapter };
+  }
+
+  if (value.EMAIL_FROM === undefined && value.BACKEND_URL === undefined) {
+    throw new Error(
+      `${PREFIX}: "email" must provide email service options ("EMAIL_FROM" and "BACKEND_URL") or a prebuilt EmailAdapter`,
+    );
+  }
+
+  return {
+    kind: 'email-service',
+    options: {
+      ...value,
+      EMAIL_FROM: readRequiredString('email.EMAIL_FROM', value.EMAIL_FROM),
+      BACKEND_URL: readUrl('email.BACKEND_URL', value.BACKEND_URL),
+    } as unknown as CredEmailServiceOptions,
+  };
+};
+
 const resolveCookies = (
   overrides: CredCookieConfig | undefined,
   core: CredConfig,
@@ -514,22 +651,8 @@ export const resolveCredConfig = (
     throw new Error(`${PREFIX}: configuration object is required`);
   }
 
-  if (!isRecord(userConfig.database)) {
-    throw new Error(`${PREFIX}: "database" is required`);
-  }
-
-  assertAdapter('database.user', userConfig.database.user, USER_ADAPTER_METHODS);
-  assertAdapter(
-    'database.refreshToken',
-    userConfig.database.refreshToken,
-    REFRESH_ADAPTER_METHODS,
-  );
-
-  if (userConfig.database.audit !== undefined) {
-    assertAdapter('database.audit', userConfig.database.audit, AUDIT_ADAPTER_METHODS);
-  }
-
-  assertAdapter('email', userConfig.email, EMAIL_ADAPTER_METHODS);
+  const database = resolveDatabase(userConfig.database);
+  const email = resolveEmail(userConfig.email);
 
   if (typeof userConfig.jwtSecret !== 'string') {
     throw new Error(`${PREFIX}: "jwtSecret" is required and must be a string`);
@@ -548,12 +671,8 @@ export const resolveCredConfig = (
   const isProduction = process.env.NODE_ENV === 'production';
 
   return {
-    database: {
-      user: userConfig.database.user,
-      refreshToken: userConfig.database.refreshToken,
-      audit: userConfig.database.audit,
-    },
-    email: userConfig.email,
+    database,
+    email,
     jwtSecret: userConfig.jwtSecret,
     clientUrl: readUrl('clientUrl', userConfig.clientUrl),
     backendUrl: readUrl('backendUrl', userConfig.backendUrl),
@@ -573,12 +692,4 @@ export const createCoreAuthConfig = (
 ): { jwtSecret: string } & CredConfig => ({
   jwtSecret: config.jwtSecret,
   ...config.core,
-});
-
-/** Builds the core dependency bundle from a resolved configuration. */
-export const createCoreDeps = (config: ResolvedCredExpressConfig): CredCoreDeps => ({
-  userDatabase: config.database.user,
-  refreshTokenDatabase: config.database.refreshToken,
-  auditDatabase: config.database.audit,
-  email: config.email,
 });

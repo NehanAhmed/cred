@@ -7,7 +7,8 @@ redirects, rate limiting, OAuth redirects, and error responses — and delegates
 decision to core.
 
 - ESM-only, TypeScript, Express 5
-- No database or mailer imports: storage and email are injected as adapters
+- Builds the official MongoDB (`@cred/mongo-storage`) and SMTP/Resend (`@cred/smtp`)
+  adapters from your config, while still accepting prebuilt adapters for custom backends
 - Rotating refresh tokens in `httpOnly` cookies with reuse detection
 - Google and GitHub OAuth authorization-code flow (no Passport global state)
 - Rate limits identical to the shipped Cred API
@@ -18,17 +19,16 @@ decision to core.
 ## Install
 
 ```bash
-pnpm add @cred/express @cred/core express cookie-parser express-rate-limit
+pnpm add @cred/express @cred/core express cookie-parser express-rate-limit mongoose nodemailer
 ```
 
-Install the adapters you want to use:
+`@cred/express` depends on `@cred/mongo-storage` and `@cred/smtp` to build the default
+adapters. `@cred/core`, `express`, `cookie-parser`, `express-rate-limit`, `mongoose`, and
+`nodemailer` are peer dependencies, so the host application supplies a single copy of each.
 
-```bash
-pnpm add @cred/mongo-storage mongoose @cred/smtp
-```
-
-`@cred/core`, `express`, `cookie-parser`, and `express-rate-limit` are peer dependencies, so
-the host application supplies a single copy of each.
+The Mongoose and Nodemailer peers are required because the package loads the official
+adapters. If you use prebuilt adapters for another backend, those libraries are installed but
+never contacted.
 
 ---
 
@@ -37,43 +37,84 @@ the host application supplies a single copy of each.
 ```ts
 import express from 'express';
 import { credExpress } from '@cred/express';
-import { mongooseStorage } from '@cred/mongo-storage';
-import { emailService } from '@cred/smtp';
 
 const app = express();
 
 // Cred reads the forwarded client IP for auditing and rate limiting.
 app.set('trust proxy', 1);
 
-const storage = mongooseStorage({ uri: process.env.MONGO_URI! });
-await storage.ready();
-
-const { EMAIL } = await emailService({
-  EMAIL_FROM: 'no-reply@example.com',
-  BACKEND_URL: 'https://api.example.com',
+const router = await credExpress({
+  database: { uri: process.env.MONGO_URI! },
+  email: {
+    EMAIL_FROM: 'no-reply@example.com',
+    BACKEND_URL: 'https://api.example.com',
+    // RESEND_API_KEY: process.env.RESEND_API_KEY, // omit to use SMTP
+  },
+  jwtSecret: process.env.JWT_SECRET!, // >= 32 characters
+  clientUrl: 'https://app.example.com',
+  backendUrl: 'https://api.example.com',
 });
 
-app.use(
-  '/api',
-  credExpress({
-    database: {
-      user: storage.user,
-      refreshToken: storage.refreshToken,
-      audit: storage.auditLogs, // optional
-    },
-    email: EMAIL,
-    jwtSecret: process.env.JWT_SECRET!, // >= 32 characters
-    clientUrl: 'https://app.example.com',
-    backendUrl: 'https://api.example.com',
-  }),
-);
+app.use('/api', router);
+
+// During graceful shutdown: closes the MongoDB connection and mail transport.
+process.on('SIGTERM', async () => {
+  await router.close();
+  process.exit(0);
+});
 
 app.listen(3000);
 ```
 
+`credExpress` is asynchronous because the email service is built asynchronously, and it waits
+for the MongoDB connection before returning. Mount the resolved router; do not mount the
+promise.
+
 That single mount exposes `POST /api/auth/login`, `GET /api/profile/me`,
 `GET /api/auth/google/callback`, and every other route listed below. Cred does not create an
 HTTP server and does not define routes outside the returned router.
+
+---
+
+## Adapters and lifecycle
+
+By default the adapter constructs both dependencies from the supplied options and injects
+them into `@cred/core`:
+
+- `database: { uri }` creates a connection with `mongooseStorage` and exposes its user,
+  refresh-token, and audit adapters. `database: { connection }` uses an existing
+  `mongoose.Connection` instead and does not close it.
+- `email: { EMAIL_FROM, BACKEND_URL, ... }` creates an `@cred/smtp` service using SMTP or
+  Resend. Additional fields are the same as `@cred/smtp`'s `emailServiceOptions`
+  (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `RESEND_API_KEY`, `provider`,
+  `verifyOnStart`, ...).
+
+Resources created this way are released by `router.close()`, which is idempotent. A connection
+you pass in through `{ connection }`, and any prebuilt adapters you supply, remain owned by
+your application and are never closed by Cred.
+
+### Custom adapters
+
+To use another database or mail provider, pass prebuilt implementations of core's adapter
+interfaces instead of options:
+
+```ts
+const router = await credExpress({
+  database: {
+    user: myUserAdapter,
+    refreshToken: myRefreshTokenAdapter,
+    audit: myAuditAdapter, // optional
+  },
+  email: myEmailAdapter,
+  jwtSecret: process.env.JWT_SECRET!,
+  clientUrl: 'https://app.example.com',
+  backendUrl: 'https://api.example.com',
+});
+```
+
+Custom adapters must implement the interfaces exported by `@cred/core`
+(`UserDatabaseAdapter`, `RefreshTokenDatabaseAdapter`, `AuditDatabaseAdapter`,
+`EmailAdapter`). Cred does not close them; manage their lifecycle in the host application.
 
 ---
 
@@ -82,9 +123,9 @@ HTTP server and does not define routes outside the returned router.
 The path passed to `app.use` **must** match `basePath` (default `/api`):
 
 ```ts
-app.use('/api', credExpress({ /* basePath: '/api' (default) */ }));
+app.use('/api', await credExpress({ /* basePath: '/api' (default) */ }));
 // or
-app.use('/v1', credExpress({ /* ... */, basePath: '/v1' }));
+app.use('/v1', await credExpress({ /* ... */, basePath: '/v1' }));
 ```
 
 `basePath` has three effects:
@@ -94,8 +135,8 @@ app.use('/v1', credExpress({ /* ... */, basePath: '/v1' }));
 2. It appears in the OAuth callback URLs registered with Google/GitHub.
 3. It is the path prefix that verification and reset email links must target.
 
-> **Email links:** `@cred/express` passes the raw token to the injected `EmailAdapter`; link
-> building belongs to that adapter. The current `@cred/smtp` adapter builds
+> **Email links:** `@cred/express` passes the raw token to the email adapter; link building
+> belongs to that adapter. The bundled `@cred/smtp` service builds
 > `${BACKEND_URL}/api/auth/...` links, so use the default `basePath: '/api'` with it (or a
 > custom email adapter that targets your base path).
 
@@ -109,10 +150,8 @@ appended by the adapter.
 
 | Option | Required | Default | Description |
 |---|---|---|---|
-| `database.user` | yes | — | `UserDatabaseAdapter` |
-| `database.refreshToken` | yes | — | `RefreshTokenDatabaseAdapter` |
-| `database.audit` | no | — | `AuditDatabaseAdapter`. Without it, audit writes are dropped and `GET /profile/me/audit-logs` returns `503` |
-| `email` | yes | — | `EmailAdapter` (`sendEmailVerification`, `sendPasswordReset`) |
+| `database` | yes | — | `{ uri }` or `{ connection }` to build `@cred/mongo-storage`; or `{ user, refreshToken, audit? }` prebuilt adapters |
+| `email` | yes | — | `@cred/smtp` options (`EMAIL_FROM`, `BACKEND_URL`, ...); or a prebuilt `EmailAdapter` |
 | `jwtSecret` | yes | — | HS256 secret, at least 32 characters |
 | `clientUrl` | yes | — | Frontend origin used for login, verification, and OAuth redirects |
 | `backendUrl` | yes | — | Public API origin used for OAuth callback URLs |
@@ -125,9 +164,13 @@ appended by the adapter.
 | `jsonBodyLimit` | no | `10kb` | JSON body limit for the mounted router |
 | `logger` | no | `console` | Object with `error(...args)` for unexpected errors |
 
-Configuration is validated when `credExpress(...)` is called. Invalid URLs, a short JWT
-secret, missing adapters, or malformed rate limits throw at startup, before any request is
-served.
+With the built-in MongoDB adapter, audit storage is always available. With prebuilt adapters,
+`database.audit` is optional: without it, audit writes are dropped and
+`GET /profile/me/audit-logs` returns `503`.
+
+Configuration is validated when `credExpress(...)` is called, and the MongoDB/email adapters
+are built before the router is returned. Invalid URLs, a short JWT secret, missing adapter
+options, or malformed rate limits throw at startup, before any request is served.
 
 ### Cookies
 
@@ -285,6 +328,11 @@ details are never sent to the client.
 - **Security middleware:** helmet, CORS, and `app.set('trust proxy', ...)` are host
   responsibilities. Set `trust proxy` whenever the API runs behind a proxy so audit IPs and
   rate limits see the client address.
+- **Dependency construction:** the adapter builds `@cred/mongo-storage` and `@cred/smtp` from
+  your options and passes only core's adapter interfaces into core. Core never imports a
+  concrete driver or mailer.
+- **Lifecycle:** `await router.close()` releases connections and transports created by the
+  adapter. Prebuilt adapters and caller-owned Mongo connections are left untouched.
 - **Stateless instances:** OAuth is implemented with `fetch` rather than Passport, so there is
   no global strategy registry. Multiple routers (for example one per tenant) do not share
   state; rate-limit memory stores are per instance.

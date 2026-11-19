@@ -52,11 +52,17 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@cred/mongo-storage": "workspace:*",
+    "@cred/smtp": "workspace:*"
+  },
   "peerDependencies": {
     "@cred/core": "workspace:*",
     "cookie-parser": "^1.4.7",
     "express": "^5.2.1",
-    "express-rate-limit": "^8.5.2"
+    "express-rate-limit": "^8.5.2",
+    "mongoose": "^9.7.0",
+    "nodemailer": "^10.5.0"
   },
   "devDependencies": {
     "@cred/config": "workspace:*",
@@ -68,6 +74,8 @@
     "eslint": "^10.15.0",
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
+    "mongoose": "^9.7.0",
+    "nodemailer": "^10.5.0",
     "tsdown": "^0.23.7",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.72.2"

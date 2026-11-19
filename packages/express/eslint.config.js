@@ -1,10 +1,11 @@
 import tseslint from 'typescript-eslint';
 
 /**
- * @cred/express is the Express transport adapter: it owns routing, request
- * parsing, cookies, redirects, rate limiting, and HTTP error mapping. Storage,
- * mail, Passport strategies, and auth business logic belong to @cred/core or
- * the dedicated adapter packages, so importing them here is an error.
+ * @cred/express is the Express transport adapter. It owns routing, request
+ * parsing, cookies, redirects, rate limiting, and HTTP error mapping, and it
+ * builds the official @cred/mongo-storage / @cred/smtp adapters from config.
+ * Drivers, Passport strategies, and auth business logic belong elsewhere, so
+ * importing them directly here is an error.
  */
 const outOfScopeLibraries = [
   'mongoose',
@@ -16,8 +17,6 @@ const outOfScopeLibraries = [
   'jsonwebtoken',
   'helmet',
   'cors',
-  '@cred/mongo-storage',
-  '@cred/smtp',
 ];
 
 export default tseslint.config(

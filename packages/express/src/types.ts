@@ -7,9 +7,9 @@ import type {
 } from '@cred/core';
 
 /**
- * The dependency bundle every core service takes. The database and email
- * implementations are supplied by the host application; the Express adapter
- * never constructs them itself.
+ * The dependency bundle every core service takes. The Express adapter builds
+ * the official MongoDB and email adapters from its config, or accepts
+ * prebuilt implementations for custom backends, and injects them into core.
  */
 export interface CredCoreDeps {
   userDatabase: UserDatabaseAdapter;

@@ -1,0 +1,25 @@
+{
+  "name": "demo",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev":"tsx watch src/index.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "type": "module",
+  "license": "ISC",
+  "packageManager": "pnpm@10.33.2",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "@cred/express": "workspace:*",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.6",
+    "tsdown": "^0.23.7",
+    "typescript": "^7.0.2"
+  }
+}
