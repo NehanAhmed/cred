@@ -147,6 +147,57 @@ function classifyResponse<T>(
   }
 }
 
+const CSRF_COOKIE_NAME = "csrfToken"
+const CSRF_HEADER_NAME = "X-CSRF-Token"
+
+let cachedCsrfToken: string | null = null
+
+function readCsrfCookie(): string | null {
+  if (typeof document === "undefined") return null
+
+  const prefix = `${CSRF_COOKIE_NAME}=`
+
+  for (const entry of document.cookie.split(";")) {
+    const trimmed = entry.trim()
+    if (trimmed.startsWith(prefix)) {
+      return decodeURIComponent(trimmed.slice(prefix.length))
+    }
+  }
+
+  return null
+}
+
+async function getCsrfToken(): Promise<string | null> {
+  const cookieToken = readCsrfCookie()
+  if (cookieToken) {
+    cachedCsrfToken = cookieToken
+    return cookieToken
+  }
+
+  if (cachedCsrfToken) return cachedCsrfToken
+
+  try {
+    const response = await fetch("/api/auth/csrf-token", {
+      method: "GET",
+      credentials: "same-origin",
+    })
+    if (!response.ok) return null
+
+    const json: unknown = await response.json()
+    const token =
+      isRecord(json) &&
+      isRecord(json.data) &&
+      typeof json.data.csrfToken === "string"
+        ? json.data.csrfToken
+        : null
+
+    cachedCsrfToken = token
+    return token
+  } catch {
+    return null
+  }
+}
+
 export async function apiCall<T>(
   path: string,
   options: RequestOptions = { method: "GET" }
@@ -154,11 +205,20 @@ export async function apiCall<T>(
   try {
     const { method, body } = options
 
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    }
+
+    if (method !== "GET") {
+      const csrfToken = await getCsrfToken()
+      if (csrfToken) {
+        headers[CSRF_HEADER_NAME] = csrfToken
+      }
+    }
+
     const fetchOptions: RequestInit = {
       method,
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers,
     }
 
     if (body !== undefined) {

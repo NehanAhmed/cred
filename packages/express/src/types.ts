@@ -31,6 +31,7 @@ export interface CredRequestContext {
  */
 export interface CredLocals {
   credUser?: JWTPayload;
+  credCsrfToken?: string;
 }
 
 /** OAuth providers supported by the adapter. */

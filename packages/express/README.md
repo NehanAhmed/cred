@@ -347,6 +347,7 @@ All paths are relative to the mount point. With the default configuration, the f
 | `POST` | `/auth/login` | Public | `auth`, `login` | Log in with email or username plus password; sets cookies |
 | `POST` | `/auth/logout` | Access cookie | `auth`, `logout` | Delete the presented refresh token and clear cookies |
 | `POST` | `/auth/refresh` | Refresh cookie | `auth`, `refresh` | Rotate the refresh token and issue a new access token |
+| `GET` | `/auth/csrf-token` | Public | `auth` | Return the CSRF token and ensure the `csrfToken` cookie is set |
 | `GET` | `/auth/verify-email/:token` | Public | `auth`, `verifyEmail` | Verify an email address; always redirects |
 | `POST` | `/auth/forgot-password` | Public | `auth`, `forgotPassword` | Request a reset link; always returns the same message |
 | `POST` | `/auth/reset-password/:token` | Public | `auth`, `resetPassword` | Reset a password with a one-time token |
@@ -361,6 +362,12 @@ All paths are relative to the mount point. With the default configuration, the f
 | `GET` | `/profile/me/audit-logs` | Access cookie | `profile` | Return paginated audit logs, newest first |
 
 There is no health route in this package. Unmatched paths are not handled by the Cred router; they fall through to the host app's 404 handler and Express's default HTML response.
+
+### CSRF protection
+
+Every unsafe request (`POST`, `PUT`, `PATCH`, `DELETE`) must echo the `csrfToken` cookie in the `X-CSRF-Token` header. The router sets the cookie on any request and `GET /auth/csrf-token` also returns the token in the JSON envelope. Requests that create or recover a session — `POST /auth`, `/auth/login`, `/auth/forgot-password`, and `/auth/reset-password/:token` — are exempt; everything else, including logout, refresh, and profile changes, is protected. A missing or mismatched token returns `403` with the standard error envelope.
+
+The cookie is deliberately not `httpOnly` so same-origin browser clients can read it from `document.cookie`. Cross-origin clients can call `GET /auth/csrf-token` and send the returned value in the header while keeping their cookies.
 
 The OAuth routes are always mounted. Configuring `oauth.google` or `oauth.github` determines whether the flow can start; an unconfigured provider redirects to a login error.
 
@@ -660,6 +667,7 @@ Express sends this as `text/html; charset=utf-8` with the default string respons
 | Access token | `token` | `cookies.accessTokenPath` (default `/`) | `cookies.accessTokenMaxAgeMs` (default 15 minutes) | `httpOnly`, `sameSite` from config (default `strict`), `secure` from config |
 | Refresh token | `refreshToken` | `${basePath}/auth` | `cookies.refreshTokenMaxAgeMs` (default `core.refreshTokenTtlMs`, 7 days) | `httpOnly`, `sameSite` from config (default `strict`), `secure` from config |
 | OAuth state | `oauth_state` | `${basePath}/auth` | 10 minutes | `httpOnly`, `sameSite=lax`, `secure` from config |
+| CSRF token | `csrfToken` | `/` | `cookies.refreshTokenMaxAgeMs` (7 days by default) | `httpOnly: false`, `sameSite` from config, `secure` from config |
 
 `secure` defaults to `NODE_ENV === 'production'`. It is not automatically enabled for HTTPS in other environments; set `cookies.secure: true` explicitly when serving over HTTPS outside production.
 
@@ -815,6 +823,7 @@ What the package does:
 - Stores access and refresh tokens in `httpOnly` cookies. `secure` defaults to production and can be enabled explicitly; `sameSite` defaults to `strict`.
 - Uses `sameSite=lax` for OAuth state and OAuth callback cookies because those requests cross sites.
 - Generates a random 32-byte OAuth state value and verifies it against an `httpOnly` cookie.
+- Issues a double-submit CSRF token cookie and requires `X-CSRF-Token` on unsafe requests outside the session-creation routes.
 - Applies rate limits to every auth and profile route.
 - Forwards `req.ip` and the `user-agent` header to core for audit logging.
 - Returns a generic `500 Internal server error` for unhandled errors and does not include internal error details in the response.
@@ -828,7 +837,6 @@ What remains the host application's responsibility:
 - Helmet or other security headers. The package does not add helmet.
 - Storing `JWT_SECRET`, OAuth client secrets, database credentials, and SMTP credentials securely.
 - Keeping the JWT secret at least 32 characters long.
-- CSRF protection beyond the cookie `sameSite` policy and OAuth state. The package does not mount a separate CSRF middleware.
 - Database security, backups, and email deliverability.
 
 The 10 KB default JSON body limit applies to the whole mounted router. Increase `jsonBodyLimit` only if a Cred request body actually needs it.
@@ -845,7 +853,7 @@ The 10 KB default JSON body limit applies to the whole mounted router. Increase 
 - **Database option pass-through is narrow.** For `{ uri }` and `{ connection }`, only that property is passed to `@cred/mongo-storage`; other properties on the same object are ignored.
 - **No custom rate-limit store.** The limiters always use `express-rate-limit`'s default store. Multi-process deployments do not share counters.
 - **No configurable OAuth scopes, endpoints, or timeout.** Google and GitHub use fixed endpoints, scopes, and a 10-second timeout.
-- **No CORS, helmet, CSRF middleware, or proxy configuration.** These are host responsibilities.
+- **No CORS, helmet, or proxy configuration.** These are host responsibilities.
 - **No catch-all route.** Unmatched paths fall through to the host app's 404 handling.
 - **Audit logs depend on the audit adapter.** Without one, writes are dropped and the audit route returns `503`.
 - **Separate token and cookie lifetimes.** `core.accessTokenExpiry` and `cookies.accessTokenMaxAgeMs` are independent, as are `core.refreshTokenTtlMs` and `cookies.refreshTokenMaxAgeMs`.

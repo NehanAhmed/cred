@@ -12,11 +12,13 @@ import type { ResolvedCredExpressConfig } from './config.js';
 import { createAuthController } from './controllers/auth.controller.js';
 import { createOAuthController } from './controllers/oauth.controller.js';
 import { createProfileController } from './controllers/profile.controller.js';
+import { sendSuccess } from './helpers/api.helper.js';
 import { createRequireAuth } from './middleware/auth.middleware.js';
+import { createCsrfProtection } from './middleware/csrf.middleware.js';
 import { createErrorHandler } from './middleware/error.middleware.js';
 import { createRateLimiters } from './middleware/rate-limit.middleware.js';
 import { validate } from './middleware/validate.middleware.js';
-import type { CredCoreDeps } from './types.js';
+import type { CredCoreDeps, CredLocals } from './types.js';
 
 /**
  * Builds the complete Cred router. The router owns JSON/cookie parsing so the
@@ -39,6 +41,10 @@ export const createRouter = (
   // Every auth route (including OAuth) passes through the broad limiter, then
   // the route-specific limiter where one exists.
   authRouter.use(limiters.auth);
+
+  authRouter.get('/csrf-token', (_req, res) => {
+    sendSuccess(res, { csrfToken: (res.locals as CredLocals).credCsrfToken });
+  });
 
   authRouter.post('/', limiters.register, validate(registerSchema), auth.register);
   authRouter.post('/login', limiters.login, validate(loginSchema), auth.login);
@@ -86,6 +92,7 @@ export const createRouter = (
 
   router.use(express.json({ limit: config.jsonBodyLimit }));
   router.use(cookieParser());
+  router.use(createCsrfProtection(config));
   router.use('/auth', authRouter);
   router.use('/profile', profileRouter);
   router.use(createErrorHandler(config));
