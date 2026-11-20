@@ -5,7 +5,7 @@ pnpm/Turborepo monorepo. There is no frontend and no CI in this repository.
 
 ## Project state (verified 2026-11-11)
 
-- `pnpm build` passes: Turborepo builds `@cred/shared` with tsup, then `@cred/api` with `tsc`.
+- `pnpm build` passes: Turborepo builds `@cred-kit/shared` with tsup, then `@cred-kit/api` with `tsc`.
 - Jest defines **122 tests in 7 suites**. `README.md` documents the same counts; the tests remain
   the source of truth if they drift.
 - This checkout is **not a git repo**. Do not assume `git`, commit, or worktree commands work.
@@ -25,7 +25,7 @@ pnpm/Turborepo monorepo. There is no frontend and no CI in this repository.
 
 ```bash
 pnpm install          # pnpm 10.33.2; workspace packages apps/* and packages/*
-pnpm build            # turbo build -> tsup @cred/shared, tsc @cred/api
+pnpm build            # turbo build -> tsup @cred-kit/shared, tsc @cred-kit/api
 pnpm start            # turbo start -> node dist/index.js (requires build + env)
 pnpm test             # POSIX shells only (Linux/macOS/WSL)
 pnpm test:coverage    # Jest with coverage
@@ -67,7 +67,7 @@ files you changed or match the surrounding style manually.
 
 ```text
 cred/
-  apps/api/                       @cred/api — Express server
+  apps/api/                       @cred-kit/api — Express server
     src/index.ts                  entrypoint: connectDB(), http server, graceful shutdown
     src/app.ts                    env validation, middleware, route mounting
     src/db/db.ts                  mongoose connect/disconnect
@@ -81,8 +81,8 @@ cred/
     src/templates/                HTML email bodies
     src/types/types.d.ts          Express.Request.user augmentation
     src/__tests__/                route, middleware, and helper tests
-  packages/shared/                @cred/shared — types + Zod validators (tsup, ESM)
-  packages/config/                @cred/config — shared tsconfig base/node
+  packages/shared/                @cred-kit/shared — types + Zod validators (tsup, ESM)
+  packages/config/                @cred-kit/config — shared tsconfig base/node
 ```
 
 Route mounting order in `app.ts`: `/api/health` first; `/api/auth` gets `authRoutes` then
@@ -177,7 +177,7 @@ instances are created in `app.ts` and the route files.
 - Suite sizes: auth 35, auth-email 11, profile 26, oauth 27, audit 5, rate limiters 17,
   health 1 — 122 total.
 - `src/__tests__/setup.cjs` sets `NODE_ENV=test` and all required env vars before imports.
-- `jest.config.ts` maps `@cred/shared` to `packages/shared/src/index.ts` (no shared build needed
+- `jest.config.ts` maps `@cred-kit/shared` to `packages/shared/src/index.ts` (no shared build needed
   for tests) and maps `nodemailer` to `apps/api/__mocks__/nodemailer.ts`.
 - `src/__tests__/helpers/test-app.ts` builds its **own** Express app. It omits helmet and uses
   100 requests/15 min instead of the production limiters. A new route must be added there or
@@ -196,12 +196,12 @@ instances are created in `app.ts` and the route files.
 - ESM everywhere (`"type": "module"`, NodeNext). Relative imports in API source must end in
   `.js` even from `.ts` files (`import app from './app.js'`). Shared uses bundler resolution.
 - Types and Zod schemas belong in `packages/shared/src` and must be re-exported from
-  `src/index.ts`; import them as `@cred/shared`. Do not duplicate validators in `apps/api`.
+  `src/index.ts`; import them as `@cred-kit/shared`. Do not duplicate validators in `apps/api`.
 - `req.user` is globally augmented in `apps/api/src/types/types.d.ts`; do not redeclare it.
 - Follow the existing `<domain>.<kind>.ts` file naming (`auth.controllers.ts`,
   `user.models.ts`, `rate-limiters.ts`) and the route → controller → model/helper split.
 - Use `sendSuccess` / `sendError`; do not hand-roll the envelope in controllers.
-- Keep `@cred/shared` builds in sync when changing its public types: `pnpm build` (tsup) is the
+- Keep `@cred-kit/shared` builds in sync when changing its public types: `pnpm build` (tsup) is the
   package boundary. Tests bypass dist via Jest's module mapper, so a passing test does not prove
   the published `dist` is current.
 
@@ -229,7 +229,7 @@ instances are created in `app.ts` and the route files.
 - Passwords are bcrypt-hashed with 10 rounds and stripped from every response via destructuring
   (`const { password: _, ...rest } = user.toObject()`).
 - Audit logging is fire-and-forget: failures are swallowed/logged and must never break a request.
-  Action strings come from `AUDIT_ACTIONS` in `@cred/shared`; logs expire after 90 days.
+  Action strings come from `AUDIT_ACTIONS` in `@cred-kit/shared`; logs expire after 90 days.
 
 ### Profile and validation behavior
 
@@ -248,8 +248,8 @@ tests. `README.md` and `API.md` are kept in sync with the current behavior; if t
 the code, fix the prose.
 
 - `API.md` is the detailed HTTP reference; `README.md` is the concise developer entry point.
-- `PROJECT_VISION.md` describes a future npm-package/adapter split (`@cred/core`,
-  `@cred/express`, storage/email adapters). That split is **not implemented**; the current
+- `PROJECT_VISION.md` describes a future npm-package/adapter split (`@cred-kit/core`,
+  `@cred-kit/express`, storage/email adapters). That split is **not implemented**; the current
   codebase is the standalone Express API described above.
 
 ## Agent working rules

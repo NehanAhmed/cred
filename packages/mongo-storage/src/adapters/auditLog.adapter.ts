@@ -2,7 +2,7 @@ import {
     type AuditDatabaseAdapter,
     type AuditLogFilter,
     type AuditLogInterface,
-} from '@cred/core';
+} from '@cred-kit/core';
 import type { Model } from 'mongoose';
 
 /**

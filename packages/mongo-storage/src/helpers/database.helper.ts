@@ -1,4 +1,4 @@
-import type { User } from '@cred/core';
+import type { User } from '@cred-kit/core';
 
 /**
  * Translate a storage-neutral user filter into a Mongo query.

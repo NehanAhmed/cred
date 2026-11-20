@@ -6,11 +6,11 @@ import {
   type EmailAdapter,
   type RefreshTokenDatabaseAdapter,
   type UserDatabaseAdapter,
-} from '@cred/core';
-import type { MongooseStorageOptions } from '@cred/mongo-storage';
-import type { emailServiceOptions } from '@cred/smtp';
+} from '@cred-kit/core';
+import type { MongooseStorageOptions } from '@cred-kit/mongo-storage';
+import type { emailServiceOptions } from '@cred-kit/smtp';
 
-const PREFIX = '@cred/express';
+const PREFIX = '@cred-kit/express';
 
 /** Cookie `sameSite` values accepted by the adapter. */
 export type CredSameSite = 'strict' | 'lax' | 'none';
@@ -32,20 +32,20 @@ export interface CredDatabaseConfig {
   audit?: AuditDatabaseAdapter;
 }
 
-/** Connection options for the bundled `@cred/mongo-storage` adapter. */
+/** Connection options for the bundled `@cred-kit/mongo-storage` adapter. */
 export type CredMongoStorageOptions = MongooseStorageOptions;
 
 /**
  * Storage configuration: either MongoDB options that the adapter builds into
- * `@cred/mongo-storage`, or prebuilt core adapters for another backend.
+ * `@cred-kit/mongo-storage`, or prebuilt core adapters for another backend.
  */
 export type CredDatabaseInput = CredMongoStorageOptions | CredDatabaseConfig;
 
-/** Options for the bundled `@cred/smtp` email service. */
+/** Options for the bundled `@cred-kit/smtp` email service. */
 export type CredEmailServiceOptions = emailServiceOptions;
 
 /**
- * Email configuration: either `@cred/smtp` options that the adapter builds
+ * Email configuration: either `@cred-kit/smtp` options that the adapter builds
  * into a core `EmailAdapter`, or a prebuilt adapter.
  */
 export type CredEmailInput = CredEmailServiceOptions | EmailAdapter;
@@ -128,9 +128,9 @@ export interface CredErrorLogger {
 /**
  * Host-supplied configuration for {@link credExpress}.
  *
- * By default the adapter builds the official `@cred/mongo-storage` and
- * `@cred/smtp` implementations from the supplied options and injects them
- * into `@cred/core`. Prebuilt core adapters can be supplied instead when the
+ * By default the adapter builds the official `@cred-kit/mongo-storage` and
+ * `@cred-kit/smtp` implementations from the supplied options and injects them
+ * into `@cred-kit/core`. Prebuilt core adapters can be supplied instead when the
  * host uses a different backend.
  */
 export interface CredExpressConfig {
@@ -469,7 +469,7 @@ const resolveDatabase = (value: unknown): ResolvedCredDatabase => {
 
 /**
  * Normalizes the two supported email inputs into a runtime instruction: build
- * the bundled `@cred/smtp` service, or use a host-supplied core adapter.
+ * the bundled `@cred-kit/smtp` service, or use a host-supplied core adapter.
  */
 const resolveEmail = (value: unknown): ResolvedCredEmail => {
   if (!isRecord(value)) {

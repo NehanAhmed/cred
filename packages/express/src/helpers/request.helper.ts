@@ -1,4 +1,4 @@
-import { AuthError, type JWTPayload } from '@cred/core';
+import { AuthError, type JWTPayload } from '@cred-kit/core';
 import type { Request, Response } from 'express';
 import type { CredLocals, CredRequestContext } from '../types.js';
 

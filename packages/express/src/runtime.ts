@@ -1,10 +1,10 @@
-import type { EmailAdapter } from '@cred/core';
-import { mongooseStorage, type MongooseStorage } from '@cred/mongo-storage';
-import { emailService, type EmailService } from '@cred/smtp';
+import type { EmailAdapter } from '@cred-kit/core';
+import { mongooseStorage, type MongooseStorage } from '@cred-kit/mongo-storage';
+import { emailService, type EmailService } from '@cred-kit/smtp';
 import type { CredDatabaseConfig, ResolvedCredExpressConfig } from './config.js';
 import type { CredCoreDeps } from './types.js';
 
-const PREFIX = '@cred/express';
+const PREFIX = '@cred-kit/express';
 
 /** Resources the adapter created itself and is therefore responsible for closing. */
 interface ClosableResource {
@@ -47,8 +47,8 @@ export interface CredCoreRuntime {
  * Builds the concrete adapters requested by the resolved configuration and
  * shapes them into the dependency bundle core expects.
  *
- * `@cred/core` only knows the adapter interfaces; this package owns the
- * concrete `@cred/mongo-storage` / `@cred/smtp` construction. When a host
+ * `@cred-kit/core` only knows the adapter interfaces; this package owns the
+ * concrete `@cred-kit/mongo-storage` / `@cred-kit/smtp` construction. When a host
  * supplies prebuilt adapters they are passed through untouched.
  *
  * If construction fails part-way through, resources already created are

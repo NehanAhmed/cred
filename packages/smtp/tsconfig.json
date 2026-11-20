@@ -1,5 +1,5 @@
 {
-  "extends": "@cred/config/tsconfig/node.json",
+  "extends": "@cred-kit/config/tsconfig/node.json",
   "compilerOptions": {
     "rootDir": "./src",
     "outDir": "./dist",

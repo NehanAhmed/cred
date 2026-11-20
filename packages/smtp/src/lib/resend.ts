@@ -1,7 +1,7 @@
 import { createHttpClient, type FetchLike, type RetryOptions } from './http.js';
 import type { EmailSender } from '../helpers/email.helper.js';
 
-const PREFIX = '@cred/smtp';
+const PREFIX = '@cred-kit/smtp';
 
 export const RESEND_DEFAULTS = {
   baseUrl: 'https://api.resend.com',

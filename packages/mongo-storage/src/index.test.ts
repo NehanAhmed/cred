@@ -1,4 +1,4 @@
-import type { CreateUserInput } from '@cred/core';
+import type { CreateUserInput } from '@cred-kit/core';
 import mongoose from 'mongoose';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { startTestDatabase, type TestDatabase } from './__tests__/helpers/mongo.js';

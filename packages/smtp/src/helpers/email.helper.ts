@@ -1,6 +1,6 @@
-import { emailVerification, passwordReset, type EmailAdapter } from '@cred/core';
+import { emailVerification, passwordReset, type EmailAdapter } from '@cred-kit/core';
 
-const PREFIX = '@cred/smtp';
+const PREFIX = '@cred-kit/smtp';
 
 /** Reset links stay valid for one hour, matching core's reset-token TTL. */
 const DEFAULT_RESET_TOKEN_TTL_MS = 60 * 60 * 1000;

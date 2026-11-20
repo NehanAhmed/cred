@@ -1,7 +1,7 @@
 {
-  "name": "@cred/express",
+  "name": "@cred-kit/express",
   "version": "0.1.0",
-  "description": "Express 5 adapter for Cred: mount one router to expose registration, login, OAuth, profile, and audit endpoints backed by @cred/core.",
+  "description": "Express 5 adapter for Cred: mount one router to expose registration, login, OAuth, profile, and audit endpoints backed by @cred-kit/core.",
   "keywords": [
     "cred",
     "auth",
@@ -65,11 +65,11 @@
     "prepack": "pnpm build"
   },
   "dependencies": {
-    "@cred/mongo-storage": "workspace:*",
-    "@cred/smtp": "workspace:*"
+    "@cred-kit/mongo-storage": "workspace:*",
+    "@cred-kit/smtp": "workspace:*"
   },
   "peerDependencies": {
-    "@cred/core": "workspace:*",
+    "@cred-kit/core": "workspace:*",
     "cookie-parser": "^1.4.7",
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
@@ -77,8 +77,8 @@
     "nodemailer": "^10.5.0"
   },
   "devDependencies": {
-    "@cred/config": "workspace:*",
-    "@cred/core": "workspace:*",
+    "@cred-kit/config": "workspace:*",
+    "@cred-kit/core": "workspace:*",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.6",

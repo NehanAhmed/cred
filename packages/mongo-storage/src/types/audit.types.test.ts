@@ -1,4 +1,4 @@
-import { AUDIT_ACTIONS as CORE_AUDIT_ACTIONS } from '@cred/core';
+import { AUDIT_ACTIONS as CORE_AUDIT_ACTIONS } from '@cred-kit/core';
 import { describe, expect, it } from 'vitest';
 import { AUDIT_ACTIONS } from './audit.types.js';
 
@@ -23,7 +23,7 @@ describe('AUDIT_ACTIONS', () => {
     expect(new Set(AUDIT_ACTIONS).size).toBe(AUDIT_ACTIONS.length);
   });
 
-  it('stays in sync with the canonical list owned by @cred/core', () => {
+  it('stays in sync with the canonical list owned by @cred-kit/core', () => {
     expect(AUDIT_ACTIONS).toEqual(CORE_AUDIT_ACTIONS);
   });
 

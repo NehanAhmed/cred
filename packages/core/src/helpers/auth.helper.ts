@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { JWTPayload, RefreshTokenData } from '../types/auth.types.js';
 import { AuthError } from '../errors/auth-error.js';
-import { defaultConfig, resolveConfig, type CredConfig } from '../config.js';
+import { resolveConfig, type CredConfig } from '../config.js';
 
 export interface GeneratedToken {
   rawToken: string;

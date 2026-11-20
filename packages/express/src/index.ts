@@ -56,7 +56,7 @@ export const credExpress = async (
       await runtime.close();
     } catch (closeError) {
       config.logger.error(
-        '@cred/express: failed to release adapters after router construction failed',
+        '@cred-kit/express: failed to release adapters after router construction failed',
         closeError,
       );
     }

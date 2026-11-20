@@ -1,9 +1,9 @@
 import tseslint from 'typescript-eslint';
 
 /**
- * @cred/express is the Express transport adapter. It owns routing, request
+ * @cred-kit/express is the Express transport adapter. It owns routing, request
  * parsing, cookies, redirects, rate limiting, and HTTP error mapping, and it
- * builds the official @cred/mongo-storage / @cred/smtp adapters from config.
+ * builds the official @cred-kit/mongo-storage / @cred-kit/smtp adapters from config.
  * Drivers, Passport strategies, and auth business logic belong elsewhere, so
  * importing them directly here is an error.
  */
@@ -37,7 +37,7 @@ export default tseslint.config(
         {
           patterns: outOfScopeLibraries.map((lib) => ({
             group: [lib, `${lib}/*`],
-            message: `@cred/express only implements the Express transport; "${lib}" belongs in @cred/core or a dedicated adapter package.`,
+            message: `@cred-kit/express only implements the Express transport; "${lib}" belongs in @cred-kit/core or a dedicated adapter package.`,
           })),
         },
       ],

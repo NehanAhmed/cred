@@ -1,5 +1,5 @@
 {
-  "name": "@cred/mongo-storage",
+  "name": "@cred-kit/mongo-storage",
   "version": "0.1.0",
   "description": "MongoDB/Mongoose storage adapters for Cred authentication data: users, refresh tokens, and audit logs.",
   "keywords": [
@@ -66,12 +66,12 @@
     "test:watch": "vitest"
   },
   "peerDependencies": {
-    "@cred/core": "workspace:*",
+    "@cred-kit/core": "workspace:*",
     "mongoose": "^9.7.0"
   },
   "devDependencies": {
-    "@cred/config": "workspace:*",
-    "@cred/core": "workspace:*",
+    "@cred-kit/config": "workspace:*",
+    "@cred-kit/core": "workspace:*",
     "@types/node": "^26.6.6",
     "eslint": "^10.15.0",
     "mongoose": "^9.7.0",

@@ -1,11 +1,11 @@
-# @cred/mongo-storage
+# @cred-kit/mongo-storage
 
 MongoDB/Mongoose implementation of the storage contracts defined by
-[`@cred/core`](../core). It provides three adapters — users, refresh tokens, and
+[`@cred-kit/core`](../core). It provides three adapters — users, refresh tokens, and
 audit logs — that implement those contracts against MongoDB.
 
 - **ESM-only**, typed, and built with `tsdown`.
-- **Zero runtime dependencies of its own**: `@cred/core` and `mongoose` are peer
+- **Zero runtime dependencies of its own**: `@cred-kit/core` and `mongoose` are peer
   dependencies supplied by the host application.
 - Models are registered on a connection, not globally, so multiple connections
   (application, tests, workers) can coexist in one process.
@@ -38,10 +38,10 @@ audit logs — that implement those contracts against MongoDB.
 |---|---|
 | Node.js | `>=20.0.0` (declared in `engines`) |
 | Mongoose | `^9.7.0` (peer dependency) |
-| `@cred/core` | Workspace peer dependency; required at runtime |
+| `@cred-kit/core` | Workspace peer dependency; required at runtime |
 | Module system | ESM only — there is no CommonJS build |
 
-`@cred/core` is a peer dependency, not a bundled dependency. The adapters import
+`@cred-kit/core` is a peer dependency, not a bundled dependency. The adapters import
 runtime values from it (`DuplicateKeyError` for error translation and
 `AUDIT_ACTIONS` for the audit-log schema enum), so it must be installed by the
 host application. `mongoose` is a peer so the host supplies a single copy; two
@@ -50,11 +50,11 @@ copies of Mongoose in one process break `instanceof` checks and plugin behavior.
 ## Installation
 
 ```bash
-pnpm add @cred/mongo-storage @cred/core mongoose
+pnpm add @cred-kit/mongo-storage @cred-kit/core mongoose
 ```
 
 ```bash
-npm install @cred/mongo-storage @cred/core mongoose
+npm install @cred-kit/mongo-storage @cred-kit/core mongoose
 ```
 
 ## Quick start
@@ -64,7 +64,7 @@ npm install @cred/mongo-storage @cred/core mongoose
 Pass a MongoDB connection string. The adapter creates and owns the connection.
 
 ```ts
-import { mongooseStorage } from '@cred/mongo-storage';
+import { mongooseStorage } from '@cred-kit/mongo-storage';
 
 const storage = mongooseStorage({ uri: process.env.MONGO_URI! });
 
@@ -72,7 +72,7 @@ const storage = mongooseStorage({ uri: process.env.MONGO_URI! });
 await storage.ready();
 
 // Use storage.user, storage.refreshToken, and storage.auditLogs wherever
-// @cred/core expects its storage adapters.
+// @cred-kit/core expects its storage adapters.
 
 // On shutdown, close the connection created by the adapter.
 await storage.close();
@@ -85,7 +85,7 @@ connection and never closes it.
 
 ```ts
 import mongoose from 'mongoose';
-import { mongooseStorage } from '@cred/mongo-storage';
+import { mongooseStorage } from '@cred-kit/mongo-storage';
 
 await mongoose.connect(process.env.MONGO_URI!);
 
@@ -262,7 +262,7 @@ Indexes:
 | Field | Type | Default / constraint |
 |---|---|---|
 | `user` | ObjectId | Default `null`, `ref: 'User'` |
-| `action` | String | Required, enum values from `AUDIT_ACTIONS` in `@cred/core` |
+| `action` | String | Required, enum values from `AUDIT_ACTIONS` in `@cred-kit/core` |
 | `status` | String | Required, `success \| failure` |
 | `ip` | String | Default `null` |
 | `userAgent` | String | Default `null` |
@@ -320,7 +320,7 @@ The adapters expose single-document atomic operations:
 ### Duplicate-key translation
 
 Writes that can hit a unique index translate MongoDB error code `11000` into
-`DuplicateKeyError` from `@cred/core`, with the conflicting field name taken from
+`DuplicateKeyError` from `@cred-kit/core`, with the conflicting field name taken from
 `keyPattern` (or `keyValue` as a fallback) when available. This applies to:
 
 - `user.create`
@@ -342,7 +342,7 @@ declares no unique indexes.
 
 ### Schema tolerance
 
-The adapters are written against `@cred/core` types, not against a fixed
+The adapters are written against `@cred-kit/core` types, not against a fixed
 Mongoose schema:
 
 - `user.create` and `refreshToken.create` use `strict: false` so contract fields
@@ -415,7 +415,7 @@ packages/mongo-storage/
 │       ├── refresh-token.model.ts   CredRefreshToken schema + factory
 │       └── audit-log.model.ts       CredAuditLog schema + factory
 ├── tsdown.config.ts                 ESM bundle + .d.mts declarations
-├── tsconfig.json                    extends @cred/config
+├── tsconfig.json                    extends @cred-kit/config
 ├── eslint.config.js                 lint rules and import boundaries
 └── package.json
 ```
@@ -423,7 +423,7 @@ packages/mongo-storage/
 ## Development
 
 Run these from `packages/mongo-storage`, or from the repository root with
-`pnpm --filter @cred/mongo-storage <script>`.
+`pnpm --filter @cred-kit/mongo-storage <script>`.
 
 | Command | Description |
 |---|---|
@@ -443,7 +443,7 @@ The package owns database models and adapters only. `eslint.config.js` rejects
 imports of HTTP, authentication-token, mail, and OAuth libraries, including
 `express`, `passport`, `nodemailer`, `express-rate-limit`, `helmet`, `cors`,
 `cookie-parser`, `jsonwebtoken`, and `bcryptjs`. Those concerns belong to
-`@cred/core` or the application layer.
+`@cred-kit/core` or the application layer.
 
 ## License
 

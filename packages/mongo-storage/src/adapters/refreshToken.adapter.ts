@@ -2,7 +2,7 @@ import {
     DuplicateKeyError,
     type RefreshToken,
     type RefreshTokenDatabaseAdapter,
-} from '@cred/core';
+} from '@cred-kit/core';
 import type { Model } from 'mongoose';
 
 /**

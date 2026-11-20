@@ -6,7 +6,7 @@ import {
   updateProfile as updateProfileUser,
   type PasswordChangeRequest,
   type ProfileUpdateRequest,
-} from '@cred/core';
+} from '@cred-kit/core';
 import type { RequestHandler } from 'express';
 import type { ResolvedCredExpressConfig } from '../config.js';
 import { sendError, sendSuccess } from '../helpers/api.helper.js';

@@ -29,7 +29,7 @@ export class OAuthProviderError extends Error {
     message: string,
     options: { cause?: unknown } = {},
   ) {
-    super(`@cred/express: ${provider} OAuth ${message}`, options);
+    super(`@cred-kit/express: ${provider} OAuth ${message}`, options);
     this.name = 'OAuthProviderError';
   }
 }

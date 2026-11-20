@@ -29,7 +29,7 @@
   refresh tokens, and SHA-256 hash storage for refresh and email tokens.
 - **Complete auth flows** — email/password registration, email verification, password reset,
   Google/GitHub OAuth, account lockout, and audit logging.
-- **Typed end to end** — Zod schemas and shared request/response types live in `@cred/shared`.
+- **Typed end to end** — Zod schemas and shared request/response types live in `@cred-kit/shared`.
 - **Hardened API** — helmet, CORS with credentials, 10 KB JSON body limit, and per-route rate
   limiting.
 - **Tested** — 122 Jest tests across 7 suites using supertest and in-memory MongoDB.
@@ -87,7 +87,7 @@ OAuth callback URLs are derived from `BACKEND_URL`:
 
 | Command | Description |
 |---|---|
-| `pnpm build` | Build `@cred/shared` with tsup, then `@cred/api` with `tsc` (typecheck gate) |
+| `pnpm build` | Build `@cred-kit/shared` with tsup, then `@cred-kit/api` with `tsc` (typecheck gate) |
 | `pnpm start` | Run the built API from `apps/api/dist` |
 | `pnpm test` | Run all Jest suites — **POSIX shells only** |
 | `pnpm test:coverage` | Run Jest with coverage |
@@ -178,8 +178,8 @@ Rate-limited responses are plain text from `express-rate-limit`, not the standar
 ```text
 cred/
   apps/api/               Express API (routes, controllers, models, helpers, tests)
-  packages/shared/        Shared types and Zod validators (@cred/shared)
-  packages/config/        Shared TypeScript configs (@cred/config)
+  packages/shared/        Shared types and Zod validators (@cred-kit/shared)
+  packages/config/        Shared TypeScript configs (@cred-kit/config)
   API.md                  Detailed HTTP reference
   AGENTS.md               Repository conventions for contributors and AI agents
 ```

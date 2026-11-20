@@ -1,9 +1,9 @@
 import tseslint from 'typescript-eslint';
 
 /**
- * @cred/mongo-storage is the Mongoose implementation of core's storage
+ * @cred-kit/mongo-storage is the Mongoose implementation of core's storage
  * contracts: it owns database models and adapters only. HTTP, auth-token,
- * mail and OAuth concerns belong to apps/api or @cred/core, so importing
+ * mail and OAuth concerns belong to apps/api or @cred-kit/core, so importing
  * their libraries here is an error.
  */
 const outOfScopeLibraries = [
@@ -41,7 +41,7 @@ export default tseslint.config(
         {
           patterns: outOfScopeLibraries.map((lib) => ({
             group: [lib, `${lib}/*`],
-            message: `@cred/mongo-storage only implements database storage; "${lib}" belongs in apps/api or @cred/core.`,
+            message: `@cred-kit/mongo-storage only implements database storage; "${lib}" belongs in apps/api or @cred-kit/core.`,
           })),
         },
       ],

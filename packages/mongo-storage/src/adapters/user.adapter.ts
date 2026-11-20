@@ -4,7 +4,7 @@ import {
     type User,
     type UserDatabaseAdapter,
     type UserQuery,
-} from '@cred/core';
+} from '@cred-kit/core';
 import type { Model } from 'mongoose';
 import { toMongoFilter } from '../helpers/database.helper.js';
 

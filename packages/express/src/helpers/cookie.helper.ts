@@ -11,7 +11,7 @@ const REFRESH_TOKEN_ENC_ALGO = 'aes-256-gcm';
 const REFRESH_TOKEN_IV_BYTES = 12;
 
 const deriveRefreshCookieKey = (config: ResolvedCredExpressConfig): Buffer => {
-  return crypto.createHash('sha256').update(config.core.jwtSecret, 'utf8').digest();
+  return crypto.createHash('sha256').update(config.jwtSecret, 'utf8').digest();
 };
 
 const encryptRefreshTokenForCookie = (
