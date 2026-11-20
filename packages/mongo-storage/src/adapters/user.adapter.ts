@@ -53,6 +53,10 @@ const buildUserFilter = (filter: Partial<User>): Record<string, unknown> =>
  * `UserQuery` values may be comparison operators (`$gt`, `$lte`, ...) rather
  * than plain scalars. Mongoose receives them untouched so time-based
  * conditional updates stay atomic.
+ *
+ * An empty condition maps to `{}`, which Mongo treats as "match any document".
+ * That mirrors `findOne` instead of rejecting filters that only contain
+ * undefined values.
  */
 const buildUserCondition = (condition: UserQuery): Record<string, unknown> => {
     const { id, ...rest } = condition;
@@ -60,10 +64,6 @@ const buildUserCondition = (condition: UserQuery): Record<string, unknown> => {
 
     if (id !== undefined) {
         query._id = id;
-    }
-
-    if (Object.keys(query).length === 0) {
-        throw new Error('A conditional user update requires at least one condition');
     }
 
     return query;
@@ -139,11 +139,10 @@ export const createUserAdapter = (UserModel: MongooseModel): UserDatabaseAdapter
 
         update: async (id, updates) => {
             try {
-
                 const document = await UserModel.findByIdAndUpdate(
                     id,
                     { $set: buildUserUpdate(updates) },
-                    { new: true, runValidators: true, strict: false },
+                    { returnDocument: 'after', runValidators: true, strict: false },
                 )
                     .lean()
                     .exec();
@@ -159,13 +158,13 @@ export const createUserAdapter = (UserModel: MongooseModel): UserDatabaseAdapter
 
                 throw error;
             }
-
         },
 
         findOneByTwoConditions: async (filter1, filter2) => {
             const filters = [filter1, filter2]
                 .map((filter) => omitUndefined(filter as Record<string, unknown>))
-                .filter((filter) => Object.keys(filter).length > 0);
+                .filter((filter) => Object.keys(filter).length > 0)
+                .map((filter) => buildUserFilter(filter as Partial<User>));
 
             if (filters.length === 0) {
                 return null;
@@ -184,7 +183,7 @@ export const createUserAdapter = (UserModel: MongooseModel): UserDatabaseAdapter
             const document = await UserModel.findByIdAndUpdate(
                 id,
                 { $inc: { loginAttempts: 1 } },
-                { new: true },
+                { returnDocument: 'after' },
             )
                 .lean()
                 .exec();
@@ -198,15 +197,28 @@ export const createUserAdapter = (UserModel: MongooseModel): UserDatabaseAdapter
         },
 
         findOneAndUpdate: async (condition, updates) => {
-            const document = await UserModel.findOneAndUpdate(
-                buildUserCondition(condition),
-                { $set: buildUserUpdate(updates) },
-                { new: true, runValidators: true, strict: false, strictQuery: false },
-            )
-                .lean()
-                .exec();
+            try {
+                const document = await UserModel.findOneAndUpdate(
+                    buildUserCondition(condition),
+                    { $set: buildUserUpdate(updates) },
+                    {
+                        returnDocument: 'after',
+                        runValidators: true,
+                        strict: false,
+                        strictQuery: false,
+                    },
+                )
+                    .lean()
+                    .exec();
 
-            return toUserOrNull(document);
+                return toUserOrNull(document);
+            } catch (error) {
+                if (isDuplicateKeyError(error)) {
+                    throw new DuplicateKeyError(duplicateKeyField(error));
+                }
+
+                throw error;
+            }
         },
     };
 };

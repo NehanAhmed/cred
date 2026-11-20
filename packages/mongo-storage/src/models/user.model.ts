@@ -1,45 +1,50 @@
 import mongoose, { Connection, Model } from 'mongoose';
+import { USER_MODEL_NAME } from './model-names.js';
 
 const userSchema = new mongoose.Schema(
   {
     username: {
       type: String,
       required: true,
-      unique: true,
+      unique: true
     },
     email: {
       type: String,
       required: true,
-      unique: true,
+      unique: true
     },
     password: {
       type: String,
-      required: false,
+      required: false
     },
     bio: {
       type: String,
-      required: false,
+      required: false
     },
     phoneNumber: {
       type: String,
-      required: false,
+      required: false
     },
     gender: {
       type: String,
       enum: ['male', 'female', 'other', null],
-      default: null,
+      default: null
     },
     isVerified: {
       type: Boolean,
-      default: false,
+      default: false
     },
     verificationToken: {
       type: String,
-      default: null,
+      default: null
     },
     verificationTokenExpires: {
       type: Date,
-      default: null,
+      default: null
+    },
+    verificationTokenLookup: {
+      type: String,
+      default: null
     },
     verificationTokenLookup: {
       type: String,
@@ -47,62 +52,66 @@ const userSchema = new mongoose.Schema(
     },
     resetPasswordToken: {
       type: String,
-      default: null,
+      default: null
     },
     resetPasswordExpires: {
       type: Date,
-      default: null,
+      default: null
     },
     resetPasswordTokenLookup: {
       type: String,
-      default: null,
+      default: null
     },
     googleId: {
-      type: String,
+      type: String
     },
     githubId: {
-      type: String,
+      type: String
     },
     provider: {
       type: String,
       enum: ['local', 'github', 'google'],
-      default: 'local',
+      default: 'local'
     },
     avatar: {
       type: String,
-      default: null,
+      default: null
     },
     loginAttempts: {
       type: Number,
-      default: 0,
+      default: 0
     },
     lockoutUntil: {
       type: Date,
-      default: null,
+      default: null
     },
     lastLogin: {
       type: Date,
-      default: null,
+      default: null
     },
     lastIp: {
       type: String,
-      default: null,
-    },
+      default: null
+    }
   },
   { timestamps: true }
 );
 
-// The legacy hashed-token lookups moved to the opaque `*Lookup` ids, so the
-// old compound indexes are dropped. The lookup fields are only ever compared
-// by equality and are `null` for most users, hence the partial unique indexes
-// (a sparse index would still collide on explicit `null` values).
+userSchema.index({ verificationToken: 1, verificationTokenExpires: 1 });
+userSchema.index({ resetPasswordToken: 1, resetPasswordExpires: 1 });
 userSchema.index(
   { verificationTokenLookup: 1 },
-  { unique: true, partialFilterExpression: { verificationTokenLookup: { $type: 'string' } } },
+  {
+    unique: true,
+    partialFilterExpression: { verificationTokenLookup: { $type: 'string' } }
+  }
 );
 userSchema.index(
   { resetPasswordTokenLookup: 1 },
-  { unique: true, partialFilterExpression: { resetPasswordTokenLookup: { $type: 'string' } } },
+  {
+    unique: true,
+    partialFilterExpression: { resetPasswordTokenLookup: { $type: 'string' } }
+  }
 );
 userSchema.index({ googleId: 1 }, { unique: true, sparse: true });
 userSchema.index({ githubId: 1 }, { unique: true, sparse: true });
@@ -113,6 +122,6 @@ userSchema.pre('save', async function () {
   }
 });
 
-export function getUserModel(connection: Connection, name = 'CredUser', collection = 'User') {
+export function getUserModel(connection: Connection, name = USER_MODEL_NAME, collection = 'User') {
   return (connection.models[name] as Model<any>) ?? connection.model(name, userSchema, collection);
 }
