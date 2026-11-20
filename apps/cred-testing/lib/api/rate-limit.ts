@@ -1,4 +1,8 @@
 import { apiCall, type ApiResult } from "@/lib/api-client"
+import { randomBytes } from "crypto"
+
+const secureRandomSuffix = (length = 8): string =>
+  randomBytes(Math.ceil(length / 2)).toString("hex").slice(0, length)
 
 export type RateLimiterDef = {
   id: string
@@ -33,8 +37,8 @@ export const RATE_LIMITER_DEFS: RateLimiterDef[] = [
     requiresAuth: false,
     description: "Account creation rate limiter",
     getBody: () => ({
-      username: `rate-test-${Math.random().toString(36).slice(2, 10)}`,
-      email: `rate-test-${Math.random().toString(36).slice(2, 10)}@example.com`,
+      username: `rate-test-${secureRandomSuffix(8)}`,
+      email: `rate-test-${secureRandomSuffix(8)}@example.com`,
       password: "RateLimitTest1",
     }),
   },
