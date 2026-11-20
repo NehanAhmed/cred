@@ -1,0 +1,17 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@4.0.1/schema.json",
+  "baseBranch": "main",
+  "access": "public",
+  "format": "auto",
+  "changelog": [
+    "@changesets/changelog-github",
+    {
+      "repo": "cred"
+    }
+  ],
+  "commit": true,
+  "ignore": ["cred-testing","demo","@cred-kit/shared","@cred-kit/config"],
+  "fixed": [],
+  "linked": [],
+  "updateInternalDependencies": "patch"
+}

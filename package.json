@@ -15,7 +15,9 @@
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "format": "prettier --write \"apps/**/*.ts\" \"apps/**/*.tsx\" \"packages/**/*.ts\"",
-    "format:check": "prettier --check \"apps/**/*.ts\" \"apps/**/*.tsx\" \"packages/**/*.ts\""
+    "format:check": "prettier --check \"apps/**/*.ts\" \"apps/**/*.tsx\" \"packages/**/*.ts\"",
+    "changeset": "changeset",
+    "release": "turbo run build --filter=./packages/* && changeset publish"
   },
   "pnpm": {
     "overrides": {
@@ -23,6 +25,7 @@
     }
   },
   "devDependencies": {
+    "@changesets/cli": "^3.0.3",
     "prettier": "^3.8.4",
     "turbo": "^2.5.2",
     "typescript": "^6.0.3"
