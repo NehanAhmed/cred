@@ -16,11 +16,14 @@ import {
   type ResolvedCredExpressConfig,
 } from '../config.js';
 import { sendSuccess } from '../helpers/api.helper.js';
-import { clearAuthCookies, setAuthCookies } from '../helpers/cookie.helper.js';
+import {
+  clearAuthCookies,
+  readRefreshTokenCookie,
+  setAuthCookies,
+} from '../helpers/cookie.helper.js';
 import {
   getAuthenticatedUser,
   getRequestContext,
-  readCookie,
   readRouteParam,
 } from '../helpers/request.helper.js';
 import type { CredCoreDeps } from '../types.js';
@@ -92,7 +95,7 @@ export const createAuthController = (
 
     logout: async (req, res) => {
       const user = getAuthenticatedUser(res);
-      const rawToken = readCookie(req, config.cookies.refreshTokenName);
+      const rawToken = readRefreshTokenCookie(req, config);
 
       await logoutUser(
         {
@@ -109,7 +112,7 @@ export const createAuthController = (
     },
 
     refresh: async (req, res) => {
-      const rawToken = readCookie(req, config.cookies.refreshTokenName) ?? '';
+      const rawToken = readRefreshTokenCookie(req, config) ?? '';
 
       try {
         const tokens = await refreshUser(
