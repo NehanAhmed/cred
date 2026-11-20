@@ -59,9 +59,10 @@ jobs:
       - name: Build, lint, typecheck, test
         env:
           EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           if [ "$EVENT_NAME" = "pull_request" ]; then
-            pnpm turbo run build lint typecheck test --affected
+            TURBO_SCM_BASE="$BASE_SHA" pnpm turbo run build lint typecheck test --affected
           else
             pnpm turbo run build lint typecheck test
           fi
