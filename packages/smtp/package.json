@@ -44,9 +44,7 @@
   "files": [
 "dist","README.md"  ],
   "sideEffects": false,
-  "engines": {
-    "node": ">=20.0.0"
-  },
+  "engines": { "node": ">=22" },
   "packageManager": "pnpm@10.33.2",
   "publishConfig": {
     "access": "public"
