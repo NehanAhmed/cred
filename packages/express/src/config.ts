@@ -287,6 +287,16 @@ const readOptionalString = (name: string, value: unknown): string | undefined =>
   return readRequiredString(name, value);
 };
 
+const stripTrailingSlashes = (value: string): string => {
+  let end = value.length;
+
+  while (end > 0 && value.charCodeAt(end - 1) === 47 /* '/' */) {
+    end -= 1;
+  }
+
+  return value.slice(0, end);
+};
+
 const readUrl = (name: string, value: unknown): string => {
   const raw = readRequiredString(name, value);
 
@@ -307,7 +317,7 @@ const readUrl = (name: string, value: unknown): string => {
     throw new Error(`${PREFIX}: "${name}" must not contain a query string or fragment`);
   }
 
-  return url.href.replace(/\/+$/, '');
+  return stripTrailingSlashes(url.href);
 };
 
 const readBasePath = (value: unknown): string => {
@@ -321,7 +331,7 @@ const readBasePath = (value: unknown): string => {
     throw new Error(`${PREFIX}: "basePath" must be a plain URL path, received "${raw}"`);
   }
 
-  return raw.replace(/\/+$/, '');
+  return stripTrailingSlashes(raw);
 };
 
 const readPositiveInteger = (name: string, value: unknown): number => {

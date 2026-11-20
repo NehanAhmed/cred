@@ -15,11 +15,6 @@ const refreshTokenSchema = new mongoose.Schema(
       type: String,
       default: null
     },
-    /** Public lookup id used to find the token before bcrypt verification. */
-    lookupId: {
-      type: String,
-      default: null,
-    },
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: USER_MODEL_NAME,
