@@ -2,27 +2,25 @@ name: CI
 
 on:
   pull_request:
-  workflow_call:        # lets release.yml run the same matrix before publishing
+  workflow_call:        
 
 permissions:
   contents: read
 
-# Cancel superseded runs on the same PR. Called runs get a unique group.
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 defaults:
   run:
-    shell: bash         # same shell syntax on Linux and Windows runners
-
+    shell: bash         
 jobs:
   verify:
     name: ${{ matrix.os }} / node ${{ matrix.node }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
-      fail-fast: false  # see every OS result, not just the first failure
+      fail-fast: false  
       matrix:
        os: [ubuntu-latest, ubuntu-22.04, windows-latest, windows-2022]
        node: [22, 24]
@@ -35,9 +33,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # turbo --affected needs history
+          fetch-depth: 0   
 
-      - uses: pnpm/action-setup@v4   # version comes from "packageManager"
+      - uses: pnpm/action-setup@v4   
 
       - uses: actions/setup-node@v4
         with:
@@ -76,7 +74,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm turbo run build --filter="./packages/*"
-      # Shows exactly what each tarball would contain; fails if exports/files are broken.
       - run: pnpm --filter "./packages/*" exec pnpm pack --dry-run
 
   ci-gate:
