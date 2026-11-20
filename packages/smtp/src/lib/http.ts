@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-const PREFIX = '@cred/smtp';
+const PREFIX = '@cred-kit/smtp';
 
 export type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 

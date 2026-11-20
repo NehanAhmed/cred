@@ -1,5 +1,5 @@
 import mongoose, { type Connection } from 'mongoose';
-import type { UserDatabaseAdapter, RefreshTokenDatabaseAdapter, AuditDatabaseAdapter } from '@cred/core';
+import type { UserDatabaseAdapter, RefreshTokenDatabaseAdapter, AuditDatabaseAdapter } from '@cred-kit/core';
 import { getUserModel } from './models/user.model.js';
 import { getRefreshModel } from './models/refresh-token.model.js';
 import { getAuditModel } from './models/audit-log.model.js';

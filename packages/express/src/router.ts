@@ -5,7 +5,7 @@ import {
   passwordResetSchema,
   profileSchema,
   registerSchema,
-} from '@cred/core';
+} from '@cred-kit/core';
 import cookieParser from 'cookie-parser';
 import express, { type Router } from 'express';
 import type { ResolvedCredExpressConfig } from './config.js';

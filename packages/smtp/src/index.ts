@@ -1,4 +1,4 @@
-import type { EmailAdapter } from '@cred/core';
+import type { EmailAdapter } from '@cred-kit/core';
 import { createEmailAdapter, type EmailSender } from './helpers/email.helper.js';
 import { getTransporter, smtpSend, type smtpOptions } from './lib/transporter.js';
 import { createResendSender, type resendOptions } from './lib/resend.js';
@@ -9,7 +9,7 @@ export type { FetchLike, HttpClient, RetryOptions } from './lib/http.js';
 export { EmailApiError } from './lib/http.js';
 export type { EmailSender, OutboundEmail } from './helpers/email.helper.js';
 
-const PREFIX = '@cred/smtp';
+const PREFIX = '@cred-kit/smtp';
 
 export type EmailProvider = 'smtp' | 'resend';
 

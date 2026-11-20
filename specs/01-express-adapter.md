@@ -1,10 +1,10 @@
 ## Converting the apps/api into a express adapter.
 
-Our goal is to convert the apps/api into a express adapter that will be a covering layer that will be used by the person downloading the package of ours. The express adapter will be a controller and api adapter that will cover all the api and auth routes and then use the @cred/core which contains all the fuctions that are needed in the auth and other operations. But the @cred/core needs two things. It needs deps which are the adapters @cred/smtp and @cred/mongo-storage. These are the dependencies that are needed to be passed to the @cred/core to be able to use it's function. I will convince you to read the @cred/core completely and @cred/smtp along with mongo-storage so you will have the complete idea. You will have to build the both adapters then pass them to the functions that will imported from the @cred/core. The user will just import the credExpress factory and pass him the needed params and then say like app.use('/',credExpress({ and the needed params. })). SO this is how i want the flow to be exactly. The express adapter will be just a controller router and routes that will just use the @cred/core functions to do everything so they dont have to like manually interact with the database and models and functions or helper, @cred/core has everything they need and all it has to do is do dependency injection in the functions and it will have things. But the main thing that @cred/express-adapter neeeds to do is handle responsing and error handling and redirecting and all the other factors like rate-limiting and express related things because the @cred/core is just a function pacakge and it can't redirect user to a specific page after login or after password reset or oauth callback so the main job is this. 
+Our goal is to convert the apps/api into a express adapter that will be a covering layer that will be used by the person downloading the package of ours. The express adapter will be a controller and api adapter that will cover all the api and auth routes and then use the @cred-kit/core which contains all the fuctions that are needed in the auth and other operations. But the @cred-kit/core needs two things. It needs deps which are the adapters @cred-kit/smtp and @cred-kit/mongo-storage. These are the dependencies that are needed to be passed to the @cred-kit/core to be able to use it's function. I will convince you to read the @cred-kit/core completely and @cred-kit/smtp along with mongo-storage so you will have the complete idea. You will have to build the both adapters then pass them to the functions that will imported from the @cred-kit/core. The user will just import the credExpress factory and pass him the needed params and then say like app.use('/',credExpress({ and the needed params. })). SO this is how i want the flow to be exactly. The express adapter will be just a controller router and routes that will just use the @cred-kit/core functions to do everything so they dont have to like manually interact with the database and models and functions or helper, @cred-kit/core has everything they need and all it has to do is do dependency injection in the functions and it will have things. But the main thing that @cred-kit/express-adapter neeeds to do is handle responsing and error handling and redirecting and all the other factors like rate-limiting and express related things because the @cred-kit/core is just a function pacakge and it can't redirect user to a specific page after login or after password reset or oauth callback so the main job is this. 
 
 # Example Info on the implementation:
 
-The user doesn’t define routes at all. The route table lives inside @cred/express, and the user mounts the whole router at one path:
+The user doesn’t define routes at all. The route table lives inside @cred-kit/express, and the user mounts the whole router at one path:
 
 ts
 - "app.use('/api', credExpress({ ...config }));
@@ -23,7 +23,7 @@ Controllers are factories. This is how a controller “knows” which database a
 
 ts
 // controllers/auth.controller.ts
-import { login as loginUser, AuthError } from '@cred/core';
+import { login as loginUser, AuthError } from '@cred-kit/core';
 
 export function createAuthController(config: ResolvedConfig, deps: CoreDeps) {
   return {
@@ -97,7 +97,7 @@ This is just a example code that i used to reference just how the code should wo
 
 # Scaffolding package
 
-Create a express typescript app and add eslint along with tsdown and full commands in the package.json. Add linting build commands and eslint command. Make the folder structure as same as other packages (e.g: @cred/core and @cred/mongo-storage). Follow the same code structure as the other packages and it should be following the same code patterns. 
+Create a express typescript app and add eslint along with tsdown and full commands in the package.json. Add linting build commands and eslint command. Make the folder structure as same as other packages (e.g: @cred-kit/core and @cred-kit/mongo-storage). Follow the same code structure as the other packages and it should be following the same code patterns. 
 
 # Building the project 
 

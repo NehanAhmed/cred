@@ -1,5 +1,5 @@
 {
-  "name": "@cred/core",
+  "name": "@cred-kit/core",
   "version": "0.1.0",
   "description": "Framework-agnostic, storage-agnostic authentication core for Node.js: registration, verified email login, rotating refresh tokens with reuse detection, OAuth account linking, profiles, and audit logging.",
   "keywords": [

@@ -1,7 +1,7 @@
 import {
   findOrCreateOAuthUser,
   oauthCallback as completeOAuthCallback,
-} from '@cred/core';
+} from '@cred-kit/core';
 import { randomBytes } from 'node:crypto';
 import type { RequestHandler } from 'express';
 import {
@@ -114,7 +114,7 @@ export const createOAuthController = (
         profile = await fetchProfile(provider, credentials, code);
       } catch (error) {
         config.logger.error(
-          `@cred/express: ${provider} OAuth authentication failed`,
+          `@cred-kit/express: ${provider} OAuth authentication failed`,
           error,
         );
         res.redirect(loginRedirect(`${provider}_auth_failed`));
@@ -157,7 +157,7 @@ export const createOAuthController = (
         res.redirect(`${config.clientUrl}/auth/callback`);
       } catch (error) {
         config.logger.error(
-          `@cred/express: ${provider} OAuth callback failed`,
+          `@cred-kit/express: ${provider} OAuth callback failed`,
           error,
         );
         res.redirect(loginRedirect('oauth_failed'));

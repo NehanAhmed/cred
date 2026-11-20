@@ -1,4 +1,4 @@
-# @cred/smtp
+# @cred-kit/smtp
 
 Email delivery for [Cred](https://github.com/NehanAhmed/cred) authentication flows. This package
 implements core's `EmailAdapter` contract over either **SMTP (Nodemailer)** or the **Resend HTTP
@@ -23,7 +23,7 @@ ESM only · Node.js 20+ · MIT
 - [Lifecycle](#lifecycle)
 - [Error handling](#error-handling)
 - [Security notes](#security-notes)
-- [Using it with `@cred/core`](#using-it-with-cred-core)
+- [Using it with `@cred-kit/core`](#using-it-with-cred-core)
 - [Public API](#public-api)
 - [Scope and non-goals](#scope-and-non-goals)
 - [Project layout](#project-layout)
@@ -36,11 +36,11 @@ ESM only · Node.js 20+ · MIT
 ## Why this package
 
 Cred needs to send two transactional emails: address verification and password reset. The
-messages themselves — subjects, HTML, link shape, expiry copy — belong to `@cred/core`. The
+messages themselves — subjects, HTML, link shape, expiry copy — belong to `@cred-kit/core`. The
 transport that actually delivers them is an operational decision: a self-hosted SMTP relay in one
 deployment, a hosted API in another.
 
-`@cred/smtp` keeps that decision at the edge:
+`@cred-kit/smtp` keeps that decision at the edge:
 
 - **One contract in.** It returns core's `EmailAdapter`, so application code only ever calls
   `sendEmailVerification` and `sendPasswordReset`.
@@ -60,20 +60,20 @@ deployment, a hosted API in another.
 | SMTP hardening | TLS 1.2 floor, `requireTLS` by default, pooled connections, finite connect/greeting/socket timeouts |
 | Resend resilience | Per-attempt timeouts, bounded retries with jitter, `Retry-After` support, one `Idempotency-Key` per logical send |
 | Observability | Failures carry the transport error as `cause`; the API key is redacted from messages |
-| Runtime footprint | No `dependencies` of its own; `@cred/core` and `nodemailer` are peers; the only Node built-in used is `node:crypto` |
+| Runtime footprint | No `dependencies` of its own; `@cred-kit/core` and `nodemailer` are peers; the only Node built-in used is `node:crypto` |
 | Types | Full TypeScript declarations, ESM output |
 
 ## Installation
 
-`@cred/smtp` is consumed from the Cred monorepo as a workspace package. Both of its runtime
+`@cred-kit/smtp` is consumed from the Cred monorepo as a workspace package. Both of its runtime
 requirements are declared as **peer dependencies**, so the host application owns the copies of
-`@cred/core` and `nodemailer`:
+`@cred-kit/core` and `nodemailer`:
 
 ```jsonc
 {
   "dependencies": {
-    "@cred/smtp": "workspace:*",
-    "@cred/core": "workspace:*",
+    "@cred-kit/smtp": "workspace:*",
+    "@cred-kit/core": "workspace:*",
     "nodemailer": "^10.5.0"
   }
 }
@@ -85,14 +85,14 @@ published to the npm registry at this time. Install it from the workspace rather
 > **Note**
 > `nodemailer` is a required peer dependency even when you use the Resend provider. The package
 > entry point imports the SMTP transport statically, so Nodemailer is loaded whenever
-> `@cred/smtp` is imported.
+> `@cred-kit/smtp` is imported.
 
 ## Quick start
 
 ### SMTP
 
 ```ts
-import { emailService } from '@cred/smtp';
+import { emailService } from '@cred-kit/smtp';
 
 const { EMAIL, verify, close } = await emailService({
   EMAIL_FROM: 'no-reply@example.com',
@@ -111,7 +111,7 @@ await verify();
 ### Resend
 
 ```ts
-import { emailService } from '@cred/smtp';
+import { emailService } from '@cred-kit/smtp';
 
 const { EMAIL, close } = await emailService({
   EMAIL_FROM: 'no-reply@example.com',
@@ -167,7 +167,7 @@ decision logic elsewhere.
 
 ## What gets sent
 
-Both transports send exactly one HTML part. The copy itself comes from `@cred/core`
+Both transports send exactly one HTML part. The copy itself comes from `@cred-kit/core`
 (`emailVerification` and `passwordReset`); this package supplies the link and the expiry line.
 
 | Adapter method | Subject | Link |
@@ -296,14 +296,14 @@ const { EMAIL, verify, close } = await emailService(options);
 ## Error handling
 
 Configuration errors are thrown while building the service — plain `Error` for service/SMTP
-options, `EmailApiError` for HTTP-client options. All messages are prefixed with `@cred/smtp:` and
+options, `EmailApiError` for HTTP-client options. All messages are prefixed with `@cred-kit/smtp:` and
 name the offending option, for example:
 
 ```text
-@cred/smtp: "SMTP_HOST" is required for the SMTP provider
-@cred/smtp: "SMTP_USER" and "SMTP_PASS" must be configured together for the SMTP provider
-@cred/smtp: "BACKEND_URL" must not contain a query string or fragment
-@cred/smtp: invalid "timeZone" "Mars/Olympus"
+@cred-kit/smtp: "SMTP_HOST" is required for the SMTP provider
+@cred-kit/smtp: "SMTP_USER" and "SMTP_PASS" must be configured together for the SMTP provider
+@cred-kit/smtp: "BACKEND_URL" must not contain a query string or fragment
+@cred-kit/smtp: invalid "timeZone" "Mars/Olympus"
 ```
 
 Delivery failures are wrapped once, so the original transport error stays inspectable:
@@ -312,7 +312,7 @@ Delivery failures are wrapped once, so the original transport error stays inspec
 try {
   await EMAIL.sendPasswordReset(email, token);
 } catch (error) {
-  // error.message: @cred/smtp: failed to send "Password Reset Link" to user@example.com
+  // error.message: @cred-kit/smtp: failed to send "Password Reset Link" to user@example.com
   // error.cause:   transport error (Nodemailer error or EmailApiError)
 }
 ```
@@ -343,10 +343,10 @@ replaced with `[redacted]`.
   integer bounds and booleans are all validated before any I/O happens.
 - **Bounded egress.** HTTP attempts are timeout-bounded and retries are capped in count and delay.
 
-## Using it with `@cred/core`
+## Using it with `@cred-kit/core`
 
 ```ts
-import { emailService } from '@cred/smtp';
+import { emailService } from '@cred-kit/smtp';
 
 const { EMAIL, close } = await emailService({
   EMAIL_FROM: process.env.EMAIL_FROM!,
@@ -387,7 +387,7 @@ import {
   type FetchLike,
   type HttpClient,
   type RetryOptions,
-} from '@cred/smtp';
+} from '@cred-kit/smtp';
 ```
 
 | Export | Kind | Purpose |
@@ -411,7 +411,7 @@ entry point.
 
 This package is deliberately narrow. It does **not**:
 
-- render or customize email templates (copy lives in `@cred/core`);
+- render or customize email templates (copy lives in `@cred-kit/core`);
 - send plain-text alternatives, attachments, `cc`, `bcc`, or `replyTo`;
 - queue, schedule, or persist outbound messages;
 - handle inbound email, bounces, or webhooks;
@@ -438,14 +438,14 @@ src/
 
 Import boundaries are enforced by ESLint: Express, Mongoose, Passport, JWT, bcrypt, rate-limit,
 helmet, CORS and cookie-parser imports are rejected because they belong in the application or in
-`@cred/core`, not in the email adapter.
+`@cred-kit/core`, not in the email adapter.
 
 ## Development
 
 Run commands from `packages/smtp`, or target the package from the repository root:
 
 ```bash
-pnpm --filter @cred/smtp build
+pnpm --filter @cred-kit/smtp build
 ```
 
 | Script | Command | Description |

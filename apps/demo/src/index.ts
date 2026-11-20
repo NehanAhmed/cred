@@ -1,6 +1,6 @@
 import express from 'express'
 import { configDotenv } from 'dotenv'
-import { credExpress } from '@cred/express'
+import { credExpress } from '@cred-kit/express'
 configDotenv({ path: '../.env.local' })
 const PORT = 5000
 const app = express()

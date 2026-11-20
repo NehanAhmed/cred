@@ -1,4 +1,4 @@
-/** `@cred/core` owns the Zod validators; re-exported for `@cred/shared`. */
+/** `@cred-kit/core` owns the Zod validators; re-exported for `@cred-kit/shared`. */
 export {
   loginSchema,
   passwordForgotSchema,
@@ -6,4 +6,4 @@ export {
   profileSchema,
   registerSchema,
   passwordChangeSchema,
-} from '@cred/core';
+} from '@cred-kit/core';

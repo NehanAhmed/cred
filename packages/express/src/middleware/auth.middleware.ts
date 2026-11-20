@@ -1,4 +1,4 @@
-import { verifyAccessToken } from '@cred/core';
+import { verifyAccessToken } from '@cred-kit/core';
 import type { RequestHandler } from 'express';
 import type { ResolvedCredExpressConfig } from '../config.js';
 import { sendError } from '../helpers/api.helper.js';

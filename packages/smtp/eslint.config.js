@@ -1,9 +1,9 @@
 import tseslint from 'typescript-eslint';
 
 /**
- * @cred/smtp is the Nodemailer implementation of core's `EmailAdapter`
+ * @cred-kit/smtp is the Nodemailer implementation of core's `EmailAdapter`
  * contract: it owns SMTP transport concerns only. HTTP, database, OAuth and
- * token libraries belong to apps/api or @cred/core, so importing them here is
+ * token libraries belong to apps/api or @cred-kit/core, so importing them here is
  * an error.
  */
 const outOfScopeLibraries = [
@@ -38,7 +38,7 @@ export default tseslint.config(
         {
           patterns: outOfScopeLibraries.map((lib) => ({
             group: [lib, `${lib}/*`],
-            message: `@cred/smtp only implements email delivery; "${lib}" belongs in apps/api or @cred/core.`
+            message: `@cred-kit/smtp only implements email delivery; "${lib}" belongs in apps/api or @cred-kit/core.`
           }))
         }
       ]

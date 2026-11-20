@@ -46,7 +46,7 @@ export type smtpOptions = {
   timeouts?: smtpTimeouts;
 };
 
-const PREFIX = '@cred/smtp';
+const PREFIX = '@cred-kit/smtp';
 
 const TRUE_VALUES = new Set(['true', '1', 'yes', 'on']);
 const FALSE_VALUES = new Set(['false', '0', 'no', 'off']);

@@ -16,7 +16,7 @@
     "express": "^5.2.1"
   },
   "devDependencies": {
-    "@cred/express": "workspace:*",
+    "@cred-kit/express": "workspace:*",
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.6",
     "tsdown": "^0.23.7",

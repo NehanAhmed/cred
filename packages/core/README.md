@@ -1,6 +1,6 @@
 <div align="center">
 
-# @cred/core
+# @cred-kit/core
 
 **Framework-agnostic, storage-agnostic authentication primitives for Node.js.**
 
@@ -14,7 +14,7 @@ Registration · email verification · password login · rotating refresh tokens 
 
 </div>
 
-`@cred/core` contains Cred's authentication domain logic as plain TypeScript functions. It hands you the hard parts of authentication — password hashing, verified email flows, single-use tokens, refresh-token rotation with reuse detection, account lockout, OAuth account linking, profile mutations, and audit events — while leaving the HTTP layer, database, mail transport, and OAuth strategy entirely to you.
+`@cred-kit/core` contains Cred's authentication domain logic as plain TypeScript functions. It hands you the hard parts of authentication — password hashing, verified email flows, single-use tokens, refresh-token rotation with reuse detection, account lockout, OAuth account linking, profile mutations, and audit events — while leaving the HTTP layer, database, mail transport, and OAuth strategy entirely to you.
 
 The package ships **no HTTP server, no database driver, no mailer, and no Passport strategy**. You implement three small adapter interfaces (a fourth is optional) and pass them into each service call. There are no classes, singletons, or module-level mutable state, and core never reads `process.env`.
 
@@ -80,11 +80,11 @@ CommonJS applications can load the package with dynamic `import()`.
 ## Installation
 
 ```bash
-npm install @cred/core
+npm install @cred-kit/core
 # or
-pnpm add @cred/core
+pnpm add @cred-kit/core
 # or
-yarn add @cred/core
+yarn add @cred-kit/core
 ```
 
 Then implement the [adapter contracts](#adapter-contracts) for your storage, mail provider, and (optionally) audit store.
@@ -108,7 +108,7 @@ Core owns the *rules*; your application owns the *edges*.
                        │ calls
                        ▼
 ┌─────────────────────────────────────────────┐
-│ @cred/core                                  │
+│ @cred-kit/core                                  │
 │                                             │
 │ register        verifyEmail    login        │
 │ logout          refresh        forgot/reset │
@@ -150,7 +150,7 @@ import {
   refresh,
   register,
   registerSchema,
-} from '@cred/core';
+} from '@cred-kit/core';
 import {
   auditDatabase,
   email,
@@ -273,7 +273,7 @@ app.use((error, _req, res, _next) => {
 All tunable constants live in `CredConfig`. Every service that accepts a config merges your partial overrides over `defaultConfig` with `resolveConfig`; you never need to supply the full object.
 
 ```ts
-import { defaultConfig, resolveConfig, type CredConfig } from '@cred/core';
+import { defaultConfig, resolveConfig, type CredConfig } from '@cred-kit/core';
 
 defaultConfig;
 // {
@@ -400,7 +400,7 @@ Contract requirements:
 ### Error translation
 
 ```ts
-import { DuplicateKeyError } from '@cred/core';
+import { DuplicateKeyError } from '@cred-kit/core';
 
 try {
   return await model.create(document);

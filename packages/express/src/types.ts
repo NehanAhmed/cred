@@ -4,7 +4,7 @@ import type {
   JWTPayload,
   RefreshTokenDatabaseAdapter,
   UserDatabaseAdapter,
-} from '@cred/core';
+} from '@cred-kit/core';
 
 /**
  * The dependency bundle every core service takes. The Express adapter builds

@@ -1,4 +1,4 @@
-# @cred/express
+# @cred-kit/express
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/NehanAhmed/cred/blob/main/LICENSE)
 [![Node.js >= 20](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://github.com/NehanAhmed/cred/blob/main/packages/express/package.json)
@@ -9,9 +9,9 @@ Express 5 transport adapter for Cred: one mountable router for registration, log
 
 ## Overview
 
-`@cred/express` is the Express adapter for Cred. It returns an Express `Router` that implements the HTTP endpoints for authentication, profiles, and audit logs. The router owns routing, JSON and cookie parsing, request validation, cookies, redirects, rate limiting, and HTTP error mapping.
+`@cred-kit/express` is the Express adapter for Cred. It returns an Express `Router` that implements the HTTP endpoints for authentication, profiles, and audit logs. The router owns routing, JSON and cookie parsing, request validation, cookies, redirects, rate limiting, and HTTP error mapping.
 
-Authentication logic, token issuance, password and token hashing, refresh-token rotation, and audit writes are delegated to `@cred/core`. When configured with MongoDB and email options, the adapter constructs the official `@cred/mongo-storage` and `@cred/smtp` implementations at startup. It can also accept prebuilt `@cred/core` adapters for another backend.
+Authentication logic, token issuance, password and token hashing, refresh-token rotation, and audit writes are delegated to `@cred-kit/core`. When configured with MongoDB and email options, the adapter constructs the official `@cred-kit/mongo-storage` and `@cred-kit/smtp` implementations at startup. It can also accept prebuilt `@cred-kit/core` adapters for another backend.
 
 What this package does not do:
 
@@ -52,7 +52,7 @@ What this package does not do:
 - Google and GitHub OAuth authorization-code flows implemented with `fetch`, without Passport.
 - Profile read, update, password change, account deletion, and paginated audit-log routes.
 - Startup configuration validation with descriptive errors before any request is served.
-- Built-in construction of `@cred/mongo-storage` and `@cred/smtp` from configuration, or injection of prebuilt `@cred/core` adapters.
+- Built-in construction of `@cred-kit/mongo-storage` and `@cred-kit/smtp` from configuration, or injection of prebuilt `@cred-kit/core` adapters.
 - Rotating refresh tokens in `httpOnly` cookies, with cookie clearing when core reports an invalid, expired, or replayed refresh token.
 - Router-scoped `express.json()` and `cookieParser()` middleware.
 - Configurable rate limits with a broad limiter per route group and tighter per-route limiters.
@@ -65,7 +65,7 @@ What this package does not do:
 |---|---|---|
 | Node.js | `>=20.0.0` | `engines.node`; build target `node20.0.0` |
 | Express | `^5.2.1` | `peerDependencies`; the router uses Express 5 |
-| `@cred/core` | `0.1.0` in this repository (workspace-linked) | `peerDependencies` |
+| `@cred-kit/core` | `0.1.0` in this repository (workspace-linked) | `peerDependencies` |
 | `cookie-parser` | `^1.4.7` | `peerDependencies`; imported by the router |
 | `express-rate-limit` | `^8.5.2` | `peerDependencies`; imported by the middleware |
 | `mongoose` | `^9.7.0` | `peerDependencies`; used by the bundled MongoDB adapter |
@@ -78,16 +78,16 @@ The package is ESM-only (`"type": "module"`, build format `esm`). The published 
 Install the adapter and its peer dependencies:
 
 ```bash
-pnpm add @cred/express @cred/core express cookie-parser express-rate-limit mongoose nodemailer
+pnpm add @cred-kit/express @cred-kit/core express cookie-parser express-rate-limit mongoose nodemailer
 ```
 
-`@cred/mongo-storage` and `@cred/smtp` are dependencies of `@cred/express` and are installed automatically. `mongoose` and `nodemailer` are declared peers because the bundled adapters use those libraries. Install all peers in the host application; do not rely on a transitive copy.
+`@cred-kit/mongo-storage` and `@cred-kit/smtp` are dependencies of `@cred-kit/express` and are installed automatically. `mongoose` and `nodemailer` are declared peers because the bundled adapters use those libraries. Install all peers in the host application; do not rely on a transitive copy.
 
 ## Quick start
 
 ```ts
 import express from 'express';
-import { credExpress } from '@cred/express';
+import { credExpress } from '@cred-kit/express';
 
 const app = express();
 
@@ -135,7 +135,7 @@ request
         -> Zod validation where a body is accepted
         -> requireAuth for protected routes
         -> controller
-           -> @cred/core service
+           -> @cred-kit/core service
               -> user / refresh-token / audit adapters
               -> email adapter
   -> error handler
@@ -144,9 +144,9 @@ request
 | Layer | Responsibility |
 |---|---|
 | Host Express app | HTTP server, `trust proxy`, CORS, helmet, HTTPS, global middleware order, 404 handling outside the router |
-| `@cred/express` router | Route table, request parsing, validation wiring, cookies, redirects, rate limiters, response envelopes, `AuthError` and body-parser error mapping |
-| `@cred/express` runtime | Constructs `@cred/mongo-storage` and `@cred/smtp` from config, or passes prebuilt adapters through; owns `close()` |
-| `@cred/core` | Registration, login, token issuance and verification, refresh rotation, OAuth user creation/linking, profile and audit operations |
+| `@cred-kit/express` router | Route table, request parsing, validation wiring, cookies, redirects, rate limiters, response envelopes, `AuthError` and body-parser error mapping |
+| `@cred-kit/express` runtime | Constructs `@cred-kit/mongo-storage` and `@cred-kit/smtp` from config, or passes prebuilt adapters through; owns `close()` |
+| `@cred-kit/core` | Registration, login, token issuance and verification, refresh rotation, OAuth user creation/linking, profile and audit operations |
 | Storage and email adapters | Persistence and delivery |
 
 Controllers are thin. They read the request, call a core service with the dependency bundle, set or clear cookies, and send a response. Controllers do not query the database directly.
@@ -204,9 +204,9 @@ database: {
 }
 ```
 
-For `{ uri }`, the adapter creates a `@cred/mongo-storage` instance and awaits `ready()` before returning the router. For `{ connection }`, it uses the existing Mongoose connection. Only the `uri` or `connection` property is passed to the storage adapter; other properties on that object are ignored.
+For `{ uri }`, the adapter creates a `@cred-kit/mongo-storage` instance and awaits `ready()` before returning the router. For `{ connection }`, it uses the existing Mongoose connection. Only the `uri` or `connection` property is passed to the storage adapter; other properties on that object are ignored.
 
-Prebuilt adapters must implement the `@cred/core` interfaces `UserDatabaseAdapter` and `RefreshTokenDatabaseAdapter`; `audit` is optional and must implement `AuditDatabaseAdapter`. The resolver checks the required methods at startup.
+Prebuilt adapters must implement the `@cred-kit/core` interfaces `UserDatabaseAdapter` and `RefreshTokenDatabaseAdapter`; `audit` is optional and must implement `AuditDatabaseAdapter`. The resolver checks the required methods at startup.
 
 `database` cannot combine `uri`/`connection` with prebuilt adapters, and it cannot set both `uri` and `connection`.
 
@@ -214,14 +214,14 @@ If no audit adapter is supplied, core drops audit writes and `GET /profile/me/au
 
 ### Email
 
-`email` accepts either email service options or a prebuilt `@cred/core` `EmailAdapter`:
+`email` accepts either email service options or a prebuilt `@cred-kit/core` `EmailAdapter`:
 
 ```ts
-// Build the bundled @cred/smtp service.
+// Build the bundled @cred-kit/smtp service.
 email: {
   EMAIL_FROM: 'no-reply@example.com',
   BACKEND_URL: 'https://api.example.com',
-  // Additional fields are forwarded to @cred/smtp's emailServiceOptions.
+  // Additional fields are forwarded to @cred-kit/smtp's emailServiceOptions.
 }
 
 // Or supply a prebuilt adapter.
@@ -255,24 +255,24 @@ Common messages:
 
 | Condition | Error |
 |---|---|
-| Missing config object | `@cred/express: configuration object is required` |
-| Missing database | `@cred/express: "database" is required` |
-| Unrecognized database shape | `@cred/express: "database" must provide MongoDB options ("uri" or "connection") or prebuilt adapters ("user" and "refreshToken")` |
-| Mixed database input | `@cred/express: "database" cannot combine "uri"/"connection" options with prebuilt adapters` |
-| Both `uri` and `connection` | `@cred/express: "database" must set either "uri" or "connection", not both` |
-| Missing email | `@cred/express: "email" is required` |
-| Unrecognized email shape | `@cred/express: "email" must provide email service options ("EMAIL_FROM" and "BACKEND_URL") or a prebuilt EmailAdapter` |
-| Missing or non-string secret | `@cred/express: "jwtSecret" is required and must be a string` |
-| Secret shorter than 32 characters | `@cred/express: Cred: jwtSecret must be at least 32 characters` |
-| Bad URL | `@cred/express: "clientUrl" must be an absolute URL, received "..."` |
-| Non-HTTP URL | `@cred/express: "clientUrl" must use http or https, received "..."` |
-| URL with query or fragment | `@cred/express: "clientUrl" must not contain a query string or fragment` |
-| Bad base path | `@cred/express: "basePath" must start with "/", received "..."` |
-| Invalid same-site value | `@cred/express: "cookies.sameSite" must be "strict", "lax", or "none", received "..."` |
-| `sameSite: 'none'` without secure | `@cred/express: "cookies.sameSite" cannot be "none" while "cookies.secure" is false` |
-| Invalid body limit | `@cred/express: "jsonBodyLimit" must be a size such as "10kb" or "1mb", received "..."` |
-| Invalid rate limit | `@cred/express: "rateLimits.login.max" must be a positive integer, received "0"` |
-| Invalid logger | `@cred/express: "logger" must expose an error(...args) method` |
+| Missing config object | `@cred-kit/express: configuration object is required` |
+| Missing database | `@cred-kit/express: "database" is required` |
+| Unrecognized database shape | `@cred-kit/express: "database" must provide MongoDB options ("uri" or "connection") or prebuilt adapters ("user" and "refreshToken")` |
+| Mixed database input | `@cred-kit/express: "database" cannot combine "uri"/"connection" options with prebuilt adapters` |
+| Both `uri` and `connection` | `@cred-kit/express: "database" must set either "uri" or "connection", not both` |
+| Missing email | `@cred-kit/express: "email" is required` |
+| Unrecognized email shape | `@cred-kit/express: "email" must provide email service options ("EMAIL_FROM" and "BACKEND_URL") or a prebuilt EmailAdapter` |
+| Missing or non-string secret | `@cred-kit/express: "jwtSecret" is required and must be a string` |
+| Secret shorter than 32 characters | `@cred-kit/express: Cred: jwtSecret must be at least 32 characters` |
+| Bad URL | `@cred-kit/express: "clientUrl" must be an absolute URL, received "..."` |
+| Non-HTTP URL | `@cred-kit/express: "clientUrl" must use http or https, received "..."` |
+| URL with query or fragment | `@cred-kit/express: "clientUrl" must not contain a query string or fragment` |
+| Bad base path | `@cred-kit/express: "basePath" must start with "/", received "..."` |
+| Invalid same-site value | `@cred-kit/express: "cookies.sameSite" must be "strict", "lax", or "none", received "..."` |
+| `sameSite: 'none'` without secure | `@cred-kit/express: "cookies.sameSite" cannot be "none" while "cookies.secure" is false` |
+| Invalid body limit | `@cred-kit/express: "jsonBodyLimit" must be a size such as "10kb" or "1mb", received "..."` |
+| Invalid rate limit | `@cred-kit/express: "rateLimits.login.max" must be a positive integer, received "0"` |
+| Invalid logger | `@cred-kit/express: "logger" must expose an error(...args) method` |
 
 `clientUrl` and `backendUrl` are normalized by removing trailing slashes. `basePath` also has trailing slashes removed; `basePath: '/'` becomes an empty string, so the refresh cookie path becomes `/auth`.
 
@@ -382,7 +382,7 @@ The OAuth routes are always mounted. Configuring `oauth.google` or `oauth.github
 | `PUT /profile/me` | `username?`, `bio?`, `phoneNumber?`, `gender?` | Same field rules as registration; all fields optional |
 | `POST /profile/me/change-password` | `currentPassword`, `newPassword` | Non-empty current password; new password follows the password rules |
 
-Schemas come from `@cred/core` (`registerSchema`, `loginSchema`, `passwordForgotSchema`, `passwordResetSchema`, `profileSchema`, `passwordChangeSchema`). Unknown fields are stripped. Validation runs with a middleware that accepts any object with `safeParse`; the adapter does not import Zod directly.
+Schemas come from `@cred-kit/core` (`registerSchema`, `loginSchema`, `passwordForgotSchema`, `passwordResetSchema`, `profileSchema`, `passwordChangeSchema`). Unknown fields are stripped. Validation runs with a middleware that accepts any object with `safeParse`; the adapter does not import Zod directly.
 
 `logout` and `refresh` accept no body validation. The OAuth routes accept no JSON body.
 
@@ -581,7 +581,7 @@ Errors use the same envelope, with `message` and `error` set to the same string:
 
 ### AuthError handling
 
-Controllers do not translate error codes. An `AuthError` thrown by `@cred/core` is sent with the status code and message carried by the error:
+Controllers do not translate error codes. An `AuthError` thrown by `@cred-kit/core` is sent with the status code and message carried by the error:
 
 ```ts
 sendError(res, error.message, error.statusCode);
@@ -618,7 +618,7 @@ Other errors:
 | Unhandled error | `500` | `{ "success": false, "message": "Internal server error", "error": "Internal server error" }` |
 | No audit adapter | `503` | `{ "success": false, "message": "Audit logging is not configured", ... }` |
 
-Unhandled errors are logged through `logger.error('@cred/express: unhandled request error', error)` and reduced to a generic `500`. Error details are not sent to the client. If response headers have already been sent, the error is passed to the host app's error handler.
+Unhandled errors are logged through `logger.error('@cred-kit/express: unhandled request error', error)` and reduced to a generic `500`. Error details are not sent to the client. If response headers have already been sent, the error is passed to the host app's error handler.
 
 ### Validation errors
 
@@ -708,7 +708,7 @@ The token lifetimes and cookie lifetimes are configured separately:
 
 If you override one side, keep the other side consistent. Setting `cookies.accessTokenMaxAgeMs` does not change the JWT expiry, and setting `core.accessTokenExpiry` does not change the cookie max-age.
 
-Refresh rotation and replay detection are performed by `@cred/core`. This adapter stores the returned tokens in cookies. A replayed refresh token produces `401 Refresh token reuse detected. All sessions revoked.` and clears the cookies.
+Refresh rotation and replay detection are performed by `@cred-kit/core`. This adapter stores the returned tokens in cookies. A replayed refresh token produces `401 Refresh token reuse detected. All sessions revoked.` and clears the cookies.
 
 ## OAuth setup
 
@@ -850,7 +850,7 @@ The 10 KB default JSON body limit applies to the whole mounted router. Increase 
 - **No health endpoint.** Health checks belong to the host app.
 - **No email link construction.** The adapter passes the raw token to the email adapter; `basePath` is not used to build verification or reset links.
 - **OAuth routes always exist.** A provider that is not configured redirects to `${clientUrl}/login?error={provider}_auth_failed` instead of returning 404.
-- **Database option pass-through is narrow.** For `{ uri }` and `{ connection }`, only that property is passed to `@cred/mongo-storage`; other properties on the same object are ignored.
+- **Database option pass-through is narrow.** For `{ uri }` and `{ connection }`, only that property is passed to `@cred-kit/mongo-storage`; other properties on the same object are ignored.
 - **No custom rate-limit store.** The limiters always use `express-rate-limit`'s default store. Multi-process deployments do not share counters.
 - **No configurable OAuth scopes, endpoints, or timeout.** Google and GitHub use fixed endpoints, scopes, and a 10-second timeout.
 - **No CORS, helmet, or proxy configuration.** These are host responsibilities.
@@ -875,7 +875,7 @@ import {
   resolveCredRateLimits,
   createCoreAuthConfig,
   defaultCredRateLimits,
-} from '@cred/express';
+} from '@cred-kit/express';
 ```
 
 Type exports:
@@ -906,13 +906,13 @@ import type {
   CredRequestContext,
   ResolvedCredDatabase,
   ResolvedCredEmail,
-} from '@cred/express';
+} from '@cred-kit/express';
 ```
 
 Example:
 
 ```ts
-import { credExpress, type CredExpressConfig, type CredExpressRouter } from '@cred/express';
+import { credExpress, type CredExpressConfig, type CredExpressRouter } from '@cred-kit/express';
 
 const config: CredExpressConfig = {
   database: { uri: process.env.MONGO_URI! },
@@ -929,22 +929,22 @@ const router: CredExpressRouter = await credExpress(config);
 await router.close();
 ```
 
-`CredExpressRouter` extends Express's `Router` with a `close(): Promise<void>` method. `close()` is idempotent. It closes the `@cred/mongo-storage` instance created from `{ uri }` or `{ connection }`, and the `@cred/smtp` service created from email options. Prebuilt adapters supplied by the host are not closed.
+`CredExpressRouter` extends Express's `Router` with a `close(): Promise<void>` method. `close()` is idempotent. It closes the `@cred-kit/mongo-storage` instance created from `{ uri }` or `{ connection }`, and the `@cred-kit/smtp` service created from email options. Prebuilt adapters supplied by the host are not closed.
 
-The package does not augment the global Express request type. If you need the authenticated payload outside the router, verify the access-token cookie yourself with `verifyAccessToken` from `@cred/core` and use your own request typing.
+The package does not augment the global Express request type. If you need the authenticated payload outside the router, verify the access-token cookie yourself with `verifyAccessToken` from `@cred-kit/core` and use your own request typing.
 
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `@cred/express: Cred: jwtSecret must be at least 32 characters` | Secret is too short | Use a secret of at least 32 characters |
-| `@cred/express: "jwtSecret" is required and must be a string` | Missing or non-string secret | Pass `jwtSecret` |
-| `@cred/express: "basePath" must start with "/"` | Path does not start with a slash | Use `/api`, `/v1`, or `/` |
-| `@cred/express: "clientUrl" must be an absolute URL` | Value is not an absolute URL | Use `https://app.example.com` |
-| `@cred/express: "clientUrl" must not contain a query string or fragment` | URL includes `?` or `#` | Pass only the base URL |
-| `@cred/express: "cookies.sameSite" cannot be "none" while "cookies.secure" is false` | Cross-site cookies without HTTPS | Set `cookies.secure: true` |
-| `@cred/express: "database" must provide MongoDB options ...` | Empty or unrecognized database object | Pass `{ uri }`, `{ connection }`, or `{ user, refreshToken }` |
-| `@cred/express: "email" must provide email service options ...` | Missing `EMAIL_FROM`/`BACKEND_URL` or adapter methods | Pass both options or a full `EmailAdapter` |
+| `@cred-kit/express: Cred: jwtSecret must be at least 32 characters` | Secret is too short | Use a secret of at least 32 characters |
+| `@cred-kit/express: "jwtSecret" is required and must be a string` | Missing or non-string secret | Pass `jwtSecret` |
+| `@cred-kit/express: "basePath" must start with "/"` | Path does not start with a slash | Use `/api`, `/v1`, or `/` |
+| `@cred-kit/express: "clientUrl" must be an absolute URL` | Value is not an absolute URL | Use `https://app.example.com` |
+| `@cred-kit/express: "clientUrl" must not contain a query string or fragment` | URL includes `?` or `#` | Pass only the base URL |
+| `@cred-kit/express: "cookies.sameSite" cannot be "none" while "cookies.secure" is false` | Cross-site cookies without HTTPS | Set `cookies.secure: true` |
+| `@cred-kit/express: "database" must provide MongoDB options ...` | Empty or unrecognized database object | Pass `{ uri }`, `{ connection }`, or `{ user, refreshToken }` |
+| `@cred-kit/express: "email" must provide email service options ...` | Missing `EMAIL_FROM`/`BACKEND_URL` or adapter methods | Pass both options or a full `EmailAdapter` |
 | `401 Refresh token not found.` after login | Refresh cookie is missing or scoped to another path | Make the mount path match `basePath`; check cookie domain and `secure` |
 | `401 Invalid token` on profile routes | Access cookie is missing, expired, or is not an access token | Log in again or refresh |
 | OAuth redirects to `...?error=oauth_state_mismatch` | State cookie missing, expired, or path mismatch | Check `basePath`, cookie path, and the 10-minute window |
@@ -964,18 +964,18 @@ For unexpected errors, pass a `logger` and inspect its output. The router logs u
 From the repository root:
 
 ```bash
-pnpm --filter @cred/express build
-pnpm --filter @cred/express typecheck
-pnpm --filter @cred/express lint
-pnpm --filter @cred/express pack --dry-run
+pnpm --filter @cred-kit/express build
+pnpm --filter @cred-kit/express typecheck
+pnpm --filter @cred-kit/express lint
+pnpm --filter @cred-kit/express pack --dry-run
 ```
 
 Verified in this checkout:
 
-- `pnpm --filter @cred/express build` passes and produces `dist/index.mjs` (about 42 kB) and `dist/index.d.mts` (about 10 kB).
-- `pnpm --filter @cred/express typecheck` passes.
-- `pnpm --filter @cred/express lint` passes.
-- `pnpm --filter @cred/express pack --dry-run` lists `dist/index.d.mts`, `dist/index.mjs`, `package.json`, and `README.md`.
+- `pnpm --filter @cred-kit/express build` passes and produces `dist/index.mjs` (about 42 kB) and `dist/index.d.mts` (about 10 kB).
+- `pnpm --filter @cred-kit/express typecheck` passes.
+- `pnpm --filter @cred-kit/express lint` passes.
+- `pnpm --filter @cred-kit/express pack --dry-run` lists `dist/index.d.mts`, `dist/index.mjs`, `package.json`, and `README.md`.
 
 Package scripts:
 
@@ -992,9 +992,9 @@ There is no `test` script and there are no test files in this package, so no pac
 
 ## Related packages
 
-- `@cred/core` — core authentication services and adapter interfaces used by this router.
-- `@cred/mongo-storage` — MongoDB storage adapter constructed by default from `database` options.
-- `@cred/smtp` — email adapter constructed by default from `email` options.
+- `@cred-kit/core` — core authentication services and adapter interfaces used by this router.
+- `@cred-kit/mongo-storage` — MongoDB storage adapter constructed by default from `database` options.
+- `@cred-kit/smtp` — email adapter constructed by default from `email` options.
 
 ## Contributing
 

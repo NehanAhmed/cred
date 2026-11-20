@@ -1,4 +1,4 @@
-import { DuplicateKeyError, type CreateUserInput, type User, type UserQuery } from '@cred/core';
+import { DuplicateKeyError, type CreateUserInput, type User, type UserQuery } from '@cred-kit/core';
 import mongoose, { type Model } from 'mongoose';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { startTestDatabase, type TestDatabase } from '../__tests__/helpers/mongo.js';

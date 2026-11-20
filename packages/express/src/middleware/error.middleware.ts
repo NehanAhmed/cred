@@ -1,4 +1,4 @@
-import { AuthError } from '@cred/core';
+import { AuthError } from '@cred-kit/core';
 import type { ErrorRequestHandler } from 'express';
 import type { ResolvedCredExpressConfig } from '../config.js';
 import { sendError } from '../helpers/api.helper.js';
@@ -47,7 +47,7 @@ export const createErrorHandler = (config: ResolvedCredExpressConfig): ErrorRequ
       }
     }
 
-    config.logger.error('@cred/express: unhandled request error', error);
+    config.logger.error('@cred-kit/express: unhandled request error', error);
     sendError(res, 'Internal server error', 500);
   };
 };

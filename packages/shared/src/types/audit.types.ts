@@ -1,7 +1,7 @@
-import type { AuditAction } from '@cred/core';
+import type { AuditAction } from '@cred-kit/core';
 
-export { AUDIT_ACTIONS } from '@cred/core';
-export type { AuditAction } from '@cred/core';
+export { AUDIT_ACTIONS } from '@cred-kit/core';
+export type { AuditAction } from '@cred-kit/core';
 
 /**
  * HTTP-layer audit parameters. Distinct from core's storage-level

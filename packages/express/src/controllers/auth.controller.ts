@@ -9,7 +9,7 @@ import {
   verifyEmail as verifyEmailUser,
   type LoginRequest,
   type RegisterRequest,
-} from '@cred/core';
+} from '@cred-kit/core';
 import type { RequestHandler } from 'express';
 import {
   createCoreAuthConfig,
