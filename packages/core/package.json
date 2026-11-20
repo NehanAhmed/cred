@@ -55,9 +55,7 @@
     "README.md"
   ],
   "sideEffects": false,
-  "engines": {
-    "node": ">=20.0.0"
-  },
+  "engines": { "node": ">=22" },
   "publishConfig": {
     "access": "public"
   },

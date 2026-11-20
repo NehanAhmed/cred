@@ -24,13 +24,9 @@ jobs:
     strategy:
       fail-fast: false  # see every OS result, not just the first failure
       matrix:
-        os: [ubuntu-latest, ubuntu-22.04, windows-latest, windows-2022]
+       os: [ubuntu-latest, ubuntu-22.04, windows-latest, windows-2022]
         node: [22]
-        include:
-          # package.json engines allows Node 20.10+, so cover the floor once.
-          # Delete this entry if you don't want the extra job.
-          - os: ubuntu-latest
-            node: 20
+       
     env:
       MONGOMS_DOWNLOAD_DIR: ${{ github.workspace }}/.mongodb-binaries
       MONGOMS_VERSION: 8.2.6
