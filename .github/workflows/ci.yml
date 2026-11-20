@@ -25,7 +25,7 @@ jobs:
       fail-fast: false  # see every OS result, not just the first failure
       matrix:
        os: [ubuntu-latest, ubuntu-22.04, windows-latest, windows-2022]
-        node: [22]
+       node: [22]
        
     env:
       MONGOMS_DOWNLOAD_DIR: ${{ github.workspace }}/.mongodb-binaries
