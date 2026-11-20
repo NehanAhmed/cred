@@ -1,6 +1,6 @@
 {
   "name": "@cred/smtp",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "SMTP (Nodemailer) and Resend email adapter for Cred authentication flows.",
   "keywords": [
     "cred",
@@ -10,10 +10,16 @@
     "nodemailer",
     "resend",
     "email",
+    "email-adapter",
+    "transactional-email",
+    "email-verification",
+    "password-reset",
+    "esm",
+    "typescript",
     "adapter"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "Nehan Ahmed",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/NehanAhmed/cred.git",
@@ -32,33 +38,39 @@
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "files": [
-    "dist"
-  ],
+"dist","README.md"  ],
   "sideEffects": false,
   "engines": {
     "node": ">=20.0.0"
   },
   "packageManager": "pnpm@10.33.2",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
-  "dependencies": {
+  "peerDependencies": {
     "@cred/core": "workspace:*",
     "nodemailer": "^10.5.0"
   },
   "devDependencies": {
     "@cred/config": "workspace:*",
+    "@cred/core": "workspace:*",
     "@types/node": "^26.6.6",
     "@types/nodemailer": "^8.0.2",
     "eslint": "^10.15.0",
+    "nodemailer": "^10.5.0",
     "tsdown": "^0.23.7",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.72.2",

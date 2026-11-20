@@ -5,6 +5,9 @@ import { User } from "../types/auth.types.js";
 import { generateAccessToken, generateRefreshTokenData } from "../helpers/auth.helper.js";
 import { logAuditEvent } from "../helpers/audit.helper.js";
 import crypto from 'node:crypto';
+import bcrypt from 'bcryptjs';
+import { DuplicateKeyError } from "../errors/duplicate-key-error.js";
+import { resolveConfig, type CredConfig } from "../config.js";
 
 const generateUniqueUsername = async (base: string, deps: { userDatabase: UserDatabaseAdapter }): Promise<string> => {
     const sanitized = base
@@ -30,8 +33,10 @@ const generateUniqueUsername = async (base: string, deps: { userDatabase: UserDa
  */
 export async function findOrCreateOAuthUser(
     input: FindOrCreateOAuthUserInput,
-    deps: { userDatabase: UserDatabaseAdapter, auditDatabase?: AuditDatabaseAdapter }
+    deps: { userDatabase: UserDatabaseAdapter, auditDatabase?: AuditDatabaseAdapter },
+    config: Partial<CredConfig> = {}
 ): Promise<User> {
+    const cfg = resolveConfig(config);
     const { provider, profileId, email, displayName, avatar, isEmailVerified } = input;
     const providerField = provider === 'google' ? 'googleId' : 'githubId';
     const normalizedEmail = email ? email.trim().toLowerCase() : undefined;
@@ -64,28 +69,40 @@ export async function findOrCreateOAuthUser(
         displayName || normalizedEmail?.split('@')[0] || 'user',
         deps
     );
+    try {
+        const user = await deps.userDatabase.create({
+            username,
+            email: normalizedEmail || `${profileId}@${provider}.oauth`,
+            // The account never authenticates with a password, but the column
+            // must still hold a bcrypt hash like every other user so nothing
+            // can ever compare against (or mistake) a plaintext value.
+            password: await bcrypt.hash(crypto.randomBytes(32).toString('hex'), cfg.passwordHashRounds),
+            provider,
+            [providerField]: profileId,
+            avatar: avatar || null,
+            isVerified: true,
+        });
+        return user;
 
-    const user = await deps.userDatabase.create({
-        username,
-        email: normalizedEmail || `${profileId}@${provider}.oauth`,
-        password: crypto.randomBytes(32).toString('hex'),
-        provider,
-        [providerField]: profileId,
-        avatar: avatar || null,
-        isVerified: true,
-    });
-
-    if (!user) {
-        throw new AuthError('USER_CREATION_FAILED', 'Failed to create user', 500);
+    } catch (error: unknown) {
+        if (error instanceof DuplicateKeyError) {
+            const field = error.field || 'field';
+            await logAuditEvent({
+                action: 'profile_update',
+                status: 'failure',
+                metadata: { reason: `${field} is already taken` },
+            }, { auditDatabase: deps.auditDatabase });
+            throw new AuthError('DUPLICATE_KEY', `${field} is already taken`, 400);
+        }
+        throw error;
     }
 
-    return user;
 }
 
 export async function oauthCallback(
     input: OAuthCallbackInput,
     deps: { userDatabase: UserDatabaseAdapter, refreshTokenDatabase: RefreshTokenDatabaseAdapter, auditDatabase?: AuditDatabaseAdapter },
-    config: { jwtSecret: string },
+    config: { jwtSecret: string } & Partial<CredConfig>,
     context: { ip?: string, userAgent?: string } = {}
 ): Promise<OAuthCallbackResult> {
     const { user, provider } = input;
@@ -115,13 +132,37 @@ export async function oauthCallback(
         throw new AuthError('OAUTH_INVALID_USER', 'Invalid user object from OAuth provider', 401);
     }
 
-    await deps.userDatabase.update(userId, {
-        lastLogin: new Date(),
-        lastIp: context.ip || null,
-    });
+    const failureAudit = async (reason: string) => {
+        await logAuditEvent({
+            user: userId,
+            action: 'oauth_login',
+            status: 'failure',
+            ip: context.ip,
+            userAgent: context.userAgent,
+            metadata: { reason },
+        }, { auditDatabase: deps.auditDatabase });
+    };
 
-    const accessToken = generateAccessToken({ id: userId, email, username }, config.jwtSecret);
-    const rtData = await generateRefreshTokenData();
+    // Touching lastLogin/lastIp is best-effort bookkeeping, but a storage
+    // failure must surface as an `AuthError` (the legacy controller caught
+    // everything and redirected), never as a raw driver error.
+    try {
+        const updated = await deps.userDatabase.update(userId, {
+            lastLogin: new Date(),
+            lastIp: context.ip || null,
+        });
+        if (!updated) {
+            await failureAudit('User account no longer exists');
+            throw new AuthError('OAUTH_FAILED', 'User account no longer exists', 401);
+        }
+    } catch (error: unknown) {
+        if (error instanceof AuthError) throw error;
+        await failureAudit('Failed to update login metadata');
+        throw new AuthError('OAUTH_FAILED', 'OAuth login failed. Please try again.', 401);
+    }
+
+    const accessToken = generateAccessToken({ id: userId, email, username }, config.jwtSecret, config);
+    const rtData = await generateRefreshTokenData(config);
 
     const refreshToken = await deps.refreshTokenDatabase.create({
         lookupId: rtData.lookupId,

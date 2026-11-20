@@ -12,8 +12,10 @@
     "start": "turbo start",
     "test": "turbo test",
     "test:coverage": "turbo test:coverage",
-    "format": "prettier --write \"apps/**/*.ts\" \"packages/**/*.ts\"",
-    "format:check": "prettier --check \"apps/**/*.ts\" \"packages/**/*.ts\""
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "format": "prettier --write \"apps/**/*.ts\" \"apps/**/*.tsx\" \"packages/**/*.ts\"",
+    "format:check": "prettier --check \"apps/**/*.ts\" \"apps/**/*.tsx\" \"packages/**/*.ts\""
   },
   "pnpm": {
     "overrides": {

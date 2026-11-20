@@ -1,34 +1,78 @@
 {
   "name": "@cred/core",
   "version": "0.1.0",
-  "description": "",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "description": "Framework-agnostic, storage-agnostic authentication core for Node.js: registration, verified email login, rotating refresh tokens with reuse detection, OAuth account linking, profiles, and audit logging.",
+  "keywords": [
+    "cred",
+    "auth",
+    "authentication",
+    "jwt",
+    "jsonwebtoken",
+    "refresh-token",
+    "refresh-token-rotation",
+    "token-rotation",
+    "oauth",
+    "oauth2",
+    "password-hashing",
+    "bcrypt",
+    "email-verification",
+    "password-reset",
+    "account-lockout",
+    "profile-management",
+    "audit-log",
+    "zod",
+    "typescript",
+    "esm",
+    "nodejs",
+    "framework-agnostic",
+    "storage-agnostic",
+    "adapter"
+  ],
+  "license": "MIT",
+  "author": "NehanAhmed (https://github.com/NehanAhmed)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NehanAhmed/cred.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/NehanAhmed/cred/tree/main/packages/core#readme",
+  "bugs": {
+    "url": "https://github.com/NehanAhmed/cred/issues"
+  },
+  "type": "module",
+  "main": "dist/index.mjs",
+  "types": "dist/index.d.mts",
   "exports": {
     ".": {
-      "types": "./dist/index.t.mts",
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
-    }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist","README.md"],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "test": "vitest run",
+    "test:watch": "vitest",
     "build": "tsdown",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "module",
   "dependencies": {
-    "@types/node": "^26.6.6",
     "bcryptjs": "^3.0.3",
     "jsonwebtoken": "^9.0.3",
-    "tsx": "^4.23.15",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^26.6.6",
     "@typescript/native": "npm:typescript@^7.0.2",
     "eslint": "^10.15.0",
     "tsdown": "^0.23.7",

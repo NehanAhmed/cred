@@ -1,4 +1,5 @@
 import { AuditDatabaseAdapter } from "../types/deps.types.js";
+import { resolveConfig, type CredConfig } from "../config.js";
 
 const toFiniteInteger = (value: number | undefined, fallback: number): number => {
     return typeof value === 'number' && Number.isFinite(value) ? Math.trunc(value) : fallback;
@@ -6,10 +7,12 @@ const toFiniteInteger = (value: number | undefined, fallback: number): number =>
 
 export async function getAuditLogs(
     input: { userId: string, page?: number, limit?: number },
-    deps: { auditDatabase: AuditDatabaseAdapter }
+    deps: { auditDatabase: AuditDatabaseAdapter },
+    config: Partial<CredConfig> = {}
 ) {
+    const cfg = resolveConfig(config);
     const page = Math.max(1, toFiniteInteger(input.page, 1));
-    const limit = Math.min(100, Math.max(1, toFiniteInteger(input.limit, 20)));
+    const limit = Math.min(cfg.auditMaxLimit, Math.max(1, toFiniteInteger(input.limit, cfg.auditDefaultLimit)));
     const skip = (page - 1) * limit;
 
     const [logs, total] = await Promise.all([

@@ -23,14 +23,20 @@ const findOrCreateOAuthUser = async (
   profileId: string,
   email: string | undefined,
   displayName: string,
-  avatar: string | undefined
+  avatar: string | undefined,
+  isEmailVerified: boolean
 ) => {
   const providerField = provider === 'google' ? 'googleId' : 'githubId';
 
   let user = await userModel.findOne({ [providerField]: profileId });
   if (user) return user;
 
-  if (email) {
+  // Email-based linking requires the OAuth provider to have verified the
+  // address. Linking on an unverified email is an account-takeover vector:
+  // anyone who controls the address on the provider side could claim an
+  // existing account. Unverified emails fall through to account creation,
+  // which fails cleanly on a duplicate email.
+  if (email && isEmailVerified) {
     user = await userModel.findOne({ email: email.toLowerCase() });
     if (user) {
       const wasLocal = user.provider === 'local';
@@ -88,7 +94,9 @@ export function initializePassport(): void {
                 profile.name?.givenName ||
                 profile.emails?.[0]?.value?.split('@')[0] ||
                 'user',
-              profile.photos?.[0]?.value
+              profile.photos?.[0]?.value,
+              // The OIDC `email_verified` claim from the provider.
+              profile.emails?.[0]?.verified === true
             );
             done(null, user);
           } catch (error) {
@@ -112,15 +120,25 @@ export function initializePassport(): void {
           clientSecret: githubClientSecret,
           callbackURL: `${process.env.BACKEND_URL}/api/auth/github/callback`,
           scope: ['user:email'],
+          // Return every email with its `primary`/`verified` flags so the
+          // callback can ignore unverified addresses instead of trusting the
+          // first entry (which passport-github2 would otherwise expose).
+          allRawEmails: true,
         },
         async (
           _accessToken: string,
           _refreshToken: string,
-          profile: { id: string; displayName?: string; username?: string; emails?: { value: string }[]; photos?: { value: string }[] },
+          profile: { id: string; displayName?: string; username?: string; emails?: { value: string; primary?: boolean; verified?: boolean }[]; photos?: { value: string }[] },
           done: VerifyCallback
         ) => {
           try {
-            const email = profile.emails?.[0]?.value;
+            // Prefer the verified primary address, then any verified address.
+            // An email without a verified flag is never used for linking.
+            const primaryVerified = profile.emails?.find(
+              (entry) => entry.primary && entry.verified === true
+            );
+            const anyVerified = profile.emails?.find((entry) => entry.verified === true);
+            const email = primaryVerified?.value ?? anyVerified?.value;
 
             const user = await findOrCreateOAuthUser(
               'github',
@@ -130,7 +148,8 @@ export function initializePassport(): void {
                 profile.username ||
                 email?.split('@')[0] ||
                 'user',
-              profile.photos?.[0]?.value
+              profile.photos?.[0]?.value,
+              email !== undefined
             );
             done(null, user);
           } catch (error) {

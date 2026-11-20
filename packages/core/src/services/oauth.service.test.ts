@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import { oauthCallback, findOrCreateOAuthUser } from './oauth.service.js';
 import { makeDeps, TEST_JWT_SECRET, buildUser } from '../__tests__/fakes.js';
@@ -67,6 +67,13 @@ describe('oauthCallback', () => {
   });
 
   it('audits a successful oauth login with the provider', async () => {
+    await deps.users.users.push(
+      buildUser(
+        { username: 'oauthuser', email: 'oauthuser@example.com', password: 'hashed-password', isVerified: true },
+        'user-1',
+      ),
+    );
+
     await oauthCallback(
       { user: oauthUser, provider: 'google' },
       callbackDeps(),
@@ -158,11 +165,59 @@ describe('oauthCallback', () => {
   });
 
   it('throws REFRESH_TOKEN_CREATION_FAILED when the token cannot be created', async () => {
+    deps.users.users.push(
+      buildUser(
+        { username: 'oauthuser', email: 'oauthuser@example.com', password: 'hashed-password', isVerified: true },
+        'user-1',
+      ),
+    );
     deps.tokens.createFails = true;
 
     await expect(
       oauthCallback({ user: oauthUser, provider: 'google' }, callbackDeps(), { jwtSecret: TEST_JWT_SECRET }, {}),
     ).rejects.toMatchObject({ code: 'REFRESH_TOKEN_CREATION_FAILED', statusCode: 500 });
+  });
+
+  it('throws OAUTH_FAILED and audits the failure when the user no longer exists', async () => {
+    await expect(
+      oauthCallback({ user: oauthUser, provider: 'google' }, callbackDeps(), { jwtSecret: TEST_JWT_SECRET }, {}),
+    ).rejects.toMatchObject({ code: 'OAUTH_FAILED', statusCode: 401 });
+
+    expect(deps.tokens.tokens).toHaveLength(0);
+    expect(deps.audit.logs).toEqual([
+      expect.objectContaining({
+        action: 'oauth_login',
+        status: 'failure',
+        metadata: { reason: 'User account no longer exists' },
+      }),
+    ]);
+  });
+
+  it('maps a user-database failure to OAUTH_FAILED and audits it', async () => {
+    deps.users.users.push(
+      buildUser(
+        { username: 'oauthuser', email: 'oauthuser@example.com', password: 'hashed-password', isVerified: true },
+        'user-1',
+      ),
+    );
+    const updateSpy = vi.spyOn(deps.users, 'update').mockRejectedValue(new Error('db down'));
+
+    try {
+      await expect(
+        oauthCallback({ user: oauthUser, provider: 'google' }, callbackDeps(), { jwtSecret: TEST_JWT_SECRET }, {}),
+      ).rejects.toMatchObject({ code: 'OAUTH_FAILED', statusCode: 401 });
+    } finally {
+      updateSpy.mockRestore();
+    }
+
+    expect(deps.tokens.tokens).toHaveLength(0);
+    expect(deps.audit.logs).toEqual([
+      expect.objectContaining({
+        action: 'oauth_login',
+        status: 'failure',
+        metadata: { reason: 'Failed to update login metadata' },
+      }),
+    ]);
   });
 });
 
@@ -266,12 +321,19 @@ describe('findOrCreateOAuthUser', () => {
         },
         depsWithAudit(),
       ),
-    ).rejects.toMatchObject({ name: 'DuplicateKeyError' });
+    ).rejects.toMatchObject({ code: 'DUPLICATE_KEY', statusCode: 400 });
 
     expect(deps.users.users).toHaveLength(1);
     expect(deps.users.users[0].provider).toBe('local');
     expect(deps.users.users[0].googleId).toBeUndefined();
-    expect(deps.audit.logs).toHaveLength(0);
+    // The unmapped email collision surfaces as a duplicate-key failure audit.
+    expect(deps.audit.logs).toEqual([
+      expect.objectContaining({
+        action: 'profile_update',
+        status: 'failure',
+        metadata: { reason: 'email is already taken' },
+      }),
+    ]);
   });
 
   it('creates a new user with a sanitized username and a fallback email', async () => {
@@ -286,6 +348,8 @@ describe('findOrCreateOAuthUser', () => {
     expect(result.githubId).toBe('github-9');
     expect(result.isVerified).toBe(true);
     expect(result.avatar).toBe('https://avatar');
+    // The placeholder credential must be a bcrypt hash, never plaintext.
+    expect(result.password).toMatch(/^\$2[aby]\$\d{2}\$/);
     expect(result.password).not.toBe('');
     expect(deps.audit.logs).toHaveLength(0);
   });

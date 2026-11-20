@@ -10,6 +10,7 @@ const config: Config = {
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
     '^@cred/shared$': '<rootDir>/../../packages/shared/src/index.ts',
+    '^@cred/core$': '<rootDir>/../../packages/core/src/index.ts',
     '^nodemailer$': '<rootDir>/__mocks__/nodemailer.ts',
   }
 }
