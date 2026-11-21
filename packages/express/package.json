@@ -22,7 +22,7 @@
   ],
   "author": "Nehan Ahmed",
   "license": "MIT",
-  "repository": {
+   "repository": {
     "type": "git",
     "url": "git+https://github.com/NehanAhmed/cred.git",
     "directory": "packages/express"

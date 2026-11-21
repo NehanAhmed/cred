@@ -30,7 +30,7 @@
   ],
   "license": "MIT",
   "author": "NehanAhmed (https://github.com/NehanAhmed)",
-  "repository": {
+ "repository": {
     "type": "git",
     "url": "git+https://github.com/NehanAhmed/cred.git",
     "directory": "packages/core"
