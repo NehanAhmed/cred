@@ -1,16 +1,12 @@
-<h1 style="bold">Currently Transforming Cred into a npm package and upgrading it to a adapter architecture pattern. Readme is not Currently Updated according to it. After the code completion then i will update the docs and repo desc. </h1>
-
-
 <p align="center">
-  <img src="https://ik.imagekit.io/td7wr0ax7o/Gemini_Generated_Image_cwp7cbcwp7cbcwp7.clean.png" alt="Cred Banner" width="100%">
+  <img src="https://ik.imagekit.io/td7wr0ax7o/Gemini_Generated_Image_cwp7cbcwp7cbcwp7.clean.png" alt="Cred banner" width="100%">
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/TypeScript-6.0.3-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
-  <img src="https://img.shields.io/badge/Express-5.2.1-000000?logo=express&logoColor=white" alt="Express">
-  <img src="https://img.shields.io/badge/Mongoose-9.7.0-880000?logo=mongodb&logoColor=white" alt="Mongoose">
-  <img src="https://img.shields.io/badge/Zod-4.4.3-3068B7?logo=zod&logoColor=white" alt="Zod">
-  <img src="https://img.shields.io/badge/Node.js-20.10%2B-339933?logo=node.js&logoColor=white" alt="Node.js">
+  <img src="https://img.shields.io/badge/TypeScript-6.x-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/Express-5.x-000000?logo=express&logoColor=white" alt="Express">
+  <img src="https://img.shields.io/badge/Mongoose-9.x-880000?logo=mongodb&logoColor=white" alt="Mongoose">
+  <img src="https://img.shields.io/badge/Node.js-%3E%3D22-339933?logo=node.js&logoColor=white" alt="Node.js">
   <img src="https://img.shields.io/badge/pnpm-10.33.2-F69220?logo=pnpm&logoColor=white" alt="pnpm">
   <img src="https://img.shields.io/badge/license-MIT-brightgreen" alt="MIT License">
 </p>
@@ -18,197 +14,578 @@
 <h1 align="center">Cred</h1>
 
 <p align="center">
-  A self-hosted authentication API for Node.js projects. Registration, login, Google and GitHub
-  OAuth, email verification, password reset, profile management, rotating refresh tokens, and
-  audit logs. TypeScript, Express 5, Mongoose 9, and pnpm workspaces.
+  Adapter-based authentication for Node.js. Mount one Express router to get registration, email
+  verification, password login, Google and GitHub OAuth, rotating refresh tokens, profile
+  management, and audit logs. The domain logic is framework- and storage-agnostic.
 </p>
 
-## Highlights
+## Status
 
-- **Secure sessions by default** — httpOnly cookies, 15-minute access tokens, 7-day rotating
-  refresh tokens, and SHA-256 hash storage for refresh and email tokens.
-- **Complete auth flows** — email/password registration, email verification, password reset,
-  Google/GitHub OAuth, account lockout, and audit logging.
-- **Typed end to end** — Zod schemas and shared request/response types live in `@cred-kit/shared`.
-- **Hardened API** — helmet, CORS with credentials, 10 KB JSON body limit, and per-route rate
-  limiting.
-- **Tested** — 122 Jest tests across 7 suites using supertest and in-memory MongoDB.
+Cred is pre-1.0. The four public packages are published on npm at `0.1.0`. The authentication
+core, MongoDB storage adapter, and email adapter are covered by Vitest. The Express adapter is
+implemented and mountable, but has no in-repo test suite; its published build was smoke-tested
+end to end against a real MongoDB instance.
 
-## Requirements
+| Package / app | Version | Registry | Tests | Status |
+|---|---:|---|---:|---|
+| `@cred-kit/core` | 0.1.0 | npm | 138 in 7 files | Implemented and tested |
+| `@cred-kit/mongo-storage` | 0.1.0 | npm | 187 in 9 files | Implemented and tested |
+| `@cred-kit/smtp` | 0.1.0 | npm | 65 in 5 files | Implemented and tested |
+| `@cred-kit/express` | 0.1.0 | npm | none in repo | Implemented; test coverage missing |
+| `@cred-kit/shared` | 0.0.0 | private | none | Compatibility re-export shim |
+| `@cred-kit/config` | 0.0.0 | private | n/a | Shared TypeScript configs only |
+| `apps/cred-testing` | 0.0.1 | private | none | Manual Next.js tester; partially aligned |
+| `apps/demo` | 1.0.0 | private | none | Incomplete scratch example |
 
-- **Node.js 20.10+** (Node 24 is what this checkout is verified with; the health controller uses
-  JSON import attributes).
-- **pnpm 10.33.2** (`corepack enable` is the simplest way to match the version).
-- **MongoDB** — local instance or MongoDB Atlas.
+## Table of contents
+
+- [Overview](#overview)
+- [Features](#features)
+- [Architecture](#architecture)
+- [Packages](#packages)
+- [Quick start](#quick-start)
+- [How it works](#how-it-works)
+- [Configuration](#configuration)
+- [Security model](#security-model)
+- [Known limitations](#known-limitations)
+- [Repository layout](#repository-layout)
+- [Development](#development)
+- [Testing](#testing)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Overview
+
+Cred is not a standalone authentication server. It is a set of packages that you mount inside
+your own Node.js application. `@cred-kit/core` owns the authentication rules — password hashing,
+verified email flows, token rotation, account lockout, OAuth account linking, profiles, and audit
+events — and talks to storage and email through small adapter interfaces. `@cred-kit/express`
+turns those services into an Express 5 router with cookies, CSRF protection, rate limiting,
+redirects, and JSON responses.
+
+The host application still owns the HTTP server, TLS, CORS, security headers, proxy trust, secret
+storage, and the user experience. Cred supplies the authentication domain and an Express transport
+for it.
+
+## Features
+
+- **Registration and email verification** — bcrypt-hashed passwords, single-use verification
+  tokens, and rollback of the new user when the verification email cannot be sent.
+- **Password login** — email or username, verified-email enforcement, generic invalid-credential
+  responses, and a five-attempt / fifteen-minute account lockout.
+- **Rotating refresh tokens** — opaque `lookupId.secret` tokens, only the secret stored as a
+  bcrypt hash, atomic rotation, and replay detection that revokes the whole token family.
+- **Access tokens** — HS256 JWTs with a `tokenType: 'access'` claim, a fifteen-minute default
+  lifetime, and a minimum secret length enforced before signing.
+- **Password reset** — anti-enumeration responses, one-hour single-use tokens, atomic consumption,
+  and revocation of all refresh tokens before the password changes.
+- **Google and GitHub OAuth** — authorization-code flow implemented with `fetch` (no Passport),
+  a random `oauth_state` cookie, and email-based linking only when the provider verified the email.
+- **Profile management** — read, partial update, password change, and account deletion, with
+  password and token material stripped from every returned user.
+- **Audit logs** — structured events for every authentication action, written fire-and-forget so an
+  audit-store outage cannot fail the operation being audited.
+- **MongoDB storage adapter** — user, refresh-token, and audit-log models with indexes and TTLs.
+- **SMTP and Resend email adapters** — Nodemailer SMTP with pooling and TLS defaults, or the Resend
+  HTTP API, selected from configuration.
+- **Typed validators** — Zod 4 schemas for registration, login, password reset, password change,
+  and profile updates.
+- **ESM-only packages** — bundled TypeScript declarations and no CommonJS build.
+
+## Architecture
+
+```text
+Your Express application
+  │
+  └── @cred-kit/express                  HTTP adapter: routes, cookies, CSRF, rate limits
+        │
+        ├── @cred-kit/core               authentication services, token rules, Zod schemas
+        │
+        ├── @cred-kit/mongo-storage      default user / refresh-token / audit adapters
+        │
+        └── @cred-kit/smtp               default SMTP or Resend email adapter
+```
+
+`@cred-kit/express` builds the bundled MongoDB and email adapters when you pass database and email
+options. You can also pass prebuilt `@cred-kit/core` adapters for another backend.
+
+| Layer | Responsibility |
+|---|---|
+| Host application | HTTP server, TLS, CORS, helmet, `trust proxy`, global middleware, 404 handling |
+| `@cred-kit/express` | Route table, request parsing, Zod validation, cookies, redirects, CSRF, rate limiters, response envelopes, error mapping |
+| `@cred-kit/core` | Registration, verification, login, refresh rotation, OAuth user creation/linking, profiles, audit operations |
+| Storage adapter | Persistence for users, refresh tokens, and optional audit logs |
+| Email adapter | Verification and reset message delivery |
+
+Core never reads environment variables, opens database connections, sends network requests, sets
+cookies, or applies rate limits. Those are host or adapter responsibilities.
+
+## Packages
+
+| Package | Purpose | Install |
+|---|---|---|
+| `@cred-kit/core` | Framework- and storage-agnostic authentication services and adapter interfaces | `npm install @cred-kit/core` |
+| `@cred-kit/express` | Express 5 router that mounts the authentication, profile, and audit routes | `npm install @cred-kit/express` |
+| `@cred-kit/mongo-storage` | Mongoose models and adapters for users, refresh tokens, and audit logs | `npm install @cred-kit/mongo-storage` |
+| `@cred-kit/smtp` | SMTP (Nodemailer) and Resend email adapters | `npm install @cred-kit/smtp` |
+
+`@cred-kit/express` depends on `@cred-kit/mongo-storage` and `@cred-kit/smtp`, and declares
+`@cred-kit/core`, `cookie-parser`, `express`, `express-rate-limit`, `mongoose`, and `nodemailer` as
+peer dependencies. Install the peers in the host application.
+
+Notable exports:
+
+- `@cred-kit/core` — services such as `register`, `verifyEmail`, `login`, `logout`, `refresh`,
+  `forgotPassword`, `resetPassword`, `findOrCreateOAuthUser`, `oauthCallback`, `getProfile`,
+  `updateProfile`, `updatePassword`, `deleteAccount`, and `getAuditLogs`; adapter interfaces; Zod
+  schemas; token and audit helpers; email HTML templates.
+- `@cred-kit/express` — `credExpress`, `createCoreRuntime`, `resolveCredConfig`,
+  `resolveCredRateLimits`, `createCoreAuthConfig`, `defaultCredRateLimits`, and the public
+  configuration types.
+- `@cred-kit/mongo-storage` — `mongooseStorage`, `MongooseStorage`, and `MongooseStorageOptions`.
+- `@cred-kit/smtp` — `emailService`, `resolveProvider`, `EmailApiError`, and the SMTP/Resend option
+  types.
+
+`@cred-kit/shared` and `@cred-kit/config` are private workspace packages. `@cred-kit/shared`
+re-exports core types and validators for compatibility; no package imports it. `@cred-kit/config`
+contains only shared `tsconfig` files.
 
 ## Quick start
 
+Requirements:
+
+- Node.js **22 or newer** (the published packages declare `engines.node >= 22`).
+- A running MongoDB instance, local or hosted.
+- SMTP credentials, or a Resend API key, if you want registration and password-reset emails to be
+  delivered.
+
+Create a project and install the adapter with its peer dependencies:
+
 ```bash
-git clone https://github.com/NehanAhmed/cred.git
-cd cred
-pnpm install
-cp apps/api/.env.example apps/api/.env
-# edit apps/api/.env and set at least MONGO_URI and JWT_SECRET
-pnpm build
-pnpm start
+mkdir cred-app
+cd cred-app
+npm init -y
+npm install @cred-kit/express @cred-kit/core express cookie-parser express-rate-limit mongoose nodemailer
+npm install -D typescript tsx @types/express @types/node
+npm pkg set type=module
 ```
 
-The API listens on `http://localhost:3000` by default. `pnpm start` requires a completed build
-and a reachable MongoDB instance.
+Create `src/index.ts`:
 
-> **Development server:** the current `pnpm dev` script is not usable with the pinned
-> `ts-node-dev@2.0.0` — it rejects the `--esm` flag and exits with
-> `ts-node-dev: no script to run provided`. Use `pnpm build && pnpm start` until the script is
-> fixed.
+```ts
+import express from 'express';
+import { credExpress } from '@cred-kit/express';
 
-### Environment
+const app = express();
+app.set('trust proxy', 1);
 
-`dotenv` loads from the process working directory. Turborepo runs package scripts from
-`apps/api`, so **`apps/api/.env` is the effective file** for `pnpm start` and `pnpm dev`. A root
-`.env` is not read by those commands.
+const cred = await credExpress({
+  database: { uri: process.env.MONGO_URI! },
+  email: {
+    EMAIL_FROM: process.env.EMAIL_FROM ?? 'no-reply@example.com',
+    BACKEND_URL: process.env.BACKEND_URL ?? 'http://localhost:3000',
+    SMTP_HOST: process.env.SMTP_HOST!,
+    SMTP_PORT: process.env.SMTP_PORT ?? 587,
+    SMTP_USER: process.env.SMTP_USER,
+    SMTP_PASS: process.env.SMTP_PASS,
+  },
+  jwtSecret: process.env.JWT_SECRET!, // at least 32 characters
+  clientUrl: process.env.CLIENT_URL ?? 'http://localhost:5173',
+  backendUrl: process.env.BACKEND_URL ?? 'http://localhost:3000',
+});
 
-| Variable | Required | Description |
+app.use('/api', cred);
+
+const server = app.listen(3000, () => {
+  console.log('Cred API listening on http://localhost:3000');
+});
+
+const shutdown = async (): Promise<void> => {
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+  await cred.close();
+};
+
+process.on('SIGTERM', () => void shutdown());
+process.on('SIGINT', () => void shutdown());
+```
+
+Set these environment variables before starting the process:
+
+| Variable | Required | Notes |
 |---|---|---|
-| `NODE_ENV` | Yes | `development` or `production`; the app refuses to start if unset |
-| `PORT` | No | HTTP port (default `3000`) |
-| `MONGO_URI` | Yes | MongoDB connection string |
-| `JWT_SECRET` | Yes | Secret used to sign access tokens |
-| `CLIENT_URL` | Yes | Frontend origin used for redirects (`http://localhost:5173`) |
-| `BACKEND_URL` | Yes | Public API origin used in email links and OAuth callbacks |
-| `CORS_ORIGIN` | Yes | Allowed CORS origin; normally the same as `CLIENT_URL` |
-| `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET` | No | Enables Google OAuth when both are set |
-| `GITHUB_OAUTH_CLIENT_ID` / `_SECRET` | No | Enables GitHub OAuth when both are set |
-| `SMTP_HOST` / `_PORT` / `_SECURE` / `_USER` / `_PASS` / `_FROM` | No | Production email; without `SMTP_HOST` Nodemailer uses Ethereal |
+| `MONGO_URI` | Yes | MongoDB connection string, for example `mongodb://127.0.0.1:27017/cred` |
+| `JWT_SECRET` | Yes | At least 32 characters; Cred rejects shorter secrets at startup |
+| `SMTP_HOST` | Yes with the SMTP provider | Hostname of your SMTP server |
+| `SMTP_PORT` | No | Defaults to `587` in the example |
+| `SMTP_USER` / `SMTP_PASS` | No | Set both together if your SMTP server requires authentication |
+| `EMAIL_FROM` | No | Defaults to `no-reply@example.com` in the example |
+| `BACKEND_URL` | No | Defaults to `http://localhost:3000` in the example |
+| `CLIENT_URL` | No | Defaults to `http://localhost:5173` in the example |
 
-OAuth callback URLs are derived from `BACKEND_URL`:
-`{BACKEND_URL}/api/auth/google/callback` and `{BACKEND_URL}/api/auth/github/callback`.
+Start MongoDB, then run:
 
-## Scripts
-
-| Command | Description |
-|---|---|
-| `pnpm build` | Build `@cred-kit/shared` with tsup, then `@cred-kit/api` with `tsc` (typecheck gate) |
-| `pnpm start` | Run the built API from `apps/api/dist` |
-| `pnpm test` | Run all Jest suites — **POSIX shells only** |
-| `pnpm test:coverage` | Run Jest with coverage |
-| `pnpm format` | Format `apps/**/*.ts` and `packages/**/*.ts` with Prettier |
-| `pnpm format:check` | Check formatting (currently reports 31 pre-existing files) |
-
-### Testing on Windows
-
-The `test` script uses POSIX environment syntax. In PowerShell:
-
-```powershell
-cd apps/api
-$env:NODE_OPTIONS='--experimental-vm-modules'
-pnpm exec jest
-pnpm exec jest src/__tests__/routes/auth.test.ts   # one suite
-pnpm exec jest -t "logs in with email"             # one test
+```bash
+npx tsx src/index.ts
 ```
 
-The first DB-backed run downloads MongoDB 8.2.6 (~781 MB) to
-`%USERPROFILE%\.cache\mongodb-binaries`. The 60-second `beforeAll` hook can expire while that
-download is still running; let it finish, then rerun.
+The router is mounted at `http://localhost:3000/api`. `GET /api/auth/csrf-token` returns a token
+and sets the `csrfToken` cookie.
 
-## API
+The server starts even when the SMTP host is unreachable, because the transport connects lazily.
+Registration and password-reset requests still need working email credentials; without them those
+flows fail at send time. To use Resend instead of SMTP, replace the `SMTP_*` fields with
+`RESEND_API_KEY: process.env.RESEND_API_KEY!` and set that variable.
 
-All routes are prefixed with `/api`.
+## How it works
 
-### Authentication
+A request passes through the mounted router:
 
-| Method | Path | Auth | Description |
+```text
+request
+  -> @cred-kit/express router
+     -> express.json({ limit }) and cookieParser()
+     -> CSRF middleware
+     -> /auth/* or /profile/*
+        -> broad rate limiter
+        -> route-specific rate limiter
+        -> Zod validation where a body is accepted
+        -> access-token check on protected routes
+        -> controller
+           -> @cred-kit/core service
+              -> storage adapters and email adapter
+  -> error handler
+```
+
+Routes are relative to the mount point. With the default `basePath: '/api'`, the full paths are:
+
+| Method | Path | Access | Description |
 |---|---|---|---|
-| `POST` | `/api/auth` | No | Register and send a verification email |
-| `POST` | `/api/auth/login` | No | Log in with email or username; sets auth cookies |
-| `POST` | `/api/auth/logout` | Yes | Revoke the presented refresh token and clear cookies |
+| `POST` | `/api/auth` | Public | Register and send a verification email; `201` |
+| `POST` | `/api/auth/login` | Public | Log in with email or username plus password; sets cookies |
+| `POST` | `/api/auth/logout` | Access cookie | Delete the presented refresh token and clear cookies |
 | `POST` | `/api/auth/refresh` | Refresh cookie | Rotate the refresh token and issue a new access token |
-| `GET` | `/api/auth/verify-email/:token` | No | Verify email; redirects to the frontend |
-| `POST` | `/api/auth/forgot-password` | No | Send a password reset email |
-| `POST` | `/api/auth/reset-password/:token` | No | Reset the password with a one-time token |
-| `GET` | `/api/auth/google` · `/google/callback` | No | Google OAuth with `oauth_state` validation |
-| `GET` | `/api/auth/github` · `/github/callback` | No | GitHub OAuth with `oauth_state` validation |
+| `GET` | `/api/auth/csrf-token` | Public | Return the CSRF token and ensure the `csrfToken` cookie is set |
+| `GET` | `/api/auth/verify-email/:token` | Public | Verify an email address; always redirects to the client |
+| `POST` | `/api/auth/forgot-password` | Public | Request a reset link; always returns the same message |
+| `POST` | `/api/auth/reset-password/:token` | Public | Reset a password with a one-time token |
+| `GET` | `/api/auth/google` | Public | Start Google OAuth |
+| `GET` | `/api/auth/google/callback` | Public | Finish Google OAuth |
+| `GET` | `/api/auth/github` | Public | Start GitHub OAuth |
+| `GET` | `/api/auth/github/callback` | Public | Finish GitHub OAuth |
+| `GET` | `/api/profile/me` | Access cookie | Return the current profile without the password |
+| `PUT` | `/api/profile/me` | Access cookie | Partially update username, bio, phone number, or gender |
+| `DELETE` | `/api/profile/me` | Access cookie | Delete the account, revoke refresh tokens, and clear cookies |
+| `POST` | `/api/profile/me/change-password` | Access cookie | Change the password using the current password |
+| `GET` | `/api/profile/me/audit-logs` | Access cookie | Return paginated audit logs, newest first |
 
-### Profile and health
+There is no health endpoint in `@cred-kit/express`. Unmatched paths fall through to the host
+application's 404 handler.
 
-| Method | Path | Auth | Description |
+### Response format
+
+Successful JSON responses use:
+
+```json
+{ "success": true, "message": "Logged in successfully", "data": {} }
+```
+
+Errors use the same envelope:
+
+```json
+{ "success": false, "message": "Invalid Credentials", "error": "Invalid Credentials" }
+```
+
+Zod validation failures are the exception and return `400 { "errors": [ ...issues ] }`. Rate-limit
+responses return the configured message string with status `429`, not the JSON envelope.
+
+### CSRF protection
+
+Every unsafe request (`POST`, `PUT`, `PATCH`, `DELETE`) must echo the `csrfToken` cookie in the
+`X-CSRF-Token` header. The cookie is intentionally not `httpOnly` so same-origin browser clients
+can read it. Requests that create or recover a session — `POST /auth`, `POST /auth/login`,
+`POST /auth/forgot-password`, and `POST /auth/reset-password/:token` — are exempt; logout, refresh,
+and profile changes are protected.
+
+### Redirects
+
+Email verification redirects to `${clientUrl}/login?verified=true` or
+`${clientUrl}/login?verified=false`. OAuth success redirects to `${clientUrl}/auth/callback`.
+OAuth failures redirect to `${clientUrl}/login?error=...` with an error code such as
+`oauth_state_mismatch`, `google_auth_failed`, `github_auth_failed`, or `oauth_failed`.
+
+## Configuration
+
+`credExpress` validates its configuration before mounting any route, so mistakes fail at startup
+rather than on the first request.
+
+### `credExpress` options
+
+| Option | Required | Default | Description |
 |---|---|---|---|
-| `GET` | `/api/profile/me` | Yes | Get the current user |
-| `PUT` | `/api/profile/me` | Yes | Partially update username, bio, phone, or gender |
-| `DELETE` | `/api/profile/me` | Yes | Delete the account and revoke all refresh tokens |
-| `POST` | `/api/profile/me/change-password` | Yes | Change password and revoke all refresh tokens |
-| `GET` | `/api/profile/me/audit-logs` | Yes | Paginated audit history (`page`, `limit` 1–100) |
-| `GET` | `/api/health` | No | App and database health (`503` when the DB is down) |
+| `database` | Yes | — | `{ uri }`, `{ connection }`, or prebuilt `{ user, refreshToken, audit? }` adapters |
+| `email` | Yes | — | Email service options or a prebuilt `EmailAdapter` |
+| `jwtSecret` | Yes | — | HS256 signing secret; at least 32 characters |
+| `clientUrl` | Yes | — | Absolute `http`/`https` URL used for verification and OAuth redirects |
+| `backendUrl` | Yes | — | Absolute public API URL used to build OAuth callback URLs; do not include `basePath` |
+| `basePath` | No | `/api` | Public mount path; must match the path passed to `app.use(...)` |
+| `oauth` | No | `{}` | Optional Google and GitHub `clientId` / `clientSecret` pairs |
+| `cookies` | No | see below | Cookie names, paths, lifetimes, `secure`, `sameSite`, and `domain` |
+| `rateLimits` | No | `defaultCredRateLimits` | Partial overrides for any limiter |
+| `core` | No | core defaults | Token lifetimes, bcrypt rounds, lockout policy, audit page sizes |
+| `jsonBodyLimit` | No | `10kb` | JSON body limit for the mounted router |
+| `logger` | No | `console` | Object with an `error(...args)` method for unexpected errors |
 
-See [API.md](./API.md) for request bodies, responses, error codes, and examples.
+`database` accepts exactly one shape:
 
-## Auth model
+```ts
+// Build the bundled MongoDB adapter.
+database: { uri: process.env.MONGO_URI! }
 
-- **Access token** — `token` cookie, 15-minute JWT, `httpOnly`, `sameSite=strict`
-  (`lax` during OAuth), `secure` in production.
-- **Refresh token** — `refreshToken` cookie scoped to `/api/auth`, 7-day lifetime. Only a SHA-256
-  hash is stored. Tokens rotate on use; replaying a consumed token revokes the entire token family.
-- **Verification and reset** — email verification tokens expire after 24 hours; password reset
-  tokens expire after 1 hour. Both are hashed at rest.
-- **Login protection** — generic `Invalid credentials` errors, five failed attempts trigger a
-  15-minute account lockout, and login is blocked until the email is verified.
-- **OAuth accounts** — Google/GitHub accounts are linked by email when possible; a unique username
-  is generated on collision.
-- **Audit logs** — login, logout, refresh, registration, verification, password, profile, OAuth,
-  and deletion events are recorded with a 90-day TTL.
-- **Passwords** — bcrypt with 10 rounds and never included in API responses.
+// Use an existing Mongoose connection.
+database: { connection: existingMongooseConnection }
 
-## Rate limiting
+// Supply prebuilt core adapters.
+database: { user, refreshToken, audit }
+```
 
-| Scope | Window | Max |
-|---|---|---|
-| All `/api/auth/*` | 15 min | 20 |
-| Login | 15 min | 5 |
-| Register / forgot password | 60 min | 3 |
-| Refresh / email verification / OAuth | 15 min | 10 |
-| Password reset | 15 min | 5 |
-| Logout | 15 min | 20 |
-| All `/api/profile/*` | 15 min | 50 |
-| Profile update / change password | 15 min | 50 |
-| Health check | 1 min | 30 |
+`email` accepts either the bundled email service options or a prebuilt core `EmailAdapter`:
 
-Rate-limited responses are plain text from `express-rate-limit`, not the standard JSON envelope.
+```ts
+// SMTP
+email: {
+  EMAIL_FROM: 'no-reply@example.com',
+  BACKEND_URL: 'https://api.example.com',
+  SMTP_HOST: 'smtp.example.com',
+  SMTP_PORT: 587,
+  SMTP_USER: process.env.SMTP_USER,
+  SMTP_PASS: process.env.SMTP_PASS,
+}
 
-## Project layout
+// Resend
+email: {
+  EMAIL_FROM: 'no-reply@example.com',
+  BACKEND_URL: 'https://api.example.com',
+  RESEND_API_KEY: process.env.RESEND_API_KEY!,
+}
+```
+
+SMTP defaults to port `587`, implicit TLS when the port is `465`, and `requireTLS` when the
+connection is not already secure. `SMTP_USER` and `SMTP_PASS` must be set together. The Resend
+provider is selected automatically when `RESEND_API_KEY` is set, or explicitly with
+`provider: 'resend'`. Set `verifyOnStart: true` if you want startup to fail when the email
+credentials are invalid; it defaults to `false`.
+
+### Core tunables
+
+`core` is a partial override of the defaults below:
+
+| Field | Default | Meaning |
+|---|---:|---|
+| `accessTokenExpiry` | `15m` | Access-token lifetime passed to the JWT signer |
+| `refreshTokenTtlMs` | `604800000` (7 days) | Refresh-token lifetime |
+| `tokenHashRounds` | `10` | bcrypt rounds for refresh, verification, and reset token secrets |
+| `passwordHashRounds` | `10` | bcrypt rounds for passwords |
+| `lockoutThreshold` | `5` | Failed logins before the account locks |
+| `lockoutDurationMs` | `900000` (15 minutes) | Lockout duration |
+| `verificationTokenTtlMs` | `86400000` (24 hours) | Email-verification token lifetime |
+| `resetTokenTtlMs` | `3600000` (1 hour) | Password-reset token lifetime |
+| `auditMaxLimit` | `100` | Maximum audit-log page size |
+| `auditDefaultLimit` | `20` | Default audit-log page size |
+
+### Rate limits
+
+| Key | Window | Max | Applies to |
+|---|---:|---:|---|
+| `auth` | 15 min | 20 | Every `/auth/*` request, including OAuth |
+| `login` | 15 min | 5 | `POST /auth/login` |
+| `register` | 60 min | 3 | `POST /auth` |
+| `forgotPassword` | 60 min | 3 | `POST /auth/forgot-password` |
+| `refresh` | 15 min | 10 | `POST /auth/refresh` |
+| `verifyEmail` | 15 min | 10 | `GET /auth/verify-email/:token` |
+| `resetPassword` | 15 min | 5 | `POST /auth/reset-password/:token` |
+| `logout` | 15 min | 20 | `POST /auth/logout` |
+| `oauth` | 15 min | 10 | All OAuth routes |
+| `profile` | 15 min | 50 | Every `/profile/*` request |
+| `profileUpdate` | 15 min | 50 | `PUT /profile/me` and `POST /profile/me/change-password` |
+
+Each rule accepts a partial override:
+
+```ts
+rateLimits: {
+  login: { max: 10, windowMs: 10 * 60 * 1000 },
+  register: { message: 'Registration is temporarily limited.' },
+}
+```
+
+A route passes through the broad group limiter and its route-specific limiter, so the tighter
+budget wins. The limiters use `express-rate-limit`'s default in-memory store; counters are per
+process and are not shared across instances.
+
+### Environment variables
+
+The packages read only `process.env.NODE_ENV`, and only for one decision: the default value of
+`cookies.secure` (`NODE_ENV === 'production'`). Everything else — MongoDB credentials, the JWT
+secret, SMTP or Resend credentials, URLs, and OAuth client secrets — is read by the host
+application and passed into `credExpress`.
+
+## Security model
+
+| Area | Implemented behavior |
+|---|---|
+| Passwords | bcrypt with 10 rounds by default; never returned in API responses |
+| Access token | HS256 JWT, 15 minutes by default, payload `{ id, email, username, tokenType: 'access' }` |
+| JWT secret | Must be a non-empty string of at least 32 characters; checked before signing |
+| Refresh token | Opaque `lookupId.secret`, 7 days by default; only the secret is bcrypt-hashed at rest |
+| Rotation | Every refresh atomically claims the old token and issues a successor in the same family |
+| Replay detection | Presenting a consumed refresh token revokes the entire family |
+| Email verification | Single-use, 24 hours by default, bcrypt-hashed token secret |
+| Password reset | Single-use, 1 hour by default, bcrypt-hashed token secret; all refresh tokens revoked before the password changes |
+| Login lockout | 5 failed attempts trigger a 15-minute lock; an active lock is not extended by further failures |
+| Enumeration | Unknown users and wrong passwords both return `Invalid Credentials`; forgot-password always returns the same message |
+| OAuth state | Random 32-byte state stored in an `httpOnly` cookie and compared on callback |
+| OAuth linking | An email links an existing account only when the provider reports the email as verified |
+| CSRF | Double-submit cookie; unsafe requests require `X-CSRF-Token` |
+| Audit logs | Fire-and-forget writes; failures never break the audited operation; 90-day TTL in MongoDB |
+| Transport | Cookies, CSRF, CORS, HTTPS, and rate limiting are split between the adapter and the host as described below |
+
+### Cookies
+
+| Cookie | Default name | Path | Max-Age | Flags |
+|---|---|---|---:|---|
+| Access token | `token` | `/` | 15 min | `httpOnly`, `sameSite=strict` by default, `secure` in production by default |
+| Refresh token | `refreshToken` | `${basePath}/auth` | 7 days | `httpOnly`, `sameSite=strict` by default, `secure` in production by default, AES-256-GCM encrypted value |
+| CSRF token | `csrfToken` | `/` | 7 days | not `httpOnly`, `sameSite=strict` by default, `secure` in production by default |
+| OAuth state | `oauth_state` | `${basePath}/auth` | 10 min | `httpOnly`, `sameSite=lax`, `secure: true` always |
+
+The refresh-token cookie value is encrypted with AES-256-GCM using a key derived from `jwtSecret`.
+The access token and refresh token lifetimes are configured separately: the JWT expiry comes from
+`core.accessTokenExpiry`, while the cookie lifetime comes from `cookies.accessTokenMaxAgeMs`.
+
+### Host responsibilities
+
+Cred does not add CORS, helmet, HTTPS, or `trust proxy`. Configure those in the host application.
+Set `app.set('trust proxy', ...)` when the API runs behind a proxy so rate limits and audit IPs see
+the client address. Serve the API over HTTPS and set `cookies.secure: true` outside production when
+you do.
+
+## Known limitations
+
+- **No in-repo tests for `@cred-kit/express`.** The package has no `test` script and no test files.
+  Its published build was smoke-tested by mounting it, fetching a CSRF token, and attempting a
+  login, but that is not a substitute for a test suite.
+- **No health endpoint.** `@cred-kit/express` does not expose `/api/health`. The `apps/cred-testing`
+  health panel and its health rate-limit entry call `/api/health`, which returns 404 against the
+  adapter.
+- **No CORS, helmet, or proxy configuration.** These remain host responsibilities.
+- **No custom rate-limit store.** Counters are in memory and are not shared across processes.
+- **No exported auth guard or `req.user` augmentation.** Protected routes live inside the router;
+  your own routes must verify the access token themselves with `verifyAccessToken` from
+  `@cred-kit/core`.
+- **ESM-only.** The packages publish `dist/index.mjs` and `dist/index.d.mts` with no CommonJS
+  `require` condition.
+- **`basePath` must match the mount path.** A mismatch scopes the refresh cookie to the wrong path
+  and builds the wrong OAuth callback URL. Email links also hardcode `/api/auth/...` in
+  `@cred-kit/smtp`, so a non-`/api` base path breaks verification and reset links.
+- **OAuth requires HTTPS or localhost.** The `oauth_state` cookie is always `secure: true`, so
+  browsers will not send it over plain HTTP on a non-localhost origin.
+- **Linking a local account through OAuth changes its login method.** The account's `provider` is
+  set to `google` or `github`, and password login and password change are then rejected.
+- **Root development scripts are incomplete.** `pnpm dev` fails because `apps/demo` runs `tsx`
+  without declaring it. `pnpm start` starts only the Next.js tester, not an API. `pnpm format` and
+  `pnpm format:check` fail because the root Prettier config references a missing
+  `prettier-plugin-tailwindcss`.
+- **`apps/demo` is a scratch example.** It has no build or start script, and its source contains a
+  hardcoded example SMTP credential. Do not deploy it as-is.
+- **Package READMEs advertise Node 20.** The published package manifests declare
+  `engines.node >= 22`; treat the manifests and CI matrix as authoritative.
+- **Pre-1.0.** Public APIs may change between minor versions.
+
+## Repository layout
 
 ```text
 cred/
-  apps/api/               Express API (routes, controllers, models, helpers, tests)
-  packages/shared/        Shared types and Zod validators (@cred-kit/shared)
-  packages/config/        Shared TypeScript configs (@cred-kit/config)
-  API.md                  Detailed HTTP reference
-  AGENTS.md               Repository conventions for contributors and AI agents
+├── apps/
+│   ├── cred-testing/          Next.js 16 manual API tester (private)
+│   └── demo/                  Incomplete Express host example (private)
+├── packages/
+│   ├── core/                  @cred-kit/core
+│   ├── express/               @cred-kit/express
+│   ├── mongo-storage/         @cred-kit/mongo-storage
+│   ├── smtp/                  @cred-kit/smtp
+│   ├── shared/                @cred-kit/shared (private compatibility shim)
+│   └── config/                @cred-kit/config (private tsconfig files)
+├── specs/                     Adapter design notes
+├── .github/workflows/         CI
+├── API.md                     Old standalone-API reference (not current)
+├── AGENTS.md                  Contributor/agent notes (partly stale)
+├── LICENSE
+└── README.md
 ```
+
+## Development
+
+Install dependencies with the pinned pnpm version and run the repository checks:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm build
+pnpm lint
+pnpm typecheck
+pnpm test
+```
+
+Package-scoped commands:
+
+```bash
+pnpm --filter @cred-kit/core test
+pnpm --filter @cred-kit/mongo-storage test
+pnpm --filter @cred-kit/smtp test
+pnpm --filter @cred-kit/express build
+pnpm --filter @cred-kit/express typecheck
+pnpm --filter @cred-kit/express lint
+pnpm --filter ./packages/* exec pnpm pack --dry-run
+```
+
+The Next.js tester runs on port 5173:
+
+```bash
+pnpm --filter cred-testing dev
+```
+
+The repository uses pnpm `10.33.2` and Turborepo. CI runs `build`, `lint`, `typecheck`, and `test`
+on Node 22 and 24 across Ubuntu and Windows, plus a package-contents job that runs the pack
+dry-run.
 
 ## Testing
 
-122 tests across 7 suites:
+The root `pnpm test` runs the Vitest suites in the three tested packages:
 
-| Suite | Tests |
-|---|---|
-| Auth (register, login, logout, refresh, verify email, lockout) | 35 |
-| Auth email (forgot/reset password) | 11 |
-| Profile (get, update, delete, change password) | 26 |
-| OAuth (Google + GitHub initiation, callbacks, state validation) | 27 |
-| Audit logs (ownership, pagination) | 5 |
-| Rate limiters | 17 |
-| Health | 1 |
+| Package | Framework | Files | Tests | Coverage focus |
+|---|---|---:|---:|---|
+| `@cred-kit/core` | Vitest with in-memory fakes | 7 | 138 | Registration, verification, login and lockout, refresh rotation and replay, password reset, OAuth linking, profiles, audit pagination, token helpers, validators |
+| `@cred-kit/mongo-storage` | Vitest + `mongodb-memory-server` | 9 | 187 | User, refresh-token, and audit models and adapters, indexes, TTLs, and atomic updates |
+| `@cred-kit/smtp` | Vitest | 5 | 65 | SMTP transport options, Resend HTTP behavior, retries, link construction, and email templates |
+| `@cred-kit/express` | none | 0 | 0 | No in-repo tests |
+| `apps/cred-testing` | none | 0 | 0 | No tests |
 
-Tests use supertest, in-memory MongoDB, and a mocked Nodemailer transport. The test app in
-`apps/api/src/__tests__/helpers/test-app.ts` is assembled separately from `src/app.ts`; new
-routes must be added there for route tests.
+That is **390 tests across 21 files**. The first DB-backed run downloads a MongoDB binary for
+`mongodb-memory-server`; CI caches it under `.mongodb-binaries`.
+
+## Roadmap
+
+No roadmap is published in this repository. The packages are pre-1.0, and the only design note in
+the checkout is `specs/01-express-adapter.md`. Track work in the repository's issue tracker:
+[github.com/NehanAhmed/cred/issues](https://github.com/NehanAhmed/cred/issues).
+
+## Contributing
+
+Open an issue or pull request at [github.com/NehanAhmed/cred](https://github.com/NehanAhmed/cred).
+Before submitting, run `pnpm build`, `pnpm lint`, `pnpm typecheck`, and `pnpm test`, and keep
+changes scoped to the affected package.
 
 ## License
 
 MIT. See [LICENSE](./LICENSE).
 
-Copyright © 2026 [Nehan Ahmed](https://github.com/NehanAhmed)
-
-## Contributing
-
-Contributions are welcome. Open an issue or pull request at
-[github.com/NehanAhmed/cred](https://github.com/NehanAhmed/cred).
+Copyright © 2026 Nehan Ahmed — Cred
