@@ -1,6 +1,6 @@
 {
   "name": "@cred-kit/smtp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "SMTP (Nodemailer) and Resend email adapter for Cred authentication flows.",
   "keywords": [
     "cred",
