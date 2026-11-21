@@ -6,11 +6,16 @@
   "changelog": [
     "@changesets/changelog-github",
     {
-      "repo": "cred"
+      "repo": "NehanAhmed/cred"
     }
   ],
   "commit": true,
-  "ignore": ["cred-testing","demo","@cred-kit/shared","@cred-kit/config"],
+  "ignore": [
+    "cred-testing",
+    "demo",
+    "@cred-kit/shared",
+    "@cred-kit/config"
+  ],
   "fixed": [],
   "linked": [],
   "updateInternalDependencies": "patch"
