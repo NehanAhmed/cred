@@ -4,7 +4,7 @@
 
 **Framework-agnostic, storage-agnostic authentication primitives for Node.js.**
 
-Registration · email verification · password login · rotating refresh tokens · OAuth account linking · profiles · audit logs
+Registration · email verification · password login · rotating refresh tokens · OAuth account linking · profiles · audit logs.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/NehanAhmed/cred/blob/main/packages/core/package.json)
 [![ESM only](https://img.shields.io/badge/modules-ESM%20only-f9a03c)](https://github.com/NehanAhmed/cred/blob/main/packages/core/package.json)
