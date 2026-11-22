@@ -1,0 +1,50 @@
+name: Feature request
+description: Propose a change to Cred, a new adapter, or documentation.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please discuss large changes in an issue before starting work on a pull request.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem are you trying to solve? Describe the use case, not the implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What should change and why would it solve the problem?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: What alternatives did you consider?
+  - type: dropdown
+    id: layer
+    attributes:
+      label: Affected layer
+      description: Which part of the repository would change?
+      multiple: true
+      options:
+        - "@cred-kit/core"
+        - "@cred-kit/express"
+        - A storage adapter (@cred-kit/mongo-storage or a new one)
+        - An email adapter (@cred-kit/smtp or a new one)
+        - A new adapter package
+        - Documentation
+    validations:
+      required: true
+  - type: checkboxes
+    id: security
+    attributes:
+      label: Security
+      description: Reporting policy
+      options:
+        - label: "I confirm this is not a security vulnerability. Security issues must be reported privately through SECURITY.md."
+          required: true

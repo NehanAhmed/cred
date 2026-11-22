@@ -1,0 +1,27 @@
+# Dependency updates for the pnpm workspace and GitHub Actions.
+#
+# Note: dependency updates need a Changesets entry only when they change a
+# published package's runtime dependencies. Changes to devDependencies,
+# private packages, or CI do not need one.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+      development-dependencies:
+        dependency-type: "development"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
