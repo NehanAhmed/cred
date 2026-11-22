@@ -141,8 +141,8 @@ still reports 136 pre-existing unformatted files. It is not a clean gate. Format
 you change, with the per-file command above. Do not reformat unrelated files.
 
 `pnpm dev` starts the demo API and the tester in watch mode. `pnpm start` runs their built start
-scripts, so run `pnpm build` first. The demo is a scratch example and requires its own environment
-file.
+scripts, so run `pnpm build` first. The demo is a scratch example; copy `apps/demo/.env.example` to
+`apps/demo/.env.local` before starting it (see `apps/demo/README.md`).
 
 ## Making a change
 

@@ -1,7 +1,7 @@
 # Known Limitations Checklist
 
-Progress: **1 / 13 tasks complete** (1 done, 0 in progress, 0 blocked, 0 skipped).
-Phase 0 complete. Phase 1: L-10 done; L-11 next.
+Progress: **2 / 13 tasks complete** (2 done, 0 in progress, 0 blocked, 0 skipped).
+Phase 0 complete. Phase 1: L-10 and L-11 done; L-12 next.
 
 States: `[ ]` not started, `[~]` in progress (only one at a time), `[x]` done
 and verified, `[!]` blocked (needs owner decision), `[-]` skipped with reason.
@@ -44,11 +44,23 @@ expected missing-env error because its dotenv path is still wrong (L-11).
 README and CONTRIBUTING updated for the new script behavior and the
 formatting caveat.
 
-- [ ] L-11 Remove demo credential and add environment/scripts
-  - [ ] tests written (not applicable; build/start verification)
-  - [ ] implementation
-  - [ ] verification passed
-  - [ ] docs updated
+- [x] L-11 Remove demo credential and add environment/scripts
+  - [x] tests written (not applicable; build/start verification)
+  - [x] implementation
+  - [x] verification passed
+  - [x] docs updated
+
+**Evidence:** Replaced the hardcoded SMTP block in `apps/demo/src/index.ts`
+with required environment reads, fixed the dotenv path to `.env.local`, and
+added fail-fast errors that name the missing variable. Added
+`apps/demo/.env.example` (placeholders only) and `apps/demo/README.md`.
+`git check-ignore` confirms `.env.local` is ignored and `.env.example` is not.
+A literal search for the old credential/host/user patterns found no matches.
+`pnpm --filter demo build` passed. `pnpm --filter demo start` and
+`pnpm --filter demo exec tsx src/index.ts` both failed fast with
+`Missing required environment variable: SMTP_HOST`, which is the expected
+result without a complete local `.env.local`. Root README and CONTRIBUTING
+updated.
 
 - [ ] L-12 Correct Node 20 claims in package READMEs
   - [ ] tests written (not applicable; docs-only)
@@ -173,3 +185,7 @@ formatting caveat.
   `build`/`start` scripts, installed the root Tailwind Prettier plugin,
   verified `format:check` runs (136 pre-existing files flagged), and verified
   root `start` launches the tester and the demo start script.
+- 2026-11-22: L-11 complete. Removed the demo SMTP credential from source,
+  added `.env.example` and a demo README, corrected the dotenv path, and
+  verified fail-fast missing-variable errors. Build passed; a full start
+  requires a complete local `.env.local` with MongoDB and SMTP values.

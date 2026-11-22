@@ -35,7 +35,7 @@ end to end against a real MongoDB instance.
 | `@cred-kit/shared` | 0.0.0 | private | none | Compatibility re-export shim |
 | `@cred-kit/config` | 0.0.0 | private | n/a | Shared TypeScript configs only |
 | `apps/cred-testing` | 0.0.1 | private | none | Manual Next.js tester; partially aligned |
-| `apps/demo` | 1.0.0 | private | none | Incomplete scratch example |
+| `apps/demo` | 1.0.0 | private | none | Scratch Express host example |
 
 ## Table of contents
 
@@ -494,8 +494,8 @@ you do.
 - **`pnpm format:check` is not a clean gate.** The command runs, but it reports 136
   pre-existing unformatted files. Format only the files you change; no repository-wide formatting
   commit has been made.
-- **`apps/demo` is a scratch example.** It has no build or start script, and its source contains a
-  hardcoded example SMTP credential. Do not deploy it as-is.
+- **`apps/demo` is a scratch example.** It has working build/start scripts and reads credentials
+  from `apps/demo/.env.local`; see `apps/demo/README.md`. Do not deploy it as-is.
 - **Package READMEs advertise Node 20.** The published package manifests declare
   `engines.node >= 22`; treat the manifests and CI matrix as authoritative.
 - **Pre-1.0.** Public APIs may change between minor versions.
