@@ -491,10 +491,9 @@ you do.
   browsers will not send it over plain HTTP on a non-localhost origin.
 - **Linking a local account through OAuth changes its login method.** The account's `provider` is
   set to `google` or `github`, and password login and password change are then rejected.
-- **Root development scripts are incomplete.** `pnpm dev` fails because `apps/demo` runs `tsx`
-  without declaring it. `pnpm start` starts only the Next.js tester, not an API. `pnpm format` and
-  `pnpm format:check` fail because the root Prettier config references a missing
-  `prettier-plugin-tailwindcss`.
+- **`pnpm format:check` is not a clean gate.** The command runs, but it reports 136
+  pre-existing unformatted files. Format only the files you change; no repository-wide formatting
+  commit has been made.
 - **`apps/demo` is a scratch example.** It has no build or start script, and its source contains a
   hardcoded example SMTP credential. Do not deploy it as-is.
 - **Package READMEs advertise Node 20.** The published package manifests declare
@@ -533,7 +532,14 @@ pnpm build
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm format:check
 ```
+
+`pnpm format:check` runs, but it currently reports pre-existing formatting issues. Format only the
+files you change.
+
+Root `pnpm dev` starts the demo API and the Next.js tester in watch mode. Root `pnpm start` runs
+their built start scripts, so run `pnpm build` first.
 
 Package-scoped commands:
 

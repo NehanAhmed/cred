@@ -1,7 +1,7 @@
 # Known Limitations Checklist
 
-Progress: **0 / 13 tasks complete** (0 done, 0 in progress, 0 blocked, 0 skipped).
-Phase 0 complete. Phase 1 starts with L-10.
+Progress: **1 / 13 tasks complete** (1 done, 0 in progress, 0 blocked, 0 skipped).
+Phase 0 complete. Phase 1: L-10 done; L-11 next.
 
 States: `[ ]` not started, `[~]` in progress (only one at a time), `[x]` done
 and verified, `[!]` blocked (needs owner decision), `[-]` skipped with reason.
@@ -27,11 +27,22 @@ passed. `pnpm turbo run build lint typecheck test` passed: 19/19 tasks; core
 
 ## Phase 1: Hygiene and safety
 
-- [ ] L-10 Repair root scripts and Prettier plugin
-  - [ ] tests written (not applicable; script verification)
-  - [ ] implementation
-  - [ ] verification passed
-  - [ ] docs updated
+- [x] L-10 Repair root scripts and Prettier plugin
+  - [x] tests written (not applicable; script verification)
+  - [x] implementation
+  - [x] verification passed
+  - [x] docs updated
+
+**Evidence:** `pnpm --filter demo add -D tsx` installed `tsx@4.23.15`;
+`pnpm add -D -w prettier-plugin-tailwindcss` installed `^0.8.1`.
+`pnpm --filter demo exec tsx --version` → `tsx v4.23.15`. Added
+`build: tsdown` and `start: node dist/index.mjs` to `apps/demo/package.json`;
+`pnpm --filter demo build` passed. `pnpm format:check` now runs and reports
+136 pre-existing unformatted files (exit 1). Root `pnpm start` started the
+tester on port 5173 and the demo start script; the demo exited with the
+expected missing-env error because its dotenv path is still wrong (L-11).
+README and CONTRIBUTING updated for the new script behavior and the
+formatting caveat.
 
 - [ ] L-11 Remove demo credential and add environment/scripts
   - [ ] tests written (not applicable; build/start verification)
@@ -158,3 +169,7 @@ passed. `pnpm turbo run build lint typecheck test` passed: 19/19 tasks; core
 - 2026-11-22: Phase 0 complete. Untracked files committed as `6f19249`;
   branch `fix/known-limitations` created; baseline recorded; both tracking
   files created.
+- 2026-11-22: L-10 complete. Declared `tsx` for the demo, added demo
+  `build`/`start` scripts, installed the root Tailwind Prettier plugin,
+  verified `format:check` runs (136 pre-existing files flagged), and verified
+  root `start` launches the tester and the demo start script.

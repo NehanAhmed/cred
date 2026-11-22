@@ -136,14 +136,13 @@ Test runners:
 
 The counts above are from the verified run described in the pull request checklist.
 
-Formatting caveat: the root `pnpm format` and `pnpm format:check` scripts are not a usable gate
-today. `pnpm format:check` exits 1 because `apps/cred-testing/.prettierrc` loads
-`prettier-plugin-tailwindcss`, which is not installed at the workspace root, and because many
-existing package files are not Prettier-clean. Format only the files you change, with the
-per-file command above. Do not reformat unrelated files.
+Formatting caveat: `pnpm format:check` now loads `prettier-plugin-tailwindcss` correctly, but it
+still reports 136 pre-existing unformatted files. It is not a clean gate. Format only the files
+you change, with the per-file command above. Do not reformat unrelated files.
 
-`pnpm dev` is not part of the verified workflow. `apps/demo` runs `tsx` without declaring it, so
-the root dev task is not a reliable way to start the repository.
+`pnpm dev` starts the demo API and the tester in watch mode. `pnpm start` runs their built start
+scripts, so run `pnpm build` first. The demo is a scratch example and requires its own environment
+file.
 
 ## Making a change
 
