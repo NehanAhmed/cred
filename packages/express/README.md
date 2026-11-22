@@ -1,7 +1,7 @@
 # @cred-kit/express
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/NehanAhmed/cred/blob/main/LICENSE)
-[![Node.js >= 20](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://github.com/NehanAhmed/cred/blob/main/packages/express/package.json)
+[![Node.js >= 22](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)](https://github.com/NehanAhmed/cred/blob/main/packages/express/package.json)
 
 Express 5 transport adapter for Cred: one mountable router for registration, login, OAuth, profiles, and audit logs.
 
@@ -63,7 +63,7 @@ What this package does not do:
 
 | Requirement | Version | Evidence |
 |---|---|---|
-| Node.js | `>=20.0.0` | `engines.node`; build target `node20.0.0` |
+| Node.js | `>=22` | `engines.node`; observed tsdown build target `node22.0.0` |
 | Express | `^5.2.1` | `peerDependencies`; the router uses Express 5 |
 | `@cred-kit/core` | `0.1.0` in this repository (workspace-linked) | `peerDependencies` |
 | `cookie-parser` | `^1.4.7` | `peerDependencies`; imported by the router |

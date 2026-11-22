@@ -496,8 +496,6 @@ you do.
   commit has been made.
 - **`apps/demo` is a scratch example.** It has working build/start scripts and reads credentials
   from `apps/demo/.env.local`; see `apps/demo/README.md`. Do not deploy it as-is.
-- **Package READMEs advertise Node 20.** The published package manifests declare
-  `engines.node >= 22`; treat the manifests and CI matrix as authoritative.
 - **Pre-1.0.** Public APIs may change between minor versions.
 
 ## Repository layout

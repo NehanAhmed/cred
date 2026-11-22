@@ -36,7 +36,7 @@ audit logs — that implement those contracts against MongoDB.
 
 | Requirement | Version / note |
 |---|---|
-| Node.js | `>=20.0.0` (declared in `engines`) |
+| Node.js | `>=22` (declared in `engines`) |
 | Mongoose | `^9.7.0` (peer dependency) |
 | `@cred-kit/core` | Workspace peer dependency; required at runtime |
 | Module system | ESM only — there is no CommonJS build |

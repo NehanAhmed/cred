@@ -4,7 +4,7 @@ Email delivery for [Cred](https://github.com/NehanAhmed/cred) authentication flo
 implements core's `EmailAdapter` contract over either **SMTP (Nodemailer)** or the **Resend HTTP
 API**, so switching transports is a configuration change rather than a code change.
 
-ESM only · Node.js 20+ · MIT
+ESM only · Node.js 22+ · MIT
 
 ---
 
@@ -450,7 +450,7 @@ pnpm --filter @cred-kit/smtp build
 
 | Script | Command | Description |
 | --- | --- | --- |
-| `build` | `tsdown` | Builds `dist/index.mjs` and `dist/index.d.mts` (ESM + declarations, target `node20.0.0`). |
+| `build` | `tsdown` | Builds `dist/index.mjs` and `dist/index.d.mts` (ESM + declarations, target `node22.0.0`). |
 | `dev` | `tsdown --watch` | Rebuilds on change. |
 | `typecheck` | `tsc --noEmit` | Type-checks the sources. |
 | `lint` | `eslint .` | Lints with `typescript-eslint` and the import-boundary rules. |
@@ -463,7 +463,7 @@ The suite currently contains **65 tests across 5 files** (`index`, `email.helper
 through transport construction and a mocked `sendMail`, and Resend through an injected `fetch`.
 
 The package builds to a single ESM entry point with `sideEffects: false`, so bundlers can
-tree-shake it. It targets Node.js 20 and newer (`engines.node: ">=20.0.0"`).
+tree-shake it. It targets Node.js 22 and newer (`engines.node: ">=22"`).
 
 ## Troubleshooting
 

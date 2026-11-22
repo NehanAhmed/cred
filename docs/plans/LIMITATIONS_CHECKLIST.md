@@ -1,7 +1,7 @@
 # Known Limitations Checklist
 
-Progress: **2 / 13 tasks complete** (2 done, 0 in progress, 0 blocked, 0 skipped).
-Phase 0 complete. Phase 1: L-10 and L-11 done; L-12 next.
+Progress: **3 / 13 tasks complete** (3 done, 0 in progress, 0 blocked, 0 skipped).
+Phase 1 complete. Phase 2: L-01 next.
 
 States: `[ ]` not started, `[~]` in progress (only one at a time), `[x]` done
 and verified, `[!]` blocked (needs owner decision), `[-]` skipped with reason.
@@ -62,11 +62,19 @@ A literal search for the old credential/host/user patterns found no matches.
 result without a complete local `.env.local`. Root README and CONTRIBUTING
 updated.
 
-- [ ] L-12 Correct Node 20 claims in package READMEs
-  - [ ] tests written (not applicable; docs-only)
-  - [ ] implementation
-  - [ ] verification passed
-  - [ ] docs updated
+- [x] L-12 Correct Node 20 claims in package READMEs
+  - [x] tests written (not applicable; docs-only)
+  - [x] implementation
+  - [x] verification passed
+  - [x] docs updated
+
+**Evidence:** Replaced Node 20 claims with `>=22` in
+`packages/express/README.md` (badge and requirements), `packages/smtp/README.md`
+(header, build table, target statement), `packages/core/README.md`, and
+`packages/mongo-storage/README.md`. Verified every public package manifest
+declares `engines.node: ">=22"`. Removed the obsolete root README limitation.
+A repository-wide Markdown search finds no stale Node 20 claims outside the
+historical plan evidence.
 
 ## Phase 2: Test foundation
 
@@ -189,3 +197,6 @@ updated.
   added `.env.example` and a demo README, corrected the dotenv path, and
   verified fail-fast missing-variable errors. Build passed; a full start
   requires a complete local `.env.local` with MongoDB and SMTP values.
+- 2026-11-22: L-12 complete. Corrected Node 20 claims to `>=22` across the
+  express, smtp, core, and mongo-storage READMEs and removed the root README
+  limitation. All package manifests declare `engines.node: ">=22"`.

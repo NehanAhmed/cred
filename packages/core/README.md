@@ -68,7 +68,7 @@ Runtime dependencies are only `bcryptjs`, `jsonwebtoken`, and `zod`.
 
 | Requirement | Details |
 |---|---|
-| Node.js | **20 or newer** (`engines.node: ">=20.0.0"`) |
+| Node.js | **22 or newer** (`engines.node: ">=22"`) |
 | Module system | **ESM only** — `dist/index.mjs` with `dist/index.d.mts` types. There is no CommonJS build. |
 | TypeScript | Built with TypeScript 6. Declarations (`.d.mts`) are bundled; use `NodeNext` or `bundler` module resolution. |
 | Runtime peers | None. `bcryptjs`, `jsonwebtoken`, and `zod` are regular dependencies. |
