@@ -228,7 +228,7 @@ email: {
 email: myEmailAdapter
 ```
 
-When using service options, `EMAIL_FROM` must be a non-empty string and `BACKEND_URL` must be an absolute `http`/`https` URL without a query string or fragment. Other fields are forwarded to the email service. An object with `sendEmailVerification` or `sendPasswordReset` is treated as a prebuilt adapter, and both methods are required.
+When using service options, `EMAIL_FROM` must be a non-empty string and `BACKEND_URL` must be an absolute `http`/`https` URL without a query string or fragment. Other fields are forwarded to the email service, including `authPathPrefix` (default `/api/auth`), which controls the verification and reset links. An object with `sendEmailVerification` or `sendPasswordReset` is treated as a prebuilt adapter, and both methods are required.
 
 ### Core tunables
 
@@ -311,7 +311,24 @@ app.use('/v1', cred);
 1. It scopes the refresh-token cookie and the OAuth state cookie to `${basePath}/auth`.
 2. It is appended to `backendUrl` to build the OAuth callback URL: `${backendUrl}${basePath}/auth/{provider}/callback`.
 
-It does not build email verification or reset links. The email adapter receives the recipient and the raw token; link construction is that adapter's responsibility.
+It does not build email verification or reset links. The email adapter receives the recipient and the raw token; link construction is that adapter's responsibility. When you use the bundled `@cred-kit/smtp` options, set `authPathPrefix` to match the mount path so emailed links resolve:
+
+```ts
+// Router mounted at /v1: basePath and authPathPrefix must agree.
+const cred = await credExpress({
+  // ...
+  basePath: '/v1',
+  email: {
+    EMAIL_FROM: 'no-reply@example.com',
+    BACKEND_URL: 'https://api.example.com',
+    authPathPrefix: '/v1/auth',
+  },
+});
+
+app.use('/v1', cred);
+```
+
+Leaving `authPathPrefix` at `/api/auth` while mounting at `/v1` produces verification and reset links that return 404. The two settings are configured independently; the adapter does not derive one from the other.
 
 A mount at `/` works with `basePath: '/'`:
 
@@ -848,7 +865,7 @@ The 10 KB default JSON body limit applies to the whole mounted router. Increase 
 - **No exported auth guard.** `requireAuth` is internal. Protected routes are the ones inside the router. Your own routes must verify the access token themselves if they need the same check.
 - **No `req.user` augmentation.** The middleware stores the JWT payload in `res.locals.credUser` for its own controllers. `CredLocals` is exported, but the package does not declare a global `Express.Request.user`.
 - **No health endpoint.** Health checks belong to the host app.
-- **No email link construction.** The adapter passes the raw token to the email adapter; `basePath` is not used to build verification or reset links.
+- **No email link construction.** The adapter passes the raw token to the email adapter; `basePath` is not used to build verification or reset links. With the bundled SMTP options, set `authPathPrefix` to match the mount path.
 - **OAuth routes always exist.** A provider that is not configured redirects to `${clientUrl}/login?error={provider}_auth_failed` instead of returning 404.
 - **Database option pass-through is narrow.** For `{ uri }` and `{ connection }`, only that property is passed to `@cred-kit/mongo-storage`; other properties on the same object are ignored.
 - **No custom rate-limit store.** The limiters always use `express-rate-limit`'s default store. Multi-process deployments do not share counters.
@@ -945,6 +962,7 @@ The package does not augment the global Express request type. If you need the au
 | `@cred-kit/express: "database" must provide MongoDB options ...` | Empty or unrecognized database object | Pass `{ uri }`, `{ connection }`, or `{ user, refreshToken }` |
 | `@cred-kit/express: "email" must provide email service options ...` | Missing `EMAIL_FROM`/`BACKEND_URL` or adapter methods | Pass both options or a full `EmailAdapter` |
 | `401 Refresh token not found.` after login | Refresh cookie is missing or scoped to another path | Make the mount path match `basePath`; check cookie domain and `secure` |
+| Verification or reset link returns 404 | `authPathPrefix` does not match the mount path | Set `email.authPathPrefix` to `${basePath}/auth` |
 | `401 Invalid token` on profile routes | Access cookie is missing, expired, or is not an access token | Log in again or refresh |
 | OAuth redirects to `...?error=oauth_state_mismatch` | State cookie missing, expired, or path mismatch | Check `basePath`, cookie path, and the 10-minute window |
 | OAuth redirects to `...?error=google_auth_failed` or `...?error=github_auth_failed` | Provider not configured or provider exchange failed | Check credentials, callback URL, and logs |

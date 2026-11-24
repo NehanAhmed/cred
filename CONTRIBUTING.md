@@ -131,7 +131,7 @@ Test runners:
 |---|---|---:|---:|
 | `@cred-kit/core` | Vitest with in-memory fakes | 7 | 138 |
 | `@cred-kit/mongo-storage` | Vitest with `mongodb-memory-server` | 9 | 187 |
-| `@cred-kit/smtp` | Vitest | 5 | 65 |
+| `@cred-kit/smtp` | Vitest | 5 | 75 |
 | `@cred-kit/express` | Vitest with Supertest and in-memory adapter fakes | 2 | 22 |
 
 The counts above are from the verified run described in the pull request checklist.

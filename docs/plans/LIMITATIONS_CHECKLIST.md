@@ -1,7 +1,7 @@
 # Known Limitations Checklist
 
-Progress: **4 / 13 tasks complete** (4 done, 0 in progress, 0 blocked, 0 skipped).
-Phases 0-2 complete. Phase 3: L-07 next.
+Progress: **5 / 13 tasks complete** (5 done, 0 in progress, 0 blocked, 0 skipped).
+Phases 0-2 complete. Phase 3: L-07 done; L-08 next.
 
 States: `[ ]` not started, `[~]` in progress (only one at a time), `[x]` done
 and verified, `[!]` blocked (needs owner decision), `[-]` skipped with reason.
@@ -99,11 +99,23 @@ updated with the new suite and script.
 
 ## Phase 3: Express and adapter features
 
-- [ ] L-07 Make smtp link prefix configurable
-  - [ ] tests written
-  - [ ] implementation
-  - [ ] verification passed
-  - [ ] docs updated
+- [x] L-07 Make smtp link prefix configurable
+  - [x] tests written
+  - [x] implementation
+  - [x] verification passed
+  - [x] docs updated
+
+**Evidence:** Added `authPathPrefix` to `emailAdapterOptions` and
+`emailServiceOptions`, defaulting to `/api/auth` via
+`DEFAULT_AUTH_PATH_PREFIX`. Links are now
+`${BACKEND_URL}${authPathPrefix}/verify-email/...` and
+`${BACKEND_URL}${authPathPrefix}/reset-password/...`. Invalid prefixes (empty,
+whitespace, missing leading slash, trailing slash, root slash, query, fragment,
+inner whitespace) throw a clear `@cred-kit/smtp:` error. `pnpm --filter
+@cred-kit/smtp test` passes: **75 tests across 5 files** (10 new). Build, lint,
+and typecheck pass; full Turborepo run passes 21/21. The smtp README, express
+README, root README, and CONTRIBUTING were updated with the option, the
+`basePath`/`authPathPrefix` independence rule, and the new counts.
 
 - [ ] L-08 Make `oauth_state` follow resolved cookie security
   - [ ] tests written
@@ -216,3 +228,7 @@ updated with the new suite and script.
 - 2026-11-24: L-01 complete. Added the express Vitest/Supertest suite:
   22 tests across 2 files with in-memory adapter fakes. Build, lint,
   typecheck, and the full Turborepo run (21/21 tasks) pass.
+- 2026-11-24: L-07 complete. Added the backward-compatible smtp
+  `authPathPrefix` option (default `/api/auth`) with validation, used it for
+  both email links, and documented the independent `basePath` pairing. Smtp
+  suite: 75 tests across 5 files; full Turborepo run 21/21.

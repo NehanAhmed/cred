@@ -102,6 +102,35 @@ describe('createEmailAdapter', () => {
     expect(sent[0].html).toContain('/api/auth/verify-email/a%2Fb%2Bc%20d');
   });
 
+  it('uses a custom auth path prefix for verification and reset links', async () => {
+    const { adapter, sent } = buildAdapter({ authPathPrefix: '/auth' });
+
+    await adapter.sendEmailVerification('user@example.com', 'raw-token');
+    await adapter.sendPasswordReset('user@example.com', 'reset-token');
+
+    expect(sent[0].html).toContain(`${BACKEND_URL}/auth/verify-email/raw-token`);
+    expect(sent[0].html).not.toContain('/api/auth/');
+    expect(sent[1].html).toContain(`${BACKEND_URL}/auth/reset-password/reset-token`);
+    expect(sent[1].html).not.toContain('/api/auth/');
+  });
+
+  it.each([
+    ['empty', ''],
+    ['whitespace only', '   '],
+    ['missing leading slash', 'api/auth'],
+    ['trailing slash', '/api/auth/'],
+    ['root slash', '/'],
+    ['query string', '/api/auth?tenant=cred'],
+    ['fragment', '/api/auth#fragment'],
+    ['inner whitespace', '/api auth']
+  ])('rejects an invalid auth path prefix: %s', (_label, prefix) => {
+    const { send } = createCapturingSender();
+
+    expect(() =>
+      createEmailAdapter(send, { EMAIL_FROM, BACKEND_URL, authPathPrefix: prefix })
+    ).toThrow(/authPathPrefix/);
+  });
+
   it('honours a custom time zone for the reset expiry', async () => {
     const { adapter, sent } = buildAdapter({ timeZone: 'Asia/Kolkata' });
 
