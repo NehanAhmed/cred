@@ -22,16 +22,15 @@
 ## Status
 
 Cred is pre-1.0. The four public packages are published on npm at `0.1.0`. The authentication
-core, MongoDB storage adapter, and email adapter are covered by Vitest. The Express adapter is
-implemented and mountable, but has no in-repo test suite; its published build was smoke-tested
-end to end against a real MongoDB instance.
+core, MongoDB storage adapter, and email adapter are covered by Vitest, and the Express adapter has
+an HTTP-level Vitest suite that mounts the router with in-memory adapter fakes.
 
 | Package / app | Version | Registry | Tests | Status |
 |---|---:|---|---:|---|
 | `@cred-kit/core` | 0.1.0 | npm | 138 in 7 files | Implemented and tested |
 | `@cred-kit/mongo-storage` | 0.1.0 | npm | 187 in 9 files | Implemented and tested |
 | `@cred-kit/smtp` | 0.1.0 | npm | 65 in 5 files | Implemented and tested |
-| `@cred-kit/express` | 0.1.0 | npm | none in repo | Implemented; test coverage missing |
+| `@cred-kit/express` | 0.1.0 | npm | 22 in 2 files | Implemented and tested |
 | `@cred-kit/shared` | 0.0.0 | private | none | Compatibility re-export shim |
 | `@cred-kit/config` | 0.0.0 | private | n/a | Shared TypeScript configs only |
 | `apps/cred-testing` | 0.0.1 | private | none | Manual Next.js tester; partially aligned |
@@ -471,9 +470,6 @@ you do.
 
 ## Known limitations
 
-- **No in-repo tests for `@cred-kit/express`.** The package has no `test` script and no test files.
-  Its published build was smoke-tested by mounting it, fetching a CSRF token, and attempting a
-  login, but that is not a substitute for a test suite.
 - **No health endpoint.** `@cred-kit/express` does not expose `/api/health`. The `apps/cred-testing`
   health panel and its health rate-limit entry call `/api/health`, which returns 404 against the
   adapter.
@@ -570,7 +566,7 @@ The root `pnpm test` runs the Vitest suites in the three tested packages:
 | `@cred-kit/core` | Vitest with in-memory fakes | 7 | 138 | Registration, verification, login and lockout, refresh rotation and replay, password reset, OAuth linking, profiles, audit pagination, token helpers, validators |
 | `@cred-kit/mongo-storage` | Vitest + `mongodb-memory-server` | 9 | 187 | User, refresh-token, and audit models and adapters, indexes, TTLs, and atomic updates |
 | `@cred-kit/smtp` | Vitest | 5 | 65 | SMTP transport options, Resend HTTP behavior, retries, link construction, and email templates |
-| `@cred-kit/express` | none | 0 | 0 | No in-repo tests |
+| `@cred-kit/express` | Vitest with Supertest and in-memory adapter fakes | 2 | 22 | Registration, login, refresh, logout, CSRF, rate limiting, OAuth start/state, error mapping, and profile access |
 | `apps/cred-testing` | none | 0 | 0 | No tests |
 
 That is **390 tests across 21 files**. The first DB-backed run downloads a MongoDB binary for

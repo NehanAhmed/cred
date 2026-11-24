@@ -1,7 +1,7 @@
 # Known Limitations Checklist
 
-Progress: **3 / 13 tasks complete** (3 done, 0 in progress, 0 blocked, 0 skipped).
-Phase 1 complete. Phase 2: L-01 next.
+Progress: **4 / 13 tasks complete** (4 done, 0 in progress, 0 blocked, 0 skipped).
+Phases 0-2 complete. Phase 3: L-07 next.
 
 States: `[ ]` not started, `[~]` in progress (only one at a time), `[x]` done
 and verified, `[!]` blocked (needs owner decision), `[-]` skipped with reason.
@@ -78,11 +78,24 @@ historical plan evidence.
 
 ## Phase 2: Test foundation
 
-- [ ] L-01 Add `@cred-kit/express` test suite
-  - [ ] tests written
-  - [ ] implementation
-  - [ ] verification passed
-  - [ ] docs updated
+- [x] L-01 Add `@cred-kit/express` test suite
+  - [x] tests written
+  - [x] implementation
+  - [x] verification passed
+  - [x] docs updated
+
+**Evidence:** Added `vitest@5.1.0`, `supertest@7.3.2`, and
+`@types/supertest@7.2.1` as devDependencies, `test: vitest run` and
+`test:watch: vitest` scripts, and `vitest.config.ts`. Added
+`src/__tests__/fakes.ts` (in-memory core adapter fakes),
+`src/__tests__/helpers.ts` (`createTestApp`, `registerVerifiedUser`),
+`src/__tests__/auth.test.ts` (12 tests), and `src/__tests__/router.test.ts`
+(10 tests). `pnpm --filter @cred-kit/express test` passes: **22 tests across
+2 files**. `build`, `lint`, and `typecheck` pass. `pnpm turbo run build lint
+typecheck test` passes 21/21 tasks. The package `files` whitelist remains
+`dist`, `README.md`, `LICENSE`, and the build emits only the two dist files,
+so tests are not published. Express README, root README, and CONTRIBUTING
+updated with the new suite and script.
 
 ## Phase 3: Express and adapter features
 
@@ -200,3 +213,6 @@ historical plan evidence.
 - 2026-11-22: L-12 complete. Corrected Node 20 claims to `>=22` across the
   express, smtp, core, and mongo-storage READMEs and removed the root README
   limitation. All package manifests declare `engines.node: ">=22"`.
+- 2026-11-24: L-01 complete. Added the express Vitest/Supertest suite:
+  22 tests across 2 files with in-memory adapter fakes. Build, lint,
+  typecheck, and the full Turborepo run (21/21 tasks) pass.

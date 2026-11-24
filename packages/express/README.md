@@ -858,7 +858,6 @@ The 10 KB default JSON body limit applies to the whole mounted router. Increase 
 - **Audit logs depend on the audit adapter.** Without one, writes are dropped and the audit route returns `503`.
 - **Separate token and cookie lifetimes.** `core.accessTokenExpiry` and `cookies.accessTokenMaxAgeMs` are independent, as are `core.refreshTokenTtlMs` and `cookies.refreshTokenMaxAgeMs`.
 - **JSON only.** The router mounts `express.json()` and `cookie-parser`; it does not mount a URL-encoded body parser.
-- **No test suite in this package.** There is no `test` script and no test files in `packages/express`.
 - **Pre-1.0.** The public API may change between minor versions.
 
 ## TypeScript
@@ -967,15 +966,19 @@ From the repository root:
 pnpm --filter @cred-kit/express build
 pnpm --filter @cred-kit/express typecheck
 pnpm --filter @cred-kit/express lint
+pnpm --filter @cred-kit/express test
 pnpm --filter @cred-kit/express pack --dry-run
 ```
 
 Verified in this checkout:
 
-- `pnpm --filter @cred-kit/express build` passes and produces `dist/index.mjs` (about 42 kB) and `dist/index.d.mts` (about 10 kB).
+- `pnpm --filter @cred-kit/express build` passes and produces `dist/index.mjs` (about 47 kB) and `dist/index.d.mts` (about 10 kB).
 - `pnpm --filter @cred-kit/express typecheck` passes.
 - `pnpm --filter @cred-kit/express lint` passes.
+- `pnpm --filter @cred-kit/express test` passes: **22 tests across 2 files** (`auth`, `router`).
 - `pnpm --filter @cred-kit/express pack --dry-run` lists `dist/index.d.mts`, `dist/index.mjs`, `package.json`, and `README.md`.
+
+The tests are HTTP-level characterization tests built with Vitest and Supertest. They mount the real router on an Express app with in-memory core adapter fakes, so no MongoDB or SMTP connection is required. Coverage includes registration and verification, login and cookie attributes, refresh rotation, logout, CSRF enforcement, JSON body limits, `AuthError` and unknown-error mapping, router mounts and 404s, auth rate limiting, OAuth start redirects and state validation, and authenticated profile access.
 
 Package scripts:
 
@@ -985,10 +988,10 @@ Package scripts:
 | `dev` | `tsdown --watch` |
 | `lint` | `eslint .` |
 | `lint:fix` | `eslint . --fix` |
+| `test` | `vitest run` |
+| `test:watch` | `vitest` |
 | `typecheck` | `tsc --noEmit` |
 | `prepack` | `pnpm build` |
-
-There is no `test` script and there are no test files in this package, so no package-level test result is claimed here.
 
 ## Related packages
 
