@@ -1,7 +1,7 @@
 # Known Limitations Checklist
 
-Progress: **6 / 13 tasks complete** (6 done, 0 in progress, 0 blocked, 0 skipped).
-Phases 0-2 complete. Phase 3: L-08 done; L-05 next.
+Progress: **7 / 13 tasks complete** (7 done, 0 in progress, 0 blocked, 0 skipped).
+Phases 0-2 complete. Phase 3: L-05 done; L-04 next.
 
 States: `[ ]` not started, `[~]` in progress (only one at a time), `[x]` done
 and verified, `[!]` blocked (needs owner decision), `[-]` skipped with reason.
@@ -133,11 +133,27 @@ Turborepo run passes 21/21. Root and express READMEs now state that the state
 cookie follows the resolved cookie security and remove the "OAuth requires
 HTTPS or localhost" limitation.
 
-- [ ] L-05 Export auth guard and `req.user` typing
-  - [ ] tests written
-  - [ ] implementation
-  - [ ] verification passed
-  - [ ] docs updated
+- [x] L-05 Export auth guard and `req.user` typing
+  - [x] tests written
+  - [x] implementation
+  - [x] verification passed
+  - [x] docs updated
+
+**Evidence:** Added and exported `createAuthGuard({ jwtSecret, cookieName? })`
+plus `CredAuthGuardOptions`. It validates the secret with core's
+`assertJwtSecret` and a non-empty cookie name, then reuses the router's auth
+middleware, which now sets both `req.user` and `res.locals.credUser`. Added a
+global `Express.Request.user?: JWTPayload` augmentation in `types.ts` and made
+`readCookie` parse the raw `Cookie` header when `cookie-parser` is not
+mounted. Added `guard.test.ts` with 9 tests: valid token with and without
+`cookie-parser`, missing cookie, malformed token, refresh-type token, expired
+token, custom cookie name, and creation-time validation. `pnpm --filter
+@cred-kit/express test` passes: **34 tests across 3 files**; lint, typecheck,
+build, and full Turborepo run (21/21) pass. `dist/index.d.mts` contains the
+`createAuthGuard` export and `Express.Request` augmentation. A temporary
+consumer compiled against `dist` with `req.user?.id` and `req.user?.tokenType`
+and was deleted. Express and root READMEs document the guard and remove the
+old limitations.
 
 - [ ] L-04 Add configurable rate-limit store factory
   - [ ] tests written
@@ -245,3 +261,7 @@ HTTPS or localhost" limitation.
 - 2026-11-24: L-08 complete. The `oauth_state` cookie now follows the
   resolved `cookies.secure` setting for both set and clear. Express suite:
   25 tests across 2 files; full Turborepo run 21/21.
+- 2026-11-24: L-05 complete. Exported `createAuthGuard`, augmented
+  `Express.Request.user`, and made cookie reading work without
+  `cookie-parser`. Express suite: 34 tests across 3 files; full Turborepo run
+  21/21; a temporary dist consumer compiled.

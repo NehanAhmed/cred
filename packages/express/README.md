@@ -38,6 +38,7 @@ What this package does not do:
 - [Rate limiting](#rate-limiting)
 - [Security notes](#security-notes)
 - [Limitations and known constraints](#limitations-and-known-constraints)
+- [Protecting your own routes](#protecting-your-own-routes)
 - [TypeScript](#typescript)
 - [Troubleshooting](#troubleshooting)
 - [Testing and development](#testing-and-development)
@@ -864,8 +865,6 @@ The 10 KB default JSON body limit applies to the whole mounted router. Increase 
 
 - **ESM-only.** The build produces `dist/index.mjs` and `dist/index.d.mts`; `exports` has no `require` condition.
 - **Manual base path.** `basePath` is not derived from `req.baseUrl`. You must pass the mount path or use the default `/api`.
-- **No exported auth guard.** `requireAuth` is internal. Protected routes are the ones inside the router. Your own routes must verify the access token themselves if they need the same check.
-- **No `req.user` augmentation.** The middleware stores the JWT payload in `res.locals.credUser` for its own controllers. `CredLocals` is exported, but the package does not declare a global `Express.Request.user`.
 - **No health endpoint.** Health checks belong to the host app.
 - **No email link construction.** The adapter passes the raw token to the email adapter; `basePath` is not used to build verification or reset links. With the bundled SMTP options, set `authPathPrefix` to match the mount path.
 - **OAuth routes always exist.** A provider that is not configured redirects to `${clientUrl}/login?error={provider}_auth_failed` instead of returning 404.
@@ -879,6 +878,37 @@ The 10 KB default JSON body limit applies to the whole mounted router. Increase 
 - **JSON only.** The router mounts `express.json()` and `cookie-parser`; it does not mount a URL-encoded body parser.
 - **Pre-1.0.** The public API may change between minor versions.
 
+## Protecting your own routes
+
+`createAuthGuard` applies the same access-token verification the router uses to any host route. It reads the access-token cookie itself, so you do not need to mount `cookie-parser` first, and it sets `req.user` to the verified payload.
+
+```ts
+import express from 'express';
+import { createAuthGuard } from '@cred-kit/express';
+
+const app = express();
+
+app.get(
+  '/dashboard',
+  createAuthGuard({ jwtSecret: process.env.JWT_SECRET! }),
+  (req, res) => {
+    // req.user is typed as JWTPayload | undefined; the guard guarantees it here.
+    res.json({ id: req.user!.id, email: req.user!.email });
+  },
+);
+```
+
+Options:
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `jwtSecret` | `string` | required | HS256 signing secret; must be at least 32 characters |
+| `cookieName` | `string` | `'token'` | Access-token cookie name, matching `cookies.accessTokenName` |
+
+Failure responses match the router's protected routes: a missing cookie returns `401 { success: false, message: 'Unauthorized', error: 'Unauthorized' }`, and an invalid, expired, or refresh-type token returns `401 { success: false, message: 'Invalid token', error: 'Invalid token' }`. The guard does not apply CSRF or rate limiting; mount those separately if your host routes need them.
+
+`req.user` is a global augmentation of `Express.Request` with `JWTPayload | undefined`. If your application already augments `req.user` for another library, make sure the declarations are compatible.
+
 ## TypeScript
 
 The package ships declarations for every export. Run the build before typechecking against `dist`, or rely on the published package.
@@ -888,6 +918,7 @@ Runtime exports:
 ```ts
 import {
   credExpress,
+  createAuthGuard,
   createCoreRuntime,
   resolveCredConfig,
   resolveCredRateLimits,
@@ -919,6 +950,7 @@ import type {
   CredErrorLogger,
   CredCoreDeps,
   CredCoreRuntime,
+  CredAuthGuardOptions,
   CredLocals,
   CredOAuthProvider,
   CredRequestContext,
@@ -949,7 +981,7 @@ await router.close();
 
 `CredExpressRouter` extends Express's `Router` with a `close(): Promise<void>` method. `close()` is idempotent. It closes the `@cred-kit/mongo-storage` instance created from `{ uri }` or `{ connection }`, and the `@cred-kit/smtp` service created from email options. Prebuilt adapters supplied by the host are not closed.
 
-The package does not augment the global Express request type. If you need the authenticated payload outside the router, verify the access-token cookie yourself with `verifyAccessToken` from `@cred-kit/core` and use your own request typing.
+The package augments the global Express request type with `user?: JWTPayload`. Use `createAuthGuard` on host routes to populate it; the router's own protected routes populate both `req.user` and `res.locals.credUser`.
 
 ## Troubleshooting
 
@@ -958,6 +990,8 @@ The package does not augment the global Express request type. If you need the au
 | `@cred-kit/express: Cred: jwtSecret must be at least 32 characters` | Secret is too short | Use a secret of at least 32 characters |
 | `@cred-kit/express: "jwtSecret" is required and must be a string` | Missing or non-string secret | Pass `jwtSecret` |
 | `@cred-kit/express: "basePath" must start with "/"` | Path does not start with a slash | Use `/api`, `/v1`, or `/` |
+| `@cred-kit/express: "cookieName" must be a non-empty string` | `createAuthGuard` received a blank cookie name | Omit it to use `token` or pass a real cookie name |
+| `401 Unauthorized` on a host route using `createAuthGuard` | The access-token cookie is missing or has a different name | Log in first; set `cookieName` to match `cookies.accessTokenName` |
 | `@cred-kit/express: "clientUrl" must be an absolute URL` | Value is not an absolute URL | Use `https://app.example.com` |
 | `@cred-kit/express: "clientUrl" must not contain a query string or fragment` | URL includes `?` or `#` | Pass only the base URL |
 | `@cred-kit/express: "cookies.sameSite" cannot be "none" while "cookies.secure" is false` | Cross-site cookies without HTTPS | Set `cookies.secure: true` |
@@ -995,10 +1029,10 @@ Verified in this checkout:
 - `pnpm --filter @cred-kit/express build` passes and produces `dist/index.mjs` (about 47 kB) and `dist/index.d.mts` (about 10 kB).
 - `pnpm --filter @cred-kit/express typecheck` passes.
 - `pnpm --filter @cred-kit/express lint` passes.
-- `pnpm --filter @cred-kit/express test` passes: **25 tests across 2 files** (`auth`, `router`).
+- `pnpm --filter @cred-kit/express test` passes: **34 tests across 3 files** (`auth`, `guard`, `router`).
 - `pnpm --filter @cred-kit/express pack --dry-run` lists `dist/index.d.mts`, `dist/index.mjs`, `package.json`, and `README.md`.
 
-The tests are HTTP-level characterization tests built with Vitest and Supertest. They mount the real router on an Express app with in-memory core adapter fakes, so no MongoDB or SMTP connection is required. Coverage includes registration and verification, login and cookie attributes, refresh rotation, logout, CSRF enforcement, JSON body limits, `AuthError` and unknown-error mapping, router mounts and 404s, auth rate limiting, OAuth start redirects and state validation, and authenticated profile access.
+The tests are HTTP-level characterization tests built with Vitest and Supertest. They mount the real router on an Express app with in-memory core adapter fakes, so no MongoDB or SMTP connection is required. Coverage includes registration and verification, login and cookie attributes, refresh rotation, logout, CSRF enforcement, JSON body limits, `AuthError` and unknown-error mapping, router mounts and 404s, auth rate limiting, OAuth start redirects and state validation, the exported auth guard, and authenticated profile access.
 
 Package scripts:
 

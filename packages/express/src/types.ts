@@ -3,7 +3,7 @@ import type {
   EmailAdapter,
   JWTPayload,
   RefreshTokenDatabaseAdapter,
-  UserDatabaseAdapter,
+  UserDatabaseAdapter
 } from '@cred-kit/core';
 
 /**
@@ -25,13 +25,26 @@ export interface CredRequestContext {
 }
 
 /**
- * Per-request state populated by the auth middleware. Kept in `res.locals`
- * instead of augmenting Express's global `Request` type so consuming
- * applications do not inherit a package-specific request shape.
+ * Per-request state populated by the auth middleware. `req.user` is also
+ * augmented globally for host routes; `res.locals.credUser` remains the
+ * router's internal channel so controllers do not depend on the global type.
  */
 export interface CredLocals {
   credUser?: JWTPayload;
   credCsrfToken?: string;
+}
+
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Express {
+    interface Request {
+      /**
+       * Verified access-token payload, set by the router's protected routes and
+       * by `createAuthGuard`. Undefined on unauthenticated requests.
+       */
+      user?: JWTPayload;
+    }
+  }
 }
 
 /** OAuth providers supported by the adapter. */
