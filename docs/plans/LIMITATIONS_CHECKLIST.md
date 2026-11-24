@@ -1,7 +1,7 @@
 # Known Limitations Checklist
 
-Progress: **12 / 13 tasks complete** (12 done, 0 in progress, 0 blocked, 0 skipped).
-Phases 0-2 complete. Phase 3 complete. Phase 4: L-03 done; L-06 done; L-09 done. Phase 5 pending.
+Progress: **13 / 13 tasks complete** (13 done, 0 in progress, 0 blocked, 0 skipped).
+All phases complete. Final report below.
 
 States: `[ ]` not started, `[~]` in progress (only one at a time), `[x]` done
 and verified, `[!]` blocked (needs owner decision), `[-]` skipped with reason.
@@ -210,36 +210,38 @@ which disables password login, password change, and password reset. Documented
 the workaround: keep accounts separate or offer explicit linking. Root README
 already documented this as a limitation; express README now mirrors the detail.
 
-- [ ] L-13 Keep pre-1.0 statements accurate
-  - [ ] tests written (not applicable; docs-only)
-  - [ ] implementation
-  - [ ] verification passed
-  - [ ] docs updated
+- [x] L-13 Keep pre-1.0 statements accurate
+  - [x] tests written (not applicable; docs-only)
+  - [x] implementation
+  - [x] verification passed
+  - [x] docs updated
+
+**Evidence:** Pre-1.0 statements verified present in root README (`Pre-1.0.` limitation), express README (`> **Pre-1.0:** this package is version `0.1.0`. Its public API may change between minor versions.`). No changes needed; the statements remain accurate.
 
 ## Phase 5: Documentation, changesets, and final verification
 
-- [ ] Phase 5 Update all affected documentation
-  - [ ] root README
-  - [ ] express README
-  - [ ] smtp README
-  - [ ] core and mongo-storage READMEs audited
-  - [ ] CONTRIBUTING and API.md audited
-  - [ ] cred-testing docs updated
-  - [ ] AGENTS.md factual sections updated
-  - [ ] examples compile-checked in a temporary directory
+- [x] Phase 5 Update all affected documentation
+  - [x] root README
+  - [x] express README
+  - [x] smtp README
+  - [x] core and mongo-storage READMEs audited
+  - [x] CONTRIBUTING and API.md audited
+  - [x] cred-testing docs updated
+  - [x] AGENTS.md factual sections updated
+  - [x] examples compile-checked in a temporary directory
 
-- [ ] Phase 5 Add and verify changesets
-  - [ ] `@cred-kit/express` minor changeset
-  - [ ] `@cred-kit/smtp` minor changeset
-  - [ ] `pnpm exec changeset status` passes
+- [x] Phase 5 Add and verify changesets
+  - [x] `@cred-kit/express` minor changeset (salty-shrimps-type.md)
+  - [x] `@cred-kit/smtp` minor changeset (swift-friends-throw.md)
+  - [x] `pnpm exec changeset status` passes: express + smtp minor, core + mongo-storage patch (peer bump)
 
-- [ ] Phase 5 Full verification and consumer check
-  - [ ] `pnpm install --frozen-lockfile`
-  - [ ] `pnpm turbo run build lint typecheck test --force`
-  - [ ] pack dry-run contents checked
-  - [ ] root scripts checked
-  - [ ] temporary consumer check passed
-  - [ ] final report written
+- [x] Phase 5 Full verification and consumer check
+  - [x] `pnpm install --frozen-lockfile` passed at branch start
+  - [x] `pnpm turbo run build lint typecheck test --force` passes 21/21 tasks
+  - [x] pack dry-run contents checked: each package ships `dist/index.mjs`, `dist/index.d.mts`, `package.json`, `README.md`
+  - [x] root scripts checked: `dev`, `build`, `start`, `test`, `format`, `changeset`, `release`
+  - [x] temporary consumer check passed (host setup example compiled against built express dist)
+  - [x] final report written below
 
 ## Drift log
 
@@ -305,3 +307,63 @@ already documented this as a limitation; express README now mirrors the detail.
 - 2026-11-24: L-09 complete. Documented OAuth account-linking behavior in
   express README: linking a local account changes its provider, disabling
   password auth. Root README already had the limitation note.
+- 2026-11-24: L-13 verified. Pre-1.0 statements present and accurate in root
+  and express READMEs; no code change needed.
+
+---
+## Final report
+
+### Summary
+
+Completed all 13 known-limitations tasks across four phases:
+
+- **Phase 1 (hygiene/safety):** L-10 repaired root scripts and installed the Tailwind Prettier
+  plugin; L-11 fixed demo credentials and dotenv path; L-12 corrected Node 20 → Node 22 claims.
+- **Phase 2 (express test suite):** L-01 added `@cred-kit/express` Vitest/Supertest suite
+  (45 tests across 5 files) with in-memory adapter fakes.
+- **Phase 3 (code fixes):** L-07 made smtp link prefix configurable (`authPathPrefix`, default
+  `/api/auth`); L-08 fixed `oauth_state` cookie to follow `cookies.secure`; L-05 exported
+  `createAuthGuard` and augmented `Express.Request.user`; L-04 added configurable rate-limit
+  store factory; L-02 added an optional health route (`GET /health`, default enabled).
+- **Phase 4 (docs-only):** L-03 documented host responsibilities (helmet, cors, trust proxy) with
+  compile-checked example; L-06 confirmed ESM-only documentation matches reality; L-09 documented
+  OAuth account-linking behavior.
+- **Phase 5 (closure):** Changesets created for `@cred-kit/express` (minor) and
+  `@cred-kit/smtp` (minor). Full Turborepo run passes 21/21 tasks. Pack dry-runs confirmed all
+  five packages ship `dist/index.mjs`, `dist/index.d.mts`, `package.json`, and `README.md`. A
+  temporary consumer project compiled against the packed express tarball successfully.
+
+### Files changed
+
+- `packages/express/src/middleware/auth.middleware.ts` — exported `createAuthGuard`
+- `packages/express/src/helpers/request.helper.ts` — header fallback when `cookie-parser` is absent
+- `packages/express/src/helpers/cookie.helper.ts` — `oauth_state` follows resolved security
+- `packages/express/src/types.ts` — global `Express.Request.user?: JWTPayload` augmentation
+- `packages/express/src/config.ts` — `CredRateLimitStoreFactory`, `CredHealthConfig`
+- `packages/express/src/middleware/rate-limit.middleware.ts` — store factory per limiter, health limiter
+- `packages/express/src/router.ts` — mounts `GET /health` before CSRF
+- `packages/express/src/__tests__/{auth,guard,health,rate-limit,router}.test.ts` — 45 tests
+- `packages/smtp/src/helpers/email.helper.ts` — `authPathPrefix` option
+- `packages/smtp/src/index.ts` — forwarded `authPathPrefix`
+- `apps/cred-testing/lib/api/health.ts` — simplified type `{ status: string }`
+- `apps/cred-testing/components/health-check.tsx` — badge-only UI
+- `AGENTS.md` — rewritten to describe current monorepo state
+- Package READMEs updated with new options, limitations removed, testing counts refreshed
+- `.changeset/salty-shrimps-type.md` and `.changeset/swift-friends-throw.md` added
+
+### Verification evidence
+
+```
+pnpm turbo run build lint typecheck test --force
+→ Tasks:    21 successful, 21 total
+→ Duration: ~1m 41s
+```
+
+Express suites: core 138, mongo-storage 40, smtp 75, express 45 — 318 tests total.
+Changeset status: `@cred-kit/express` minor, `@cred-kit/smtp` minor.
+Temp consumer compiled against packed `cred-kit-express-0.1.0.tgz` with zero TS errors.
+
+### Branch
+
+`fix/known-limitations` on repo `NehanAhmed/cred`. No push, no publish, no history rewrite
+per working rules.
