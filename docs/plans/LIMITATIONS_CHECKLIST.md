@@ -1,7 +1,7 @@
 # Known Limitations Checklist
 
-Progress: **9 / 13 tasks complete** (9 done, 0 in progress, 0 blocked, 0 skipped).
-Phases 0-2 complete. Phase 3: L-05 done; L-04 done; L-02 done.
+Progress: **12 / 13 tasks complete** (12 done, 0 in progress, 0 blocked, 0 skipped).
+Phases 0-2 complete. Phase 3 complete. Phase 4: L-03 done; L-06 done; L-09 done. Phase 5 pending.
 
 States: `[ ]` not started, `[~]` in progress (only one at a time), `[x]` done
 and verified, `[!]` blocked (needs owner decision), `[-]` skipped with reason.
@@ -173,23 +173,42 @@ old limitations.
 
 ## Phase 4: Decision-gated and documentation-only items
 
-- [ ] L-03 Document CORS, helmet, and proxy responsibilities
-  - [ ] tests written (not applicable; docs-only)
-  - [ ] implementation
-  - [ ] verification passed
-  - [ ] docs updated
+- [x] L-03 Document CORS, helmet, and proxy responsibilities
+  - [x] tests written (not applicable; docs-only)
+  - [x] implementation
+  - [x] verification passed
+  - [x] docs updated
 
-- [ ] L-06 Document ESM-only packaging
-  - [ ] tests written (not applicable; docs-only)
-  - [ ] implementation
-  - [ ] verification passed
-  - [ ] docs updated
+**Evidence:** Added a "Host setup example" section to the express README with
+`helmet()`, `cors({ origin, credentials: true })`, and `app.set('trust proxy',
+1)`. Verified the example compiles against the packed package in a temporary
+project. Removed the outdated "No health endpoint" limitation from both root
+and express READMEs. Kept the "No CORS, helmet, or proxy configuration"
+limitation since it accurately reflects that these are host responsibilities.
 
-- [ ] L-09 Document OAuth account-linking behavior
-  - [ ] tests written (not applicable; docs-only)
-  - [ ] implementation
-  - [ ] verification passed
-  - [ ] docs updated
+- [x] L-06 Document ESM-only packaging
+  - [x] tests written (not applicable; docs-only)
+  - [x] implementation
+  - [x] verification passed
+  - [x] docs updated
+
+**Evidence:** Confirmed the existing "ESM-only" limitation statements in root
+README (`dist/index.mjs` and `dist/index.d.mts`; no CommonJS `require`
+condition) and express README match the actual `exports` map and build output.
+No changes needed.
+
+- [x] L-09 Document OAuth account-linking behavior
+  - [x] tests written (not applicable; docs-only)
+  - [x] implementation
+  - [x] verification passed
+  - [x] docs updated
+
+**Evidence:** Added a paragraph after "Core only uses an OAuth email to link an
+existing account when `isEmailVerified` is true" in the express README explaining
+that linking a local account through OAuth changes the user's `provider` field,
+which disables password login, password change, and password reset. Documented
+the workaround: keep accounts separate or offer explicit linking. Root README
+already documented this as a limitation; express README now mirrors the detail.
 
 - [ ] L-13 Keep pre-1.0 statements accurate
   - [ ] tests written (not applicable; docs-only)
@@ -278,3 +297,11 @@ old limitations.
   type and component to the simple `{ status: 'ok' }` payload. Express suite:
   45 tests across 5 files; cred-testing lint/typecheck pass; full Turborepo
   run 21/21.
+- 2026-11-24: L-03 complete. Added host setup example (helmet, cors, trust
+  proxy) to express README with compile-check in a temp project. Removed stale
+  "No health endpoint" limitation from root and express READMEs.
+- 2026-11-24: L-06 verified. ESM-only statements match actual build output
+  and exports map; no changes needed.
+- 2026-11-24: L-09 complete. Documented OAuth account-linking behavior in
+  express README: linking a local account changes its provider, disabling
+  password auth. Root README already had the limitation note.

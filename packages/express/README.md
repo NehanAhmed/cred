@@ -18,9 +18,8 @@ What this package does not do:
 - It does not create or start an HTTP server. You mount the returned router in your own Express app.
 - It does not implement storage or email delivery itself. It constructs the sibling adapters or accepts yours.
 - It does not provide CORS, helmet, HTTPS, or `trust proxy` configuration.
-- It does not provide a health endpoint.
 - It does not build email verification or password reset links.
-- It does not export an auth guard for your own routes, and it does not augment `Express.Request` with a `user` property.
+- Host routes that need authentication should use the exported `createAuthGuard`.
 
 ## Contents
 
@@ -811,6 +810,8 @@ The profile passed to core contains `provider`, `profileId`, `email`, `displayNa
 
 Core only uses an OAuth email to link an existing account when `isEmailVerified` is true.
 
+When linking an existing local account, core changes the user's `provider` to the OAuth provider (`google` or `github`). After linking, the account can no longer use password login, password change, or password reset — it must sign in through the linked OAuth provider. If you need to preserve password auth on an existing account, do not let the OAuth flow auto-link by verified email; instead, present the user with their current session and offer an explicit linking step if desired.
+
 Provider requests time out after 10 seconds. Provider and core failures are logged through `logger` with the provider name, and the client receives a redirect rather than a JSON error.
 
 ## Rate limiting
@@ -892,13 +893,48 @@ What remains the host application's responsibility:
 - Keeping the JWT secret at least 32 characters long.
 - Database security, backups, and email deliverability.
 
+### Host setup example
+
+```ts
+import cors from 'cors';
+import express from 'express';
+import helmet from 'helmet';
+import { credExpress } from '@cred-kit/express';
+
+const app = express();
+
+// Host-level middleware — runs before the Cred router.
+app.use(helmet());
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL!,
+    credentials: true,
+  }),
+);
+
+// Trust the first proxy hop so audit IPs and rate limits see the client address.
+app.set('trust proxy', 1);
+
+const cred = await credExpress({
+  // ... your config here
+});
+
+app.use('/api', cred);
+```
+
+Install the required peer packages yourself; they are not included in this adapter:
+
+```bash
+pnpm add cors helmet
+pnpm add -D @types/cors @types/helmet
+```
+
 The 10 KB default JSON body limit applies to the whole mounted router. Increase `jsonBodyLimit` only if a Cred request body actually needs it.
 
 ## Limitations and known constraints
 
 - **ESM-only.** The build produces `dist/index.mjs` and `dist/index.d.mts`; `exports` has no `require` condition.
 - **Manual base path.** `basePath` is not derived from `req.baseUrl`. You must pass the mount path or use the default `/api`.
-- **No health endpoint.** Health checks belong to the host app.
 - **No email link construction.** The adapter passes the raw token to the email adapter; `basePath` is not used to build verification or reset links. With the bundled SMTP options, set `authPathPrefix` to match the mount path.
 - **OAuth routes always exist.** A provider that is not configured redirects to `${clientUrl}/login?error={provider}_auth_failed` instead of returning 404.
 - **Database option pass-through is narrow.** For `{ uri }` and `{ connection }`, only that property is passed to `@cred-kit/mongo-storage`; other properties on the same object are ignored.
