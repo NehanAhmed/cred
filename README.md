@@ -482,9 +482,6 @@ you do.
 
 ## Known limitations
 
-- **No health endpoint.** `@cred-kit/express` does not expose `/api/health`. The `apps/cred-testing`
-  health panel and its health rate-limit entry call `/api/health`, which returns 404 against the
-  adapter.
 - **No CORS, helmet, or proxy configuration.** These remain host responsibilities.
 - **No custom rate-limit store.** Counters are in memory and are not shared across processes.
 - **ESM-only.** The packages publish `dist/index.mjs` and `dist/index.d.mts` with no CommonJS

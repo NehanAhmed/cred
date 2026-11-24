@@ -1,7 +1,7 @@
 # Known Limitations Checklist
 
-Progress: **8 / 13 tasks complete** (8 done, 0 in progress, 0 blocked, 0 skipped).
-Phases 0-2 complete. Phase 3: L-05 done; L-04 done; L-02 next.
+Progress: **9 / 13 tasks complete** (9 done, 0 in progress, 0 blocked, 0 skipped).
+Phases 0-2 complete. Phase 3: L-05 done; L-04 done; L-02 done.
 
 States: `[ ]` not started, `[~]` in progress (only one at a time), `[x]` done
 and verified, `[!]` blocked (needs owner decision), `[-]` skipped with reason.
@@ -161,13 +161,15 @@ old limitations.
   - [x] verification passed
   - [x] docs updated
 
-**Evidence:** Added `CredRateLimitStoreFactory` type and `rateLimitStoreFactory` config option. The factory is called once per limiter (11 limiters) because `express-rate-limit` rejects sharing a single store instance. Default is undefined (in-memory). Added `rate-limit.test.ts` with 4 tests: default undefined, 11 distinct stores, store increment, non-function throws. `pnpm --filter @cred-kit/express test` passes: **38 tests across 4 files**. Full Turborepo run passes 21/21. Express README documents the factory with a RedisStore example and removes the "No custom rate-limit store" limitation.
+**Evidence:** Added `CredRateLimitStoreFactory` type and `rateLimitStoreFactory` config option. The factory is called once per limiter (12 limiters) because `express-rate-limit` rejects sharing a single store instance. Default is undefined (in-memory). Added `rate-limit.test.ts` with 4 tests: default undefined, 12 distinct stores, store increment, non-function throws. `pnpm --filter @cred-kit/express test` passes: **45 tests across 5 files**. Full Turborepo run passes 21/21. Express README documents the factory with a RedisStore example and removes the "No custom rate-limit store" limitation.
 
-- [ ] L-02 Add health route and align tester
-  - [ ] tests written
-  - [ ] implementation
-  - [ ] verification passed
-  - [ ] docs updated
+- [x] L-02 Add health route and align tester
+  - [x] tests written
+  - [x] implementation
+  - [x] verification passed
+  - [x] docs updated
+
+**Evidence:** Added optional `health` block to `CredExpressConfig`: `{ enabled?, check?, rateLimit? }`, resolving to `enabled: true` by default. Mounted `GET /health` before CSRF middleware so probes do not set CSRF cookies. Returns `sendSuccess(res, { status: 'ok' }, 'Service is healthy')`; a rejecting host check logs via `config.logger.error` and returns `503`. `health.enabled = false` falls through to 404. A dedicated 60-second/30-request limiter was added (`health.rateLimit`). Added `health.test.ts` with 7 tests. Updated tester's `lib/api/health.ts` to `{ status: string }` and simplified `components/health-check.tsx` to show only a healthy/unavailable badge. `pnpm --filter @cred-kit/express test` passes: **45 tests across 5 files**; full Turborepo run 21/21; `cred-testing` lint and typecheck pass. Express README routes table and rate-limiting section updated.
 
 ## Phase 4: Decision-gated and documentation-only items
 
@@ -268,6 +270,11 @@ old limitations.
   `cookie-parser`. Express suite: 34 tests across 3 files; full Turborepo run
   21/21; a temporary dist consumer compiled.
 - 2026-11-24: L-04 complete. Added `CredRateLimitStoreFactory` type and
-  `rateLimitStoreFactory` config option. Factory called once per limiter (11
-  total) because `express-rate-limit` rejects shared stores. Express suite: 38
-  tests across 4 files; full Turborepo run 21/21.
+  `rateLimitStoreFactory` config option. Factory called once per limiter (12
+  total) because `express-rate-limit` rejects shared stores. Express suite: 45
+  tests across 5 files; full Turborepo run 21/21.
+- 2026-11-24: L-02 complete. Added optional `health` config block, mounted
+  `GET /health` before CSRF middleware, and aligned the tester's health API
+  type and component to the simple `{ status: 'ok' }` payload. Express suite:
+  45 tests across 5 files; cred-testing lint/typecheck pass; full Turborepo
+  run 21/21.

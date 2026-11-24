@@ -97,6 +97,34 @@ export interface CredCookieConfig {
   refreshTokenMaxAgeMs?: number;
 }
 
+/** Options for the optional health-check route mounted on the router. */
+export interface CredHealthConfig {
+  /**
+   * Whether to mount the health route. Defaults to `true`. Set to `false` to
+   * disable the route entirely.
+   */
+  enabled?: boolean;
+  /**
+   * Optional host-supplied check. When set, the router calls it on each
+   * request and returns `503` if the promise rejects. The built-in default
+   * only reports the adapter's own health with a simple `{ status: 'ok' }`
+   * envelope.
+   */
+  check?: () => Promise<void>;
+  /**
+   * Per-second budget for the health route. Defaults to a 60-second window
+   * allowing 30 requests, matching the shipped API.
+   */
+  rateLimit?: Partial<CredRateLimitRule>;
+}
+
+/** Resolved health-check configuration used at runtime. */
+export interface ResolvedCredHealthConfig {
+  enabled: boolean;
+  check: () => Promise<void>;
+  rateLimit: CredRateLimitRule;
+}
+
 export interface CredRateLimitRule {
   windowMs: number;
   max: number;
@@ -173,6 +201,8 @@ export interface CredExpressConfig {
   jsonBodyLimit?: string;
   /** Optional error logger; defaults to `console`. */
   logger?: CredErrorLogger;
+  /** Optional health-check route configuration. Enabled by default. */
+  health?: CredHealthConfig;
 }
 
 export interface ResolvedCredCookieConfig {
@@ -201,6 +231,7 @@ export interface ResolvedCredExpressConfig {
   core: CredConfig;
   jsonBodyLimit: string;
   logger: CredErrorLogger;
+  health: ResolvedCredHealthConfig;
 }
 
 /**
@@ -672,6 +703,35 @@ const resolveRateLimitStoreFactory = (
   return factory;
 };
 
+const HEALTH_RATE_LIMIT_DEFAULTS: CredRateLimitRule = {
+  windowMs: 60 * 1000,
+  max: 30,
+  message: 'Too many health checks, please try again later.'
+};
+
+const resolveHealth = (userHealth: CredHealthConfig | undefined): ResolvedCredHealthConfig => {
+  const enabled = userHealth?.enabled ?? true;
+
+  if (userHealth !== undefined && typeof userHealth !== 'object') {
+    throw new Error(`${PREFIX}: "health" must be an object or omitted`);
+  }
+
+  if (userHealth?.check !== undefined && typeof userHealth.check !== 'function') {
+    throw new Error(`${PREFIX}: "health.check" must be a function`);
+  }
+
+  const rateLimit: CredRateLimitRule = {
+    ...HEALTH_RATE_LIMIT_DEFAULTS,
+    ...userHealth?.rateLimit
+  };
+
+  return {
+    enabled,
+    check: userHealth?.check ?? (() => Promise.resolve()),
+    rateLimit
+  };
+};
+
 /**
  * Validates a user configuration and fills in defaults.
  *
@@ -715,7 +775,8 @@ export const resolveCredConfig = (userConfig: CredExpressConfig): ResolvedCredEx
     rateLimitStoreFactory: resolveRateLimitStoreFactory(userConfig.rateLimitStoreFactory),
     core,
     jsonBodyLimit: readBodyLimit(userConfig.jsonBodyLimit),
-    logger: resolveLogger(userConfig.logger)
+    logger: resolveLogger(userConfig.logger),
+    health: resolveHealth(userConfig.health)
   };
 };
 

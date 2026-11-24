@@ -32,8 +32,8 @@ describe('rateLimitStoreFactory', () => {
       }
     });
 
-    expect(stores).toHaveLength(11);
-    expect(new Set(stores).size).toBe(11);
+    expect(stores).toHaveLength(12);
+    expect(new Set(stores).size).toBe(12);
   });
 
   it('exercises the supplied store on a request', async () => {

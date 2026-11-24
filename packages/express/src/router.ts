@@ -12,11 +12,11 @@ import type { ResolvedCredExpressConfig } from './config.js';
 import { createAuthController } from './controllers/auth.controller.js';
 import { createOAuthController } from './controllers/oauth.controller.js';
 import { createProfileController } from './controllers/profile.controller.js';
-import { sendSuccess } from './helpers/api.helper.js';
+import { sendError, sendSuccess } from './helpers/api.helper.js';
 import { createRequireAuth } from './middleware/auth.middleware.js';
 import { createCsrfProtection } from './middleware/csrf.middleware.js';
 import { createErrorHandler } from './middleware/error.middleware.js';
-import { createRateLimiters } from './middleware/rate-limit.middleware.js';
+import { createHealthLimiter, createRateLimiters } from './middleware/rate-limit.middleware.js';
 import { validate } from './middleware/validate.middleware.js';
 import type { CredCoreDeps, CredLocals } from './types.js';
 
@@ -84,6 +84,20 @@ export const createRouter = (config: ResolvedCredExpressConfig, deps: CredCoreDe
 
   router.use(express.json({ limit: config.jsonBodyLimit }));
   router.use(cookieParser());
+
+  if (config.health.enabled) {
+    const healthLimiter = createHealthLimiter(config.health, config.rateLimitStoreFactory);
+    router.get('/health', healthLimiter, async (req, res) => {
+      try {
+        await config.health.check();
+        sendSuccess(res, { status: 'ok' }, 'Service is healthy');
+      } catch (error) {
+        config.logger.error(error);
+        sendError(res, 'Service Unavailable', 503);
+      }
+    });
+  }
+
   router.use(createCsrfProtection(config));
   router.use('/auth', authRouter);
   router.use('/profile', profileRouter);

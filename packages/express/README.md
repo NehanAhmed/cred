@@ -362,6 +362,7 @@ All paths are relative to the mount point. With the default configuration, the f
 
 | Method   | Path                          | Access         | Limiters                   | Description                                                    |
 | -------- | ----------------------------- | -------------- | -------------------------- | -------------------------------------------------------------- |
+| `GET`    | `/health`                     | Public         | `health`                   | Check adapter health; does not set CSRF cookies                |
 | `POST`   | `/auth`                       | Public         | `auth`, `register`         | Register a user; sends a verification email; `201`             |
 | `POST`   | `/auth/login`                 | Public         | `auth`, `login`            | Log in with email or username plus password; sets cookies      |
 | `POST`   | `/auth/logout`                | Access cookie  | `auth`, `logout`           | Delete the presented refresh token and clear cookies           |
@@ -380,7 +381,7 @@ All paths are relative to the mount point. With the default configuration, the f
 | `POST`   | `/profile/me/change-password` | Access cookie  | `profile`, `profileUpdate` | Change the password using the current password                 |
 | `GET`    | `/profile/me/audit-logs`      | Access cookie  | `profile`                  | Return paginated audit logs, newest first                      |
 
-There is no health route in this package. Unmatched paths are not handled by the Cred router; they fall through to the host app's 404 handler and Express's default HTML response.
+Unmatched paths fall through to the host app's 404 handler and Express's default HTML response.
 
 ### CSRF protection
 
@@ -829,6 +830,9 @@ Rate limiters are created from `rateLimits` merged over `defaultCredRateLimits`.
 | `oauth`          | 15 minutes | 10  | All OAuth routes                                      |
 | `profile`        | 15 minutes | 50  | Every `/profile/*` request                            |
 | `profileUpdate`  | 15 minutes | 50  | `PUT /profile/me`, `POST /profile/me/change-password` |
+| `health`         | 60 seconds | 30  | `GET /health`                                         |
+
+The health limiter is separate and does not share the `auth` or `profile` budget. It is configured through `health.rateLimit`.
 
 Each rule accepts a partial override:
 
@@ -859,7 +863,7 @@ const cred = await credExpress({
 });
 ```
 
-The factory is called once per limiter (11 total), so each limiter gets its own store instance. `express-rate-limit` rejects sharing a single store instance between multiple limiters.
+The factory is called once per limiter (12 total), so each limiter gets its own store instance. `express-rate-limit` rejects sharing a single store instance between multiple limiters.
 
 > **Note:** Rate-limit keys are based on `req.ip`. The router does not set `trust proxy`. If the app runs behind a proxy, set `app.set('trust proxy', ...)` on the host so limits and audit IPs see the client address rather than the proxy address.
 
@@ -872,7 +876,8 @@ What the package does:
 - Uses `sameSite=lax` for OAuth state and OAuth callback cookies because those requests cross sites.
 - Generates a random 32-byte OAuth state value and verifies it against an `httpOnly` cookie.
 - Issues a double-submit CSRF token cookie and requires `X-CSRF-Token` on unsafe requests outside the session-creation routes.
-- Applies rate limits to every auth and profile route.
+- Applies rate limits to every auth, profile, and health route.
+- Mounts `GET /health` before CSRF middleware, so health probes do not set CSRF cookies.
 - Forwards `req.ip` and the `user-agent` header to core for audit logging.
 - Returns a generic `500 Internal server error` for unhandled errors and does not include internal error details in the response.
 - Returns the canonical forgot-password message for unknown emails and email-send failures.
@@ -1052,10 +1057,10 @@ Verified in this checkout:
 - `pnpm --filter @cred-kit/express build` passes and produces `dist/index.mjs` (about 47 kB) and `dist/index.d.mts` (about 10 kB).
 - `pnpm --filter @cred-kit/express typecheck` passes.
 - `pnpm --filter @cred-kit/express lint` passes.
-- `pnpm --filter @cred-kit/express test` passes: **34 tests across 3 files** (`auth`, `guard`, `router`).
+- `pnpm --filter @cred-kit/express test` passes: **45 tests across 5 files** (`auth`, `guard`, `health`, `rate-limit`, `router`).
 - `pnpm --filter @cred-kit/express pack --dry-run` lists `dist/index.d.mts`, `dist/index.mjs`, `package.json`, and `README.md`.
 
-The tests are HTTP-level characterization tests built with Vitest and Supertest. They mount the real router on an Express app with in-memory core adapter fakes, so no MongoDB or SMTP connection is required. Coverage includes registration and verification, login and cookie attributes, refresh rotation, logout, CSRF enforcement, JSON body limits, `AuthError` and unknown-error mapping, router mounts and 404s, auth rate limiting, OAuth start redirects and state validation, the exported auth guard, and authenticated profile access.
+The tests are HTTP-level characterization tests built with Vitest and Supertest. They mount the real router on an Express app with in-memory core adapter fakes, so no MongoDB or SMTP connection is required. Coverage includes registration and verification, login and cookie attributes, refresh rotation, logout, CSRF enforcement, JSON body limits, `AuthError` and unknown-error mapping, router mounts and 404s, auth rate limiting, OAuth start redirects and state validation, the exported auth guard, authenticated profile access, health route, and rate-limit store factory.
 
 Package scripts:
 

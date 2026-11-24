@@ -1,5 +1,5 @@
 import rateLimit, { type RateLimitRequestHandler } from 'express-rate-limit';
-import type { CredRateLimitRule, CredRateLimits } from '../config.js';
+import type { CredRateLimitRule, CredRateLimits, ResolvedCredHealthConfig } from '../config.js';
 import type { CredRateLimitStoreFactory } from '../config.js';
 
 export type CredRateLimiters = {
@@ -43,3 +43,9 @@ export const createRateLimiters = (
   profile: createLimiter(rules.profile, storeFactory),
   profileUpdate: createLimiter(rules.profileUpdate, storeFactory)
 });
+
+/** Creates the dedicated health-check limiter. Defaults are 60 seconds / 30 requests. */
+export const createHealthLimiter = (
+  health: ResolvedCredHealthConfig,
+  storeFactory?: CredRateLimitStoreFactory
+): RateLimitRequestHandler => createLimiter(health.rateLimit, storeFactory);
