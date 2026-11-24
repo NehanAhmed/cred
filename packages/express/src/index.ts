@@ -92,6 +92,7 @@ export type {
   CredRateLimitRule,
   CredRateLimits,
   CredRateLimitsInput,
+  CredRateLimitStoreFactory,
   CredSameSite,
   ResolvedCredCookieConfig,
   ResolvedCredDatabase,

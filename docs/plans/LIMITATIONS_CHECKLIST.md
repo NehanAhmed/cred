@@ -1,7 +1,7 @@
 # Known Limitations Checklist
 
-Progress: **7 / 13 tasks complete** (7 done, 0 in progress, 0 blocked, 0 skipped).
-Phases 0-2 complete. Phase 3: L-05 done; L-04 next.
+Progress: **8 / 13 tasks complete** (8 done, 0 in progress, 0 blocked, 0 skipped).
+Phases 0-2 complete. Phase 3: L-05 done; L-04 done; L-02 next.
 
 States: `[ ]` not started, `[~]` in progress (only one at a time), `[x]` done
 and verified, `[!]` blocked (needs owner decision), `[-]` skipped with reason.
@@ -155,11 +155,13 @@ consumer compiled against `dist` with `req.user?.id` and `req.user?.tokenType`
 and was deleted. Express and root READMEs document the guard and remove the
 old limitations.
 
-- [ ] L-04 Add configurable rate-limit store factory
-  - [ ] tests written
-  - [ ] implementation
-  - [ ] verification passed
-  - [ ] docs updated
+- [x] L-04 Add configurable rate-limit store factory
+  - [x] tests written
+  - [x] implementation
+  - [x] verification passed
+  - [x] docs updated
+
+**Evidence:** Added `CredRateLimitStoreFactory` type and `rateLimitStoreFactory` config option. The factory is called once per limiter (11 limiters) because `express-rate-limit` rejects sharing a single store instance. Default is undefined (in-memory). Added `rate-limit.test.ts` with 4 tests: default undefined, 11 distinct stores, store increment, non-function throws. `pnpm --filter @cred-kit/express test` passes: **38 tests across 4 files**. Full Turborepo run passes 21/21. Express README documents the factory with a RedisStore example and removes the "No custom rate-limit store" limitation.
 
 - [ ] L-02 Add health route and align tester
   - [ ] tests written
@@ -265,3 +267,7 @@ old limitations.
   `Express.Request.user`, and made cookie reading work without
   `cookie-parser`. Express suite: 34 tests across 3 files; full Turborepo run
   21/21; a temporary dist consumer compiled.
+- 2026-11-24: L-04 complete. Added `CredRateLimitStoreFactory` type and
+  `rateLimitStoreFactory` config option. Factory called once per limiter (11
+  total) because `express-rate-limit` rejects shared stores. Express suite: 38
+  tests across 4 files; full Turborepo run 21/21.

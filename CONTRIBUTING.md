@@ -43,16 +43,16 @@ which uses GitHub private vulnerability reporting.
 
 Workspace members are declared in `pnpm-workspace.yaml` as `apps/*` and `packages/*`.
 
-| Path | Package | Published | Purpose |
-|---|---|---|---|
-| `packages/core` | `@cred-kit/core` | npm | Authentication services, adapter interfaces, errors, validators, and email templates |
-| `packages/express` | `@cred-kit/express` | npm | Express 5 router that mounts the auth, profile, and audit endpoints |
-| `packages/mongo-storage` | `@cred-kit/mongo-storage` | npm | Mongoose models and user, refresh-token, and audit-log adapters |
-| `packages/smtp` | `@cred-kit/smtp` | npm | SMTP (Nodemailer) and Resend email adapters |
-| `packages/shared` | `@cred-kit/shared` | private | Compatibility re-export shim; no package imports it |
-| `packages/config` | `@cred-kit/config` | private | Shared TypeScript configuration files only |
-| `apps/cred-testing` | `cred-testing` | private | Next.js manual API tester |
-| `apps/demo` | `demo` | private | Scratch Express host example; it has no build or start script |
+| Path                     | Package                   | Published | Purpose                                                                              |
+| ------------------------ | ------------------------- | --------- | ------------------------------------------------------------------------------------ |
+| `packages/core`          | `@cred-kit/core`          | npm       | Authentication services, adapter interfaces, errors, validators, and email templates |
+| `packages/express`       | `@cred-kit/express`       | npm       | Express 5 router that mounts the auth, profile, and audit endpoints                  |
+| `packages/mongo-storage` | `@cred-kit/mongo-storage` | npm       | Mongoose models and user, refresh-token, and audit-log adapters                      |
+| `packages/smtp`          | `@cred-kit/smtp`          | npm       | SMTP (Nodemailer) and Resend email adapters                                          |
+| `packages/shared`        | `@cred-kit/shared`        | private   | Compatibility re-export shim; no package imports it                                  |
+| `packages/config`        | `@cred-kit/config`        | private   | Shared TypeScript configuration files only                                           |
+| `apps/cred-testing`      | `cred-testing`            | private   | Next.js manual API tester                                                            |
+| `apps/demo`              | `demo`                    | private   | Scratch Express host example; it has no build or start script                        |
 
 Layering rules as implemented today:
 
@@ -69,11 +69,11 @@ Layering rules as implemented today:
 
 ## Prerequisites
 
-| Requirement | Version | Source |
-|---|---|---|
-| Node.js | 22 or newer | Root `engines.node` and every published package's `engines.node`; CI runs Node 22 and 24 |
-| pnpm | 10.33.2 | Root `packageManager` field |
-| MongoDB | Not required for tests | `@cred-kit/mongo-storage` uses `mongodb-memory-server` |
+| Requirement | Version                | Source                                                                                   |
+| ----------- | ---------------------- | ---------------------------------------------------------------------------------------- |
+| Node.js     | 22 or newer            | Root `engines.node` and every published package's `engines.node`; CI runs Node 22 and 24 |
+| pnpm        | 10.33.2                | Root `packageManager` field                                                              |
+| MongoDB     | Not required for tests | `@cred-kit/mongo-storage` uses `mongodb-memory-server`                                   |
 
 `mongodb-memory-server` downloads a MongoDB binary on the first database-backed test run. On
 Windows this checkout cached MongoDB `8.2.6` at
@@ -103,17 +103,17 @@ These commands were verified on Windows with Node `24.21.0` and pnpm `10.33.2`.
 
 Run these from the repository root:
 
-| Task | Command |
-|---|---|
-| Build all packages | `pnpm build` |
-| Lint all packages with a lint script | `pnpm lint` |
-| Type-check all packages with a typecheck script | `pnpm typecheck` |
-| Run all tests | `pnpm test` |
-| Run all checks through Turborepo | `pnpm turbo run build lint typecheck test` |
-| Run one package's tests | `pnpm --filter @cred-kit/core test` |
-| Run one test file | `pnpm --filter @cred-kit/core exec vitest run src/services/auth.service.test.ts` |
-| Check formatting of one file | `pnpm exec prettier --check <file>` |
-| Format one file | `pnpm exec prettier --write <file>` |
+| Task                                            | Command                                                                          |
+| ----------------------------------------------- | -------------------------------------------------------------------------------- |
+| Build all packages                              | `pnpm build`                                                                     |
+| Lint all packages with a lint script            | `pnpm lint`                                                                      |
+| Type-check all packages with a typecheck script | `pnpm typecheck`                                                                 |
+| Run all tests                                   | `pnpm test`                                                                      |
+| Run all checks through Turborepo                | `pnpm turbo run build lint typecheck test`                                       |
+| Run one package's tests                         | `pnpm --filter @cred-kit/core test`                                              |
+| Run one test file                               | `pnpm --filter @cred-kit/core exec vitest run src/services/auth.service.test.ts` |
+| Check formatting of one file                    | `pnpm exec prettier --check <file>`                                              |
+| Format one file                                 | `pnpm exec prettier --write <file>`                                              |
 
 Package filters also work for the other scripts, for example:
 
@@ -127,12 +127,12 @@ pnpm --filter @cred-kit/express typecheck
 
 Test runners:
 
-| Workspace member | Runner | Files | Tests |
-|---|---|---:|---:|
-| `@cred-kit/core` | Vitest with in-memory fakes | 7 | 138 |
-| `@cred-kit/mongo-storage` | Vitest with `mongodb-memory-server` | 9 | 187 |
-| `@cred-kit/smtp` | Vitest | 5 | 75 |
-| `@cred-kit/express` | Vitest with Supertest and in-memory adapter fakes | 3 | 34 |
+| Workspace member          | Runner                                            | Files | Tests |
+| ------------------------- | ------------------------------------------------- | ----: | ----: |
+| `@cred-kit/core`          | Vitest with in-memory fakes                       |     7 |   138 |
+| `@cred-kit/mongo-storage` | Vitest with `mongodb-memory-server`               |     9 |   187 |
+| `@cred-kit/smtp`          | Vitest                                            |     5 |    75 |
+| `@cred-kit/express`       | Vitest with Supertest and in-memory adapter fakes |     4 |    38 |
 
 The counts above are from the verified run described in the pull request checklist.
 

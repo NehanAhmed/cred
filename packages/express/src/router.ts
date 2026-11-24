@@ -4,7 +4,7 @@ import {
   passwordForgotSchema,
   passwordResetSchema,
   profileSchema,
-  registerSchema,
+  registerSchema
 } from '@cred-kit/core';
 import cookieParser from 'cookie-parser';
 import express, { type Router } from 'express';
@@ -25,15 +25,12 @@ import type { CredCoreDeps, CredLocals } from './types.js';
  * host does not need to mount those globally, and so parsing stays scoped to
  * Cred's own routes.
  */
-export const createRouter = (
-  config: ResolvedCredExpressConfig,
-  deps: CredCoreDeps,
-): Router => {
+export const createRouter = (config: ResolvedCredExpressConfig, deps: CredCoreDeps): Router => {
   const auth = createAuthController(config, deps);
   const profile = createProfileController(config, deps);
   const oauth = createOAuthController(config, deps);
 
-  const limiters = createRateLimiters(config.rateLimits);
+  const limiters = createRateLimiters(config.rateLimits, config.rateLimitStoreFactory);
   const requireAuth = createRequireAuth(config);
 
   const authRouter = express.Router();
@@ -55,13 +52,13 @@ export const createRouter = (
     '/forgot-password',
     limiters.forgotPassword,
     validate(passwordForgotSchema),
-    auth.forgotPassword,
+    auth.forgotPassword
   );
   authRouter.post(
     '/reset-password/:token',
     limiters.resetPassword,
     validate(passwordResetSchema),
-    auth.resetPassword,
+    auth.resetPassword
   );
 
   authRouter.get('/google', limiters.oauth, oauth.startGoogle);
@@ -73,18 +70,13 @@ export const createRouter = (
 
   profileRouter.use(limiters.profile, requireAuth);
   profileRouter.get('/me', profile.getProfile);
-  profileRouter.put(
-    '/me',
-    limiters.profileUpdate,
-    validate(profileSchema),
-    profile.updateProfile,
-  );
+  profileRouter.put('/me', limiters.profileUpdate, validate(profileSchema), profile.updateProfile);
   profileRouter.delete('/me', profile.deleteAccount);
   profileRouter.post(
     '/me/change-password',
     limiters.profileUpdate,
     validate(passwordChangeSchema),
-    profile.updatePassword,
+    profile.updatePassword
   );
   profileRouter.get('/me/audit-logs', profile.getAuditLogs);
 

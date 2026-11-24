@@ -5,10 +5,11 @@ import {
   type CredConfig,
   type EmailAdapter,
   type RefreshTokenDatabaseAdapter,
-  type UserDatabaseAdapter,
+  type UserDatabaseAdapter
 } from '@cred-kit/core';
 import type { MongooseStorageOptions } from '@cred-kit/mongo-storage';
 import type { emailServiceOptions } from '@cred-kit/smtp';
+import type { Store } from 'express-rate-limit';
 
 const PREFIX = '@cred-kit/express';
 
@@ -120,6 +121,14 @@ export type CredRateLimitsInput = {
   [K in keyof CredRateLimits]?: Partial<CredRateLimitRule>;
 };
 
+/**
+ * Creates one rate-limit store per limiter. Supply a shared backend store
+ * (Redis, a database, ...) for multi-process deployments. The factory is
+ * called once for each limiter because `express-rate-limit` rejects sharing a
+ * single store instance between limiter instances.
+ */
+export type CredRateLimitStoreFactory = () => Store;
+
 /** Minimal logger contract; `console` satisfies it. */
 export interface CredErrorLogger {
   error(...args: unknown[]): void;
@@ -152,6 +161,12 @@ export interface CredExpressConfig {
   oauth?: CredOAuthConfig;
   cookies?: CredCookieConfig;
   rateLimits?: CredRateLimitsInput;
+  /**
+   * Factory for the rate-limit store. Called once per limiter so each limiter
+   * gets its own instance. Defaults to `express-rate-limit`'s in-memory store;
+   * supply a shared backend for multi-process deployments.
+   */
+  rateLimitStoreFactory?: CredRateLimitStoreFactory;
   /** Core tunables (token lifetimes, bcrypt rounds, lockout policy, ...). */
   core?: Partial<CredConfig>;
   /** JSON body limit for the mounted router. Defaults to `10kb`. */
@@ -182,6 +197,7 @@ export interface ResolvedCredExpressConfig {
   oauth: CredOAuthConfig;
   cookies: ResolvedCredCookieConfig;
   rateLimits: CredRateLimits;
+  rateLimitStoreFactory?: CredRateLimitStoreFactory;
   core: CredConfig;
   jsonBodyLimit: string;
   logger: CredErrorLogger;
@@ -195,58 +211,58 @@ export const defaultCredRateLimits: CredRateLimits = {
   auth: {
     windowMs: 15 * 60 * 1000,
     max: 20,
-    message: 'Too many authentication attempts, please try again later.',
+    message: 'Too many authentication attempts, please try again later.'
   },
   login: {
     windowMs: 15 * 60 * 1000,
     max: 5,
-    message: 'Too many login attempts, please try again in 15 minutes.',
+    message: 'Too many login attempts, please try again in 15 minutes.'
   },
   register: {
     windowMs: 60 * 60 * 1000,
     max: 3,
-    message: 'Too many registration attempts, please try again in 60 minutes.',
+    message: 'Too many registration attempts, please try again in 60 minutes.'
   },
   forgotPassword: {
     windowMs: 60 * 60 * 1000,
     max: 3,
-    message: 'Too many password reset attempts, please try again in 60 minutes.',
+    message: 'Too many password reset attempts, please try again in 60 minutes.'
   },
   refresh: {
     windowMs: 15 * 60 * 1000,
     max: 10,
-    message: 'Too many refresh attempts, please try again in 15 minutes.',
+    message: 'Too many refresh attempts, please try again in 15 minutes.'
   },
   verifyEmail: {
     windowMs: 15 * 60 * 1000,
     max: 10,
-    message: 'Too many verification attempts, please try again later.',
+    message: 'Too many verification attempts, please try again later.'
   },
   resetPassword: {
     windowMs: 15 * 60 * 1000,
     max: 5,
-    message: 'Too many password reset attempts, please try again later.',
+    message: 'Too many password reset attempts, please try again later.'
   },
   logout: {
     windowMs: 15 * 60 * 1000,
     max: 20,
-    message: 'Too many logout attempts, please try again later.',
+    message: 'Too many logout attempts, please try again later.'
   },
   oauth: {
     windowMs: 15 * 60 * 1000,
     max: 10,
-    message: 'Too many OAuth attempts, please try again later.',
+    message: 'Too many OAuth attempts, please try again later.'
   },
   profile: {
     windowMs: 15 * 60 * 1000,
     max: 50,
-    message: 'Too many profile requests, please try again later.',
+    message: 'Too many profile requests, please try again later.'
   },
   profileUpdate: {
     windowMs: 15 * 60 * 1000,
     max: 50,
-    message: 'Too many profile update attempts, please try again later.',
-  },
+    message: 'Too many profile update attempts, please try again later.'
+  }
 };
 
 const USER_ADAPTER_METHODS = [
@@ -256,7 +272,7 @@ const USER_ADAPTER_METHODS = [
   'update',
   'findOneByTwoConditions',
   'incrementLoginAttempts',
-  'findOneAndUpdate',
+  'findOneAndUpdate'
 ] as const;
 
 const REFRESH_ADAPTER_METHODS = [
@@ -265,7 +281,7 @@ const REFRESH_ADAPTER_METHODS = [
   'delete',
   'update',
   'findOneAndUpdate',
-  'deleteMany',
+  'deleteMany'
 ] as const;
 
 const AUDIT_ADAPTER_METHODS = ['create', 'find', 'count'] as const;
@@ -305,7 +321,7 @@ const readUrl = (name: string, value: unknown): string => {
     url = new URL(raw);
   } catch (error) {
     throw new Error(`${PREFIX}: "${name}" must be an absolute URL, received "${raw}"`, {
-      cause: error,
+      cause: error
     });
   }
 
@@ -357,7 +373,7 @@ const readSameSite = (value: unknown): CredSameSite => {
 
   if (value !== 'strict' && value !== 'lax' && value !== 'none') {
     throw new Error(
-      `${PREFIX}: "cookies.sameSite" must be "strict", "lax", or "none", received "${String(value)}"`,
+      `${PREFIX}: "cookies.sameSite" must be "strict", "lax", or "none", received "${String(value)}"`
     );
   }
 
@@ -373,18 +389,14 @@ const readBodyLimit = (value: unknown): string => {
 
   if (!/^\d+(?:\.\d+)?\s*(?:b|kb|mb|gb|tb|pb)?$/i.test(raw)) {
     throw new Error(
-      `${PREFIX}: "jsonBodyLimit" must be a size such as "10kb" or "1mb", received "${raw}"`,
+      `${PREFIX}: "jsonBodyLimit" must be a size such as "10kb" or "1mb", received "${raw}"`
     );
   }
 
   return raw;
 };
 
-const assertAdapter = (
-  name: string,
-  value: unknown,
-  methods: readonly string[],
-): void => {
+const assertAdapter = (name: string, value: unknown, methods: readonly string[]): void => {
   if (!isRecord(value)) {
     throw new Error(`${PREFIX}: "${name}" adapter is required`);
   }
@@ -393,7 +405,7 @@ const assertAdapter = (
 
   if (missing.length > 0) {
     throw new Error(
-      `${PREFIX}: "${name}" adapter is missing required method(s): ${missing.join(', ')}`,
+      `${PREFIX}: "${name}" adapter is missing required method(s): ${missing.join(', ')}`
     );
   }
 };
@@ -418,7 +430,7 @@ const resolveDatabase = (value: unknown): ResolvedCredDatabase => {
 
   if (hasOptions && hasAdapters) {
     throw new Error(
-      `${PREFIX}: "database" cannot combine "uri"/"connection" options with prebuilt adapters`,
+      `${PREFIX}: "database" cannot combine "uri"/"connection" options with prebuilt adapters`
     );
   }
 
@@ -430,7 +442,7 @@ const resolveDatabase = (value: unknown): ResolvedCredDatabase => {
     if (value.uri !== undefined) {
       return {
         kind: 'mongoose',
-        options: { uri: readRequiredString('database.uri', value.uri) },
+        options: { uri: readRequiredString('database.uri', value.uri) }
       };
     }
 
@@ -440,7 +452,7 @@ const resolveDatabase = (value: unknown): ResolvedCredDatabase => {
 
     return {
       kind: 'mongoose',
-      options: { connection: value.connection } as unknown as CredMongoStorageOptions,
+      options: { connection: value.connection } as unknown as CredMongoStorageOptions
     };
   }
 
@@ -457,13 +469,13 @@ const resolveDatabase = (value: unknown): ResolvedCredDatabase => {
       adapters: {
         user: value.user as UserDatabaseAdapter,
         refreshToken: value.refreshToken as RefreshTokenDatabaseAdapter,
-        audit: value.audit as AuditDatabaseAdapter | undefined,
-      },
+        audit: value.audit as AuditDatabaseAdapter | undefined
+      }
     };
   }
 
   throw new Error(
-    `${PREFIX}: "database" must provide MongoDB options ("uri" or "connection") or prebuilt adapters ("user" and "refreshToken")`,
+    `${PREFIX}: "database" must provide MongoDB options ("uri" or "connection") or prebuilt adapters ("user" and "refreshToken")`
   );
 };
 
@@ -486,7 +498,7 @@ const resolveEmail = (value: unknown): ResolvedCredEmail => {
 
   if (value.EMAIL_FROM === undefined && value.BACKEND_URL === undefined) {
     throw new Error(
-      `${PREFIX}: "email" must provide email service options ("EMAIL_FROM" and "BACKEND_URL") or a prebuilt EmailAdapter`,
+      `${PREFIX}: "email" must provide email service options ("EMAIL_FROM" and "BACKEND_URL") or a prebuilt EmailAdapter`
     );
   }
 
@@ -495,15 +507,15 @@ const resolveEmail = (value: unknown): ResolvedCredEmail => {
     options: {
       ...value,
       EMAIL_FROM: readRequiredString('email.EMAIL_FROM', value.EMAIL_FROM),
-      BACKEND_URL: readUrl('email.BACKEND_URL', value.BACKEND_URL),
-    } as unknown as CredEmailServiceOptions,
+      BACKEND_URL: readUrl('email.BACKEND_URL', value.BACKEND_URL)
+    } as unknown as CredEmailServiceOptions
   };
 };
 
 const resolveCookies = (
   overrides: CredCookieConfig | undefined,
   core: CredConfig,
-  isProduction: boolean,
+  isProduction: boolean
 ): ResolvedCredCookieConfig => {
   if (overrides !== undefined && !isRecord(overrides)) {
     throw new Error(`${PREFIX}: "cookies" must be an object`);
@@ -514,12 +526,14 @@ const resolveCookies = (
   const sameSite = readSameSite(input.sameSite);
 
   if (sameSite === 'none' && !secure) {
-    throw new Error(`${PREFIX}: "cookies.sameSite" cannot be "none" while "cookies.secure" is false`);
+    throw new Error(
+      `${PREFIX}: "cookies.sameSite" cannot be "none" while "cookies.secure" is false`
+    );
   }
 
   const accessTokenPath = readRequiredString(
     'cookies.accessTokenPath',
-    input.accessTokenPath ?? '/',
+    input.accessTokenPath ?? '/'
   );
 
   if (!accessTokenPath.startsWith('/')) {
@@ -528,17 +542,17 @@ const resolveCookies = (
 
   const refreshTokenMaxAgeMs = readPositiveInteger(
     'cookies.refreshTokenMaxAgeMs',
-    input.refreshTokenMaxAgeMs ?? core.refreshTokenTtlMs,
+    input.refreshTokenMaxAgeMs ?? core.refreshTokenTtlMs
   );
 
   return {
     accessTokenName: readRequiredString(
       'cookies.accessTokenName',
-      input.accessTokenName ?? 'token',
+      input.accessTokenName ?? 'token'
     ),
     refreshTokenName: readRequiredString(
       'cookies.refreshTokenName',
-      input.refreshTokenName ?? 'refreshToken',
+      input.refreshTokenName ?? 'refreshToken'
     ),
     secure,
     sameSite,
@@ -546,9 +560,9 @@ const resolveCookies = (
     accessTokenPath,
     accessTokenMaxAgeMs: readPositiveInteger(
       'cookies.accessTokenMaxAgeMs',
-      input.accessTokenMaxAgeMs ?? 15 * 60 * 1000,
+      input.accessTokenMaxAgeMs ?? 15 * 60 * 1000
     ),
-    refreshTokenMaxAgeMs,
+    refreshTokenMaxAgeMs
   };
 };
 
@@ -573,8 +587,8 @@ const resolveOAuth = (oauth: CredOAuthConfig | undefined): CredOAuthConfig => {
       clientId: readRequiredString(`oauth.${provider}.clientId`, providerConfig.clientId),
       clientSecret: readRequiredString(
         `oauth.${provider}.clientSecret`,
-        providerConfig.clientSecret,
-      ),
+        providerConfig.clientSecret
+      )
     };
   }
 
@@ -584,7 +598,7 @@ const resolveOAuth = (oauth: CredOAuthConfig | undefined): CredOAuthConfig => {
 const resolveRateLimitRule = (
   name: keyof CredRateLimits,
   defaults: CredRateLimitRule,
-  override: Partial<CredRateLimitRule> | undefined,
+  override: Partial<CredRateLimitRule> | undefined
 ): CredRateLimitRule => {
   if (override !== undefined && !isRecord(override)) {
     throw new Error(`${PREFIX}: "rateLimits.${name}" must be an object`);
@@ -595,14 +609,12 @@ const resolveRateLimitRule = (
   return {
     windowMs: readPositiveInteger(`rateLimits.${name}.windowMs`, value.windowMs),
     max: readPositiveInteger(`rateLimits.${name}.max`, value.max),
-    message: readRequiredString(`rateLimits.${name}.message`, value.message),
+    message: readRequiredString(`rateLimits.${name}.message`, value.message)
   };
 };
 
 /** Merges caller overrides over the default rate-limit table. */
-export const resolveCredRateLimits = (
-  overrides: CredRateLimitsInput = {},
-): CredRateLimits => {
+export const resolveCredRateLimits = (overrides: CredRateLimitsInput = {}): CredRateLimits => {
   if (!isRecord(overrides)) {
     throw new Error(`${PREFIX}: "rateLimits" must be an object`);
   }
@@ -614,18 +626,18 @@ export const resolveCredRateLimits = (
     forgotPassword: resolveRateLimitRule(
       'forgotPassword',
       defaultCredRateLimits.forgotPassword,
-      overrides.forgotPassword,
+      overrides.forgotPassword
     ),
     refresh: resolveRateLimitRule('refresh', defaultCredRateLimits.refresh, overrides.refresh),
     verifyEmail: resolveRateLimitRule(
       'verifyEmail',
       defaultCredRateLimits.verifyEmail,
-      overrides.verifyEmail,
+      overrides.verifyEmail
     ),
     resetPassword: resolveRateLimitRule(
       'resetPassword',
       defaultCredRateLimits.resetPassword,
-      overrides.resetPassword,
+      overrides.resetPassword
     ),
     logout: resolveRateLimitRule('logout', defaultCredRateLimits.logout, overrides.logout),
     oauth: resolveRateLimitRule('oauth', defaultCredRateLimits.oauth, overrides.oauth),
@@ -633,8 +645,8 @@ export const resolveCredRateLimits = (
     profileUpdate: resolveRateLimitRule(
       'profileUpdate',
       defaultCredRateLimits.profileUpdate,
-      overrides.profileUpdate,
-    ),
+      overrides.profileUpdate
+    )
   };
 };
 
@@ -648,15 +660,25 @@ const resolveLogger = (logger: CredErrorLogger | undefined): CredErrorLogger => 
   return logger;
 };
 
+const resolveRateLimitStoreFactory = (
+  factory: CredRateLimitStoreFactory | undefined
+): CredRateLimitStoreFactory | undefined => {
+  if (factory === undefined) return undefined;
+
+  if (typeof factory !== 'function') {
+    throw new Error(`${PREFIX}: "rateLimitStoreFactory" must be a function`);
+  }
+
+  return factory;
+};
+
 /**
  * Validates a user configuration and fills in defaults.
  *
  * Throws a descriptive error before any route is mounted so configuration
  * mistakes surface at startup rather than on the first request.
  */
-export const resolveCredConfig = (
-  userConfig: CredExpressConfig,
-): ResolvedCredExpressConfig => {
+export const resolveCredConfig = (userConfig: CredExpressConfig): ResolvedCredExpressConfig => {
   if (!isRecord(userConfig)) {
     throw new Error(`${PREFIX}: configuration object is required`);
   }
@@ -673,7 +695,7 @@ export const resolveCredConfig = (
   } catch (error) {
     throw new Error(
       `${PREFIX}: ${error instanceof Error ? error.message : 'invalid "jwtSecret" configuration'}`,
-      { cause: error },
+      { cause: error }
     );
   }
 
@@ -690,16 +712,17 @@ export const resolveCredConfig = (
     oauth: resolveOAuth(userConfig.oauth),
     cookies: resolveCookies(userConfig.cookies, core, isProduction),
     rateLimits: resolveCredRateLimits(userConfig.rateLimits),
+    rateLimitStoreFactory: resolveRateLimitStoreFactory(userConfig.rateLimitStoreFactory),
     core,
     jsonBodyLimit: readBodyLimit(userConfig.jsonBodyLimit),
-    logger: resolveLogger(userConfig.logger),
+    logger: resolveLogger(userConfig.logger)
   };
 };
 
 /** Builds the config object expected by core's token-issuing services. */
 export const createCoreAuthConfig = (
-  config: ResolvedCredExpressConfig,
+  config: ResolvedCredExpressConfig
 ): { jwtSecret: string } & CredConfig => ({
   jwtSecret: config.jwtSecret,
-  ...config.core,
+  ...config.core
 });
