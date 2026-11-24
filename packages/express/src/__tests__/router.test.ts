@@ -104,6 +104,48 @@ describe('OAuth routes', () => {
     expect(stateCookie).toContain('SameSite=Lax');
     expect(stateCookie).toContain('Path=/api/auth');
     expect(stateCookie).toContain('Max-Age=600');
+    expect(stateCookie).not.toContain('Secure');
+  });
+
+  it('marks the oauth_state cookie Secure when cookies.secure is enabled', async () => {
+    const { app } = createTestApp({
+      oauth: GOOGLE_OAUTH,
+      cookies: { secure: true }
+    });
+
+    const response = await request(app).get('/api/auth/google');
+
+    expect(response.status).toBe(302);
+    expect(findCookie(getSetCookies(response), 'oauth_state')).toContain('Secure');
+  });
+
+  it('clears the oauth_state cookie without Secure outside production', async () => {
+    const { app } = createTestApp();
+
+    const response = await request(app)
+      .get('/api/auth/google/callback')
+      .query({ state: 'matching-state' })
+      .set('Cookie', 'oauth_state=matching-state');
+
+    expect(response.status).toBe(302);
+    expect(response.headers.location).toBe('http://localhost:3000/login?error=google_auth_failed');
+
+    const cleared = findCookie(getSetCookies(response), 'oauth_state');
+    expect(cookieValue(cleared)).toBe('');
+    expect(cleared).toContain('Path=/api/auth');
+    expect(cleared).not.toContain('Secure');
+  });
+
+  it('clears the oauth_state cookie with Secure when configured', async () => {
+    const { app } = createTestApp({ cookies: { secure: true } });
+
+    const response = await request(app)
+      .get('/api/auth/google/callback')
+      .query({ state: 'matching-state' })
+      .set('Cookie', 'oauth_state=matching-state');
+
+    expect(response.status).toBe(302);
+    expect(findCookie(getSetCookies(response), 'oauth_state')).toContain('Secure');
   });
 
   it('redirects to the client when the provider is not configured', async () => {

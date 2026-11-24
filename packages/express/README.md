@@ -773,10 +773,12 @@ Provider details:
 State handling:
 
 1. `GET /auth/{provider}` generates 32 random bytes as a hex state value.
-2. The state is stored in the `oauth_state` cookie (`httpOnly`, `sameSite=lax`, path `${basePath}/auth`, 10 minutes).
+2. The state is stored in the `oauth_state` cookie (`httpOnly`, `sameSite=lax`, path `${basePath}/auth`, 10 minutes, `secure` from config).
 3. The state is sent to the provider as the `state` query parameter.
 4. `GET /auth/{provider}/callback` compares the cookie with the query value. Missing or unequal values redirect to `${clientUrl}/login?error=oauth_state_mismatch`.
 5. On a match, the state cookie is cleared before the code exchange.
+
+The state cookie follows `cookies.secure`, which defaults to `NODE_ENV === 'production'`. OAuth therefore works over plain HTTP on a non-localhost development origin when `cookies.secure` is `false`; production deployments should keep it `true` and serve over HTTPS.
 
 OAuth outcomes:
 
@@ -993,7 +995,7 @@ Verified in this checkout:
 - `pnpm --filter @cred-kit/express build` passes and produces `dist/index.mjs` (about 47 kB) and `dist/index.d.mts` (about 10 kB).
 - `pnpm --filter @cred-kit/express typecheck` passes.
 - `pnpm --filter @cred-kit/express lint` passes.
-- `pnpm --filter @cred-kit/express test` passes: **22 tests across 2 files** (`auth`, `router`).
+- `pnpm --filter @cred-kit/express test` passes: **25 tests across 2 files** (`auth`, `router`).
 - `pnpm --filter @cred-kit/express pack --dry-run` lists `dist/index.d.mts`, `dist/index.mjs`, `package.json`, and `README.md`.
 
 The tests are HTTP-level characterization tests built with Vitest and Supertest. They mount the real router on an Express app with in-memory core adapter fakes, so no MongoDB or SMTP connection is required. Coverage includes registration and verification, login and cookie attributes, refresh rotation, logout, CSRF enforcement, JSON body limits, `AuthError` and unknown-error mapping, router mounts and 404s, auth rate limiting, OAuth start redirects and state validation, and authenticated profile access.

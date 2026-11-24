@@ -1,7 +1,7 @@
 # Known Limitations Checklist
 
-Progress: **5 / 13 tasks complete** (5 done, 0 in progress, 0 blocked, 0 skipped).
-Phases 0-2 complete. Phase 3: L-07 done; L-08 next.
+Progress: **6 / 13 tasks complete** (6 done, 0 in progress, 0 blocked, 0 skipped).
+Phases 0-2 complete. Phase 3: L-08 done; L-05 next.
 
 States: `[ ]` not started, `[~]` in progress (only one at a time), `[x]` done
 and verified, `[!]` blocked (needs owner decision), `[-]` skipped with reason.
@@ -117,11 +117,21 @@ and typecheck pass; full Turborepo run passes 21/21. The smtp README, express
 README, root README, and CONTRIBUTING were updated with the option, the
 `basePath`/`authPathPrefix` independence rule, and the new counts.
 
-- [ ] L-08 Make `oauth_state` follow resolved cookie security
-  - [ ] tests written
-  - [ ] implementation
-  - [ ] verification passed
-  - [ ] docs updated
+- [x] L-08 Make `oauth_state` follow resolved cookie security
+  - [x] tests written
+  - [x] implementation
+  - [x] verification passed
+  - [x] docs updated
+
+**Evidence:** Removed the two hardcoded `secure: true` overrides in
+`setOAuthStateCookie` and `clearOAuthStateCookie`; both now inherit
+`config.cookies.secure` from `commonOptions`. Added four characterization
+tests: the start cookie omits `Secure` outside production, includes it when
+`cookies.secure: true`, and the clear cookie follows the same rule. `pnpm
+--filter @cred-kit/express test` passes: **25 tests across 2 files**. Full
+Turborepo run passes 21/21. Root and express READMEs now state that the state
+cookie follows the resolved cookie security and remove the "OAuth requires
+HTTPS or localhost" limitation.
 
 - [ ] L-05 Export auth guard and `req.user` typing
   - [ ] tests written
@@ -232,3 +242,6 @@ README, root README, and CONTRIBUTING were updated with the option, the
   `authPathPrefix` option (default `/api/auth`) with validation, used it for
   both email links, and documented the independent `basePath` pairing. Smtp
   suite: 75 tests across 5 files; full Turborepo run 21/21.
+- 2026-11-24: L-08 complete. The `oauth_state` cookie now follows the
+  resolved `cookies.secure` setting for both set and clear. Express suite:
+  25 tests across 2 files; full Turborepo run 21/21.

@@ -30,7 +30,7 @@ an HTTP-level Vitest suite that mounts the router with in-memory adapter fakes.
 | `@cred-kit/core` | 0.1.0 | npm | 138 in 7 files | Implemented and tested |
 | `@cred-kit/mongo-storage` | 0.1.0 | npm | 187 in 9 files | Implemented and tested |
 | `@cred-kit/smtp` | 0.1.0 | npm | 75 in 5 files | Implemented and tested |
-| `@cred-kit/express` | 0.1.0 | npm | 22 in 2 files | Implemented and tested |
+| `@cred-kit/express` | 0.1.0 | npm | 25 in 2 files | Implemented and tested |
 | `@cred-kit/shared` | 0.0.0 | private | none | Compatibility re-export shim |
 | `@cred-kit/config` | 0.0.0 | private | n/a | Shared TypeScript configs only |
 | `apps/cred-testing` | 0.0.1 | private | none | Manual Next.js tester; partially aligned |
@@ -459,7 +459,7 @@ application and passed into `credExpress`.
 | Access token | `token` | `/` | 15 min | `httpOnly`, `sameSite=strict` by default, `secure` in production by default |
 | Refresh token | `refreshToken` | `${basePath}/auth` | 7 days | `httpOnly`, `sameSite=strict` by default, `secure` in production by default, AES-256-GCM encrypted value |
 | CSRF token | `csrfToken` | `/` | 7 days | not `httpOnly`, `sameSite=strict` by default, `secure` in production by default |
-| OAuth state | `oauth_state` | `${basePath}/auth` | 10 min | `httpOnly`, `sameSite=lax`, `secure: true` always |
+| OAuth state | `oauth_state` | `${basePath}/auth` | 10 min | `httpOnly`, `sameSite=lax`, `secure` in production by default |
 
 The refresh-token cookie value is encrypted with AES-256-GCM using a key derived from `jwtSecret`.
 The access token and refresh token lifetimes are configured separately: the JWT expiry comes from
@@ -487,8 +487,6 @@ you do.
 - **`basePath` must match the mount path.** A mismatch scopes the refresh cookie to the wrong path
   and builds the wrong OAuth callback URL. With the bundled SMTP options, also set
   `email.authPathPrefix` to `${basePath}/auth`; the two values are configured independently.
-- **OAuth requires HTTPS or localhost.** The `oauth_state` cookie is always `secure: true`, so
-  browsers will not send it over plain HTTP on a non-localhost origin.
 - **Linking a local account through OAuth changes its login method.** The account's `provider` is
   set to `google` or `github`, and password login and password change are then rejected.
 - **`pnpm format:check` is not a clean gate.** The command runs, but it reports 136
@@ -570,7 +568,7 @@ The root `pnpm test` runs the Vitest suites in the three tested packages:
 | `@cred-kit/core` | Vitest with in-memory fakes | 7 | 138 | Registration, verification, login and lockout, refresh rotation and replay, password reset, OAuth linking, profiles, audit pagination, token helpers, validators |
 | `@cred-kit/mongo-storage` | Vitest + `mongodb-memory-server` | 9 | 187 | User, refresh-token, and audit models and adapters, indexes, TTLs, and atomic updates |
 | `@cred-kit/smtp` | Vitest | 5 | 75 | SMTP transport options, Resend HTTP behavior, retries, link construction, and email templates |
-| `@cred-kit/express` | Vitest with Supertest and in-memory adapter fakes | 2 | 22 | Registration, login, refresh, logout, CSRF, rate limiting, OAuth start/state, error mapping, and profile access |
+| `@cred-kit/express` | Vitest with Supertest and in-memory adapter fakes | 2 | 25 | Registration, login, refresh, logout, CSRF, rate limiting, OAuth start/state, error mapping, and profile access |
 | `apps/cred-testing` | none | 0 | 0 | No tests |
 
 That is **390 tests across 21 files**. The first DB-backed run downloads a MongoDB binary for
