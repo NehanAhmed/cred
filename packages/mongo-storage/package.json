@@ -65,13 +65,13 @@
   },
   "peerDependencies": {
     "@cred-kit/core": "workspace:*",
-    "mongoose": "^9.7.0"
+    "mongoose": "^9.11.4"
   },
   "devDependencies": {
     "@cred-kit/core": "workspace:*",
     "@types/node": "^26.6.6",
     "eslint": "^10.15.0",
-    "mongoose": "^9.7.0",
+    "mongoose": "^9.11.4",
     "mongodb-memory-server": "^11.2.0",
     "tsdown": "^0.23.7",
     "typescript": "^6.0.3",
