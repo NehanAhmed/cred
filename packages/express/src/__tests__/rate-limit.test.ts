@@ -25,7 +25,9 @@ describe('rateLimitStoreFactory', () => {
     const stores: MemoryStore[] = [];
 
     createTestApp({
-      rateLimitStoreFactory: () => {
+      rateLimitStoreFactory: (keyPrefix) => {
+        expect(typeof keyPrefix).toBe('string');
+        expect(keyPrefix.length).toBeGreaterThan(0);
         const store = new MemoryStore();
         stores.push(store);
         return store;
@@ -40,7 +42,8 @@ describe('rateLimitStoreFactory', () => {
     const stores: SpyStore[] = [];
 
     const { app } = createTestApp({
-      rateLimitStoreFactory: () => {
+      rateLimitStoreFactory: (keyPrefix) => {
+        expect(typeof keyPrefix).toBe('string');
         const store = new SpyStore();
         stores.push(store);
         return store;

@@ -38,6 +38,17 @@ describe('auth routes', () => {
     expect(fakes.users.users[0].isVerified).toBe(true);
   });
 
+  it('redirects password-reset email links to the client reset page', async () => {
+    const { app } = createTestApp();
+
+    const response = await request(app).get('/api/auth/reset-password/reset-token-123');
+
+    expect(response.status).toBe(302);
+    expect(response.headers.location).toBe(
+      'http://localhost:3000/reset-password?token=reset-token-123'
+    );
+  });
+
   it('redirects to verified=false for an invalid verification token', async () => {
     const { app } = createTestApp();
 

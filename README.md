@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://ik.imagekit.io/td7wr0ax7o/Gemini_Generated_Image_cwp7cbcwp7cbcwp7.clean.png" alt="Cred banner" width="100%">
+  <img src="https://ik.imagekit.io/td7wr0ax7o/Cred%20Authentication_%20In%20One%20Mount.png" alt="Cred banner" width="100%">
 </p>
 
 <p align="center">
@@ -29,8 +29,8 @@ an HTTP-level Vitest suite that mounts the router with in-memory adapter fakes.
 | ------------------------- | ------: | -------- | -------------: | ---------------------------------------- |
 | `@cred-kit/core`          |   0.1.0 | npm      | 138 in 7 files | Implemented and tested                   |
 | `@cred-kit/mongo-storage` |   0.1.0 | npm      | 187 in 9 files | Implemented and tested                   |
-| `@cred-kit/smtp`          |   0.1.0 | npm      |  75 in 5 files | Implemented and tested                   |
-| `@cred-kit/express`       |   0.1.0 | npm      |  38 in 4 files | Implemented and tested                   |
+| `@cred-kit/smtp`          |   0.1.0 | npm      |  77 in 5 files | Implemented and tested                   |
+| `@cred-kit/express`       |   0.1.0 | npm      |  46 in 5 files | Implemented and tested                   |
 | `@cred-kit/shared`        |   0.0.0 | private  |           none | Compatibility re-export shim             |
 | `@cred-kit/config`        |   0.0.0 | private  |            n/a | Shared TypeScript configs only           |
 | `apps/cred-testing`       |   0.0.1 | private  |           none | Manual Next.js tester; partially aligned |
@@ -269,6 +269,7 @@ Routes are relative to the mount point. With the default `basePath: '/api'`, the
 | `GET`    | `/api/auth/csrf-token`            | Public         | Return the CSRF token and ensure the `csrfToken` cookie is set |
 | `GET`    | `/api/auth/verify-email/:token`   | Public         | Verify an email address; always redirects to the client        |
 | `POST`   | `/api/auth/forgot-password`       | Public         | Request a reset link; always returns the same message          |
+| `GET`    | `/api/auth/reset-password/:token` | Public         | Redirect the reset email link to the client reset page         |
 | `POST`   | `/api/auth/reset-password/:token` | Public         | Reset a password with a one-time token                         |
 | `GET`    | `/api/auth/google`                | Public         | Start Google OAuth                                             |
 | `GET`    | `/api/auth/google/callback`       | Public         | Finish Google OAuth                                            |
@@ -279,9 +280,9 @@ Routes are relative to the mount point. With the default `basePath: '/api'`, the
 | `DELETE` | `/api/profile/me`                 | Access cookie  | Delete the account, revoke refresh tokens, and clear cookies   |
 | `POST`   | `/api/profile/me/change-password` | Access cookie  | Change the password using the current password                 |
 | `GET`    | `/api/profile/me/audit-logs`      | Access cookie  | Return paginated audit logs, newest first                      |
+| `GET`    | `/api/health`                     | Public         | Check adapter health; does not set CSRF cookies                |
 
-There is no health endpoint in `@cred-kit/express`. Unmatched paths fall through to the host
-application's 404 handler.
+Unmatched paths fall through to the host application's 404 handler.
 
 ### Response format
 
@@ -342,17 +343,19 @@ rather than on the first request.
 ```ts
 // Build the bundled MongoDB adapter.
 database: {
-  uri: process.env.MONGO_URI!;
+  uri: process.env.MONGO_URI!
 }
 
 // Use an existing Mongoose connection.
 database: {
-  connection: existingMongooseConnection;
+  connection: existingMongooseConnection
 }
 
 // Supply prebuilt core adapters.
 database: {
-  (user, refreshToken, audit);
+  user,
+  refreshToken,
+  audit // optional
 }
 ```
 
@@ -483,7 +486,9 @@ you do.
 ## Known limitations
 
 - **No CORS, helmet, or proxy configuration.** These remain host responsibilities.
-- **No custom rate-limit store.** Counters are in memory and are not shared across processes.
+- **Rate-limit stores are in-memory by default.** Counters are per process. Pass
+  `rateLimitStoreFactory` to share them across processes; the factory receives a distinct key
+  prefix per limiter.
 - **ESM-only.** The packages publish `dist/index.mjs` and `dist/index.d.mts` with no CommonJS
   `require` condition.
 - **`basePath` must match the mount path.** A mismatch scopes the refresh cookie to the wrong path
@@ -563,17 +568,17 @@ dry-run.
 
 ## Testing
 
-The root `pnpm test` runs the Vitest suites in the three tested packages:
+The root `pnpm test` runs the Vitest suites in the four tested packages:
 
 | Package                   | Framework                                         | Files | Tests | Coverage focus                                                                                                                                                   |
 | ------------------------- | ------------------------------------------------- | ----: | ----: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@cred-kit/core`          | Vitest with in-memory fakes                       |     7 |   138 | Registration, verification, login and lockout, refresh rotation and replay, password reset, OAuth linking, profiles, audit pagination, token helpers, validators |
 | `@cred-kit/mongo-storage` | Vitest + `mongodb-memory-server`                  |     9 |   187 | User, refresh-token, and audit models and adapters, indexes, TTLs, and atomic updates                                                                            |
-| `@cred-kit/smtp`          | Vitest                                            |     5 |    75 | SMTP transport options, Resend HTTP behavior, retries, link construction, and email templates                                                                    |
-| `@cred-kit/express`       | Vitest with Supertest and in-memory adapter fakes |     4 |    38 | Registration, login, refresh, logout, CSRF, rate limiting, OAuth start/state, auth guard, rate-limit store, error mapping, and profile access                    |
+| `@cred-kit/smtp`          | Vitest                                            |     5 |    77 | SMTP transport options, Resend HTTP behavior, retries, link construction, and email templates                                                                    |
+| `@cred-kit/express`       | Vitest with Supertest and in-memory adapter fakes |     5 |    46 | Registration, login, refresh, logout, CSRF, rate limiting, OAuth start/state, auth guard, rate-limit store, error mapping, and profile access                    |
 | `apps/cred-testing`       | none                                              |     0 |     0 | No tests                                                                                                                                                         |
 
-That is **390 tests across 21 files**. The first DB-backed run downloads a MongoDB binary for
+That is **448 tests across 26 files**. The first DB-backed run downloads a MongoDB binary for
 `mongodb-memory-server`; CI caches it under `.mongodb-binaries`.
 
 ## Roadmap

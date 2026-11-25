@@ -25,13 +25,13 @@ export function HealthCheck() {
           {isPending ? "Checking..." : "Check Health"}
         </Button>
         {isHealthy && (
-          <Badge className="gap-1.5 bg-green-600 text-white">
+          <Badge variant="default" className="gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-current" />
             Healthy
           </Badge>
         )}
         {result?.kind === "api-error" && (
-          <Badge className="gap-1.5 bg-red-600 text-white">
+          <Badge variant="destructive" className="gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-current" />
             Unavailable
           </Badge>

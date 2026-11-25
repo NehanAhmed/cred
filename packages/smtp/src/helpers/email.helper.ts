@@ -100,7 +100,7 @@ const parseAuthPathPrefix = (value: string | undefined): string => {
     throw new Error(`${PREFIX}: "authPathPrefix" must not end with "/", received "${value}"`);
   }
 
-  if (value.includes('?') || value.includes('#') || /\s/.test(value)) {
+  if (value.includes('?') || value.includes('#') || /\s/.test(value) || value.includes('"') || value.includes("'")) {
     throw new Error(`${PREFIX}: "authPathPrefix" must be a plain URL path, received "${value}"`);
   }
 

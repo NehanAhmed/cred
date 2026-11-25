@@ -5,13 +5,14 @@ pnpm/Turborepo monorepo. There is no frontend and no CI in this repository. The 
 packages (`@cred-kit/express`, `@cred-kit/core`, `@cred-kit/mongo-storage`, `@cred-kit/smtp`)
 are published separately; `apps/cred-testing` and `apps/demo` are private example apps.
 
-## Project state (verified 2026-11-24)
+## Project state (verified 2026-11-25)
 
 - `pnpm build` passes: Turborepo builds all packages (`tsup` for shared, `tsdown` for
-  express/core/mongo-storage/smtp).
-- Vitest defines **122 tests across 4 packages**: core 138 in 7 files, mongo-storage 40 in 3 files,
-  smtp 75 in 5 files, express 45 in 5 files. `README.md` and `CONTRIBUTING.md` document these
-  counts; the test suites remain the source of truth if they drift.
+  express/core/mongo-storage/smtp). The private `@cred-kit/shared` package exists as a
+  compatibility shim; no adapter package depends on it at runtime.
+- Vitest defines **448 tests across 4 packages**: core 138 in 7 files, mongo-storage 187 in
+  9 files, smtp 77 in 5 files, express 46 in 5 files. `README.md` and `CONTRIBUTING.md` document
+  these counts; the test suites remain the source of truth if they drift.
 - This checkout is a git repo on branch `fix/known-limitations`. Use git freely.
 - `pnpm dev` starts the Next.js tester at port 5173 and `tsx watch` on the demo. Both work on
   Windows when `.env.local` is present.
@@ -77,12 +78,12 @@ cred/
     src/adapters/{user,refreshToken,audit}.adapter.ts
     src/models/{user,refreshToken,audit}.models.ts
     src/index.ts                 MongooseStorageOptions export + adapter construction
-    src/__tests__/*.test.ts      40 tests across 3 files
+    src/__tests__/*.test.ts      187 tests across 9 files
   packages/smtp/                  @cred-kit/smtp — Nodemailer SMTP + Resend adapter
     src/index.ts                 emailService() factory
     src/helpers/email.helper.ts  link building with configurable authPathPrefix
     src/lib/{transporter,resend,http}.ts
-    src/__tests__/*.test.ts      75 tests across 5 files
+    src/__tests__/*.test.ts      77 tests across 5 files
   packages/express/               @cred-kit/express — mountable Express 5 router
     src/router.ts                route table + middleware wiring
     src/controllers/{auth,oauth,profile}.controller.ts
@@ -90,9 +91,9 @@ cred/
     src/helpers/{api,cookie,path,request,oauth}.ts
     src/config.ts                resolveCredConfig(), defaultCredRateLimits
     src/index.ts                 public exports (credExpress, createAuthGuard, ...)
-    src/__tests__/*.test.ts      45 tests across 5 files
-  packages/shared/                @cred-kit/shared — types + Zod validators (tsup, ESM)
-  packages/config/                @cred-kit/config — shared tsconfig base/node
+    src/__tests__/*.test.ts      46 tests across 5 files
+  packages/shared/                @cred-kit/shared — private compatibility re-export shim (tsup, ESM)
+  packages/config/                @cred-kit/config — shared tsconfig presets (used by shared)
   apps/cred-testing/              Next.js 16 manual API tester (private)
   apps/demo/                      Scratch Express host example (private)
 ```
@@ -128,6 +129,7 @@ The router mounts under whatever `basePath` the host chooses (default `/api`).
 | POST | `/auth/refresh` | Refresh cookie | Rotates refresh token; issues new access token |
 | GET | `/auth/verify-email/:token` | No | Always redirects to `CLIENT_URL/login?verified=true` or `...?verified=false` |
 | POST | `/auth/forgot-password` | No | Always returns the same response (no email enumeration) |
+| GET | `/auth/reset-password/:token` | No | Redirects the reset email link to `${clientUrl}/reset-password?token=...` |
 | POST | `/auth/reset-password/:token` | No | One-time reset token |
 | GET | `/auth/google` / `/google/callback` | No | OAuth with `oauth_state` CSRF cookie |
 | GET | `/auth/github` / `/github/callback` | No | OAuth with `oauth_state` CSRF cookie |
@@ -179,7 +181,7 @@ All option values live in `defaultCredRateLimits` in `packages/express/src/confi
 | `forgotPassword` | 60 min | 3 | `POST /auth/forgot-password` |
 | `refresh` | 15 min | 10 | `POST /auth/refresh` |
 | `verifyEmail` | 15 min | 10 | `GET /auth/verify-email/:token` |
-| `resetPassword` | 15 min | 5 | `POST /auth/reset-password/:token` |
+| `resetPassword` | 15 min | 5 | `GET`/`POST /auth/reset-password/:token` |
 | `logout` | 15 min | 20 | `POST /auth/logout` |
 | `oauth` | 15 min | 10 | All OAuth routes |
 | `profile` | 15 min | 50 | All `/profile/*` |
@@ -190,8 +192,8 @@ The host must set `trust proxy` so rate limits and audit `ip` see the forwarded 
 
 ## Testing notes
 
-- Suite sizes: core 138 in 7 files, mongo-storage 40 in 3 files, smtp 75 in 5 files,
-  express 45 in 5 files — 318 total.
+- Suite sizes: core 138 in 7 files, mongo-storage 187 in 9 files, smtp 77 in 5 files,
+  express 46 in 5 files — 448 total.
 - Each package has its own `vitest.config.ts`; `pnpm test` runs all four in parallel via
   Turborepo.
 - DB-backed tests (core, mongo-storage) use `mongodb-memory-server` with a 60s `beforeAll` hook.

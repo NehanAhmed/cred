@@ -1,6 +1,14 @@
 {
-  "extends": "@cred-kit/config/tsconfig/node.json",
   "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "ignoreDeprecations": "6.0",
+    "isolatedModules": true,
     "rootDir": "./src",
     "outDir": "./dist",
     "types": ["node"],

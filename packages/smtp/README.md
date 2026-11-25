@@ -198,7 +198,7 @@ Passed to `emailService(options)`.
 | --- | --- | --- | --- |
 | `EMAIL_FROM` | `string` | **required** | Envelope sender for every message. Used verbatim. |
 | `BACKEND_URL` | `string` | **required** | Absolute `http(s)` URL used to build verification and reset links. Must not contain a query string or fragment. |
-| `authPathPrefix` | `string` | `'/api/auth'` | Public path prefix for the auth routes, used in verification and reset links. Must start with `/`, must not end with `/`, and must not contain a query string, fragment, or whitespace. |
+| `authPathPrefix` | `string` | `'/api/auth'` | Public path prefix for the auth routes, used in verification and reset links. Must start with `/`, must not end with `/`, and must not contain a query string, fragment, whitespace, or quote characters. |
 | `provider` | `'smtp' \| 'resend'` | auto-detected | Forces a transport. |
 | `timeZone` | `string` | `'UTC'` | IANA time zone used for the reset-link expiry. Invalid zones throw. |
 | `resetTokenTtlMs` | `number` | `3_600_000` (1 hour) | Lifetime displayed in the reset email. Must be a positive integer. |
@@ -473,7 +473,7 @@ pnpm --filter @cred-kit/smtp build
 | `test` | `vitest run` | Runs the suite once. |
 | `test:watch` | `vitest` | Runs in watch mode. |
 
-The suite currently contains **75 tests across 5 files** (`index`, `email.helper`, `transporter`,
+The suite currently contains **77 tests across 5 files** (`index`, `email.helper`, `transporter`,
 `resend`, `http`). None of them require network access or a real provider: SMTP is exercised
 through transport construction and a mocked `sendMail`, and Resend through an injected `fetch`.
 

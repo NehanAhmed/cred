@@ -2,12 +2,13 @@
 
 ## Where to ask questions
 
-Ask usage questions by opening an issue in the repository:
+Ask usage questions by opening an issue in the repository. Blank issues are enabled, so you can
+open a plain issue, or use the bug report or feature request template when it fits. Include the
+package, version, Node.js version, OS, adapters in use, reproduction steps, expected and actual
+behavior, and any logs. The repository does not have a separate discussion forum, chat channel, or
+mailing list.
 
-<https://github.com/NehanAhmed/cred/issues>
-
-Use the feature request form for questions that propose a change, and the bug report form when you
-have found a problem. There is no separate discussion forum, chat channel, or mailing list.
+<https://github.com/NehanAhmed/cred/issues/new>
 
 ## Where to report bugs
 

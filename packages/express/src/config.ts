@@ -154,8 +154,12 @@ export type CredRateLimitsInput = {
  * (Redis, a database, ...) for multi-process deployments. The factory is
  * called once for each limiter because `express-rate-limit` rejects sharing a
  * single store instance between limiter instances.
+ *
+ * Each call receives a unique `keyPrefix` string — for example `"auth"` or
+ * `"profile-update"` — so that a shared backend can namespace counters by
+ * limiter rather than collapsing them into a single bucket.
  */
-export type CredRateLimitStoreFactory = () => Store;
+export type CredRateLimitStoreFactory = (keyPrefix: string) => Store;
 
 /** Minimal logger contract; `console` satisfies it. */
 export interface CredErrorLogger {

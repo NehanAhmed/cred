@@ -235,12 +235,12 @@ already documented this as a limitation; express README now mirrors the detail.
   - [x] `@cred-kit/smtp` minor changeset (swift-friends-throw.md)
   - [x] `pnpm exec changeset status` passes: express + smtp minor, core + mongo-storage patch (peer bump)
 
-- [x] Phase 5 Full verification and consumer check
+- [~] Phase 5 Full verification and consumer check
   - [x] `pnpm install --frozen-lockfile` passed at branch start
   - [x] `pnpm turbo run build lint typecheck test --force` passes 21/21 tasks
   - [x] pack dry-run contents checked: each package ships `dist/index.mjs`, `dist/index.d.mts`, `package.json`, `README.md`
   - [x] root scripts checked: `dev`, `build`, `start`, `test`, `format`, `changeset`, `release`
-  - [x] temporary consumer check passed (host setup example compiled against built express dist)
+  - [!] temporary consumer check incomplete — router mounting, host-route guard protection, health-route response, and SMTP link prefix have not been exercised against a live instance on this checkout; the checklist cannot be marked fully verified until those commands are run and their results recorded.
   - [x] final report written below
 
 ## Drift log
@@ -359,7 +359,7 @@ pnpm turbo run build lint typecheck test --force
 → Duration: ~1m 41s
 ```
 
-Express suites: core 138, mongo-storage 40, smtp 75, express 45 — 318 tests total.
+Express suites: core 138, mongo-storage 187, smtp 77, express 46 — 448 tests total.
 Changeset status: `@cred-kit/express` minor, `@cred-kit/smtp` minor.
 Temp consumer compiled against packed `cred-kit-express-0.1.0.tgz` with zero TS errors.
 
@@ -367,3 +367,10 @@ Temp consumer compiled against packed `cred-kit-express-0.1.0.tgz` with zero TS 
 
 `fix/known-limitations` on repo `NehanAhmed/cred`. No push, no publish, no history rewrite
 per working rules.
+
+> **Credential rotation reminder.** `L-11` removed a hardcoded SMTP block from
+> `apps/demo/src/index.ts`. If any of the values that were in source (host, user, or password)
+> corresponded to a real provider account before this branch was created, rotate those
+> credentials now. Removing them from the current checkout does not revoke access if the
+> credentials were live — they remain discoverable in git history until the repository history
+> is rewritten or the provider revokes them.

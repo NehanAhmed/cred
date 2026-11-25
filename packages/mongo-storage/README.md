@@ -415,7 +415,7 @@ packages/mongo-storage/
 │       ├── refresh-token.model.ts   CredRefreshToken schema + factory
 │       └── audit-log.model.ts       CredAuditLog schema + factory
 ├── tsdown.config.ts                 ESM bundle + .d.mts declarations
-├── tsconfig.json                    extends @cred-kit/config
+├── tsconfig.json                    NodeNext compiler options
 ├── eslint.config.js                 lint rules and import boundaries
 └── package.json
 ```
@@ -432,10 +432,11 @@ Run these from `packages/mongo-storage`, or from the repository root with
 | `pnpm typecheck` | `tsc --noEmit`. |
 | `pnpm lint` | ESLint over the package. |
 | `pnpm lint:fix` | ESLint with `--fix`. |
+| `pnpm test` | Runs the Vitest suite once (`vitest run`). |
+| `pnpm test:watch` | Runs Vitest in watch mode. |
 
-This package defines build, lint, and typecheck scripts; it has no test script.
-Run `pnpm build` before publishing so `dist/` matches `src/`; the
-`prepublishOnly` script also runs the build.
+The test suite uses `mongodb-memory-server`, so the first run downloads a MongoDB binary. The
+`prepublishOnly` script runs the build before publishing so `dist/` matches `src/`.
 
 ## Design boundaries
 

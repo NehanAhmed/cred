@@ -19,7 +19,6 @@ not a production application.
    pnpm --filter demo start
    ```
 
-The API is mounted at `http://localhost:5000/api` by default. Change `PORT` in `.env.local` to use
-a different port.
+The API is mounted at `http://localhost:${PORT}/api` by default. Change `PORT` in `.env.local` to use a different port — and remember to change `BACKEND_URL` so that verification emails and password-reset links resolve correctly back to the demo itself.
 
 `.env.local` is ignored by git. Keep real credentials out of source and out of version control.

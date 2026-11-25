@@ -181,7 +181,7 @@ interface CredExpressConfig {
 | `oauth`                 | `CredOAuthConfig`     | no       | `{}`                                              | Optional Google and GitHub credentials                                                                                         |
 | `cookies`               | `CredCookieConfig`    | no       | see [Cookies and sessions](#cookies-and-sessions) | Cookie names, paths, lifetimes, and flags                                                                                      |
 | `rateLimits`            | `CredRateLimitsInput` | no       | `defaultCredRateLimits`                           | Per-limiter partial overrides                                                                                                  |
-| `rateLimitStoreFactory` | `() => Store`         | no       | in-memory store                                   | Factory for the rate-limit store. Called once per limiter; supply a shared backend (Redis, ...) for multi-process deployments. |
+| `rateLimitStoreFactory` | `(keyPrefix: string) => Store` | no       | in-memory store                                   | Factory for the rate-limit store. Called once per limiter with a distinct key prefix, so a shared backend keeps counters isolated. |
 | `core`                  | `Partial<CredConfig>` | no       | core defaults                                     | Token lifetimes, bcrypt rounds, lockout policy, audit page sizes                                                               |
 | `jsonBodyLimit`         | `string`              | no       | `10kb`                                            | JSON body limit for the mounted router                                                                                         |
 | `logger`                | `CredErrorLogger`     | no       | `console`                                         | Object with an `error(...args)` method for unexpected errors                                                                   |
@@ -370,6 +370,7 @@ All paths are relative to the mount point. With the default configuration, the f
 | `GET`    | `/auth/verify-email/:token`   | Public         | `auth`, `verifyEmail`      | Verify an email address; always redirects                      |
 | `POST`   | `/auth/forgot-password`       | Public         | `auth`, `forgotPassword`   | Request a reset link; always returns the same message          |
 | `POST`   | `/auth/reset-password/:token` | Public         | `auth`, `resetPassword`    | Reset a password with a one-time token                         |
+| `GET`    | `/auth/reset-password/:token` | Public         | `auth`, `resetPassword`    | Redirect the reset email link to the client reset page         |
 | `GET`    | `/auth/google`                | Public         | `auth`, `oauth`            | Start Google OAuth                                             |
 | `GET`    | `/auth/google/callback`       | Public         | `auth`, `oauth`            | Finish Google OAuth                                            |
 | `GET`    | `/auth/github`                | Public         | `auth`, `oauth`            | Start GitHub OAuth                                             |
@@ -496,6 +497,12 @@ Reset password:
 ```
 
 If the reset token is invalid or expired, the response is `400` with `Invalid or expired token`.
+
+Password-reset emails link to `GET {backendUrl}{authPathPrefix}/reset-password/:token`. That GET
+does not validate or consume the token; it redirects the browser to
+`${clientUrl}/reset-password?token=<token>`. The client page collects the new password and submits
+`POST /auth/reset-password/:token` with `{ "password": "..." }` to finish the reset. Change
+`clientUrl` if your frontend reset page lives somewhere other than `/reset-password`.
 
 ### Profile and audit examples
 
@@ -848,7 +855,7 @@ A route passes through the broad group limiter and its route-specific limiter, s
 
 The limiters use `express-rate-limit` with `standardHeaders: true` and `legacyHeaders: false`. By default each limiter uses `express-rate-limit`'s in-memory store. Counters are not shared across processes or hosts. If you run multiple instances, each instance enforces its own counters.
 
-To share counters across processes, pass a `rateLimitStoreFactory` that returns a shared store instance (e.g., `@cred-kit/rate-limit-redis` or a custom `Store` implementation):
+To share counters across processes, pass a `rateLimitStoreFactory` that returns a shared store instance (e.g., `@cred-kit/rate-limit-redis` or a custom `Store` implementation). The factory receives a distinct `keyPrefix` for each limiter so a shared backend can keep counters isolated:
 
 ```ts
 import { rateLimit } from 'express-rate-limit';
@@ -860,11 +867,15 @@ await redis.connect();
 
 const cred = await credExpress({
   // ...
-  rateLimitStoreFactory: () => new RedisStore({ sendCommand: (...args) => redis.sendCommand(args) })
+  rateLimitStoreFactory: (keyPrefix) =>
+    new RedisStore({
+      prefix: `cred:rl:${keyPrefix}:`,
+      sendCommand: (...args) => redis.sendCommand(args)
+    })
 });
 ```
 
-The factory is called once per limiter (12 total), so each limiter gets its own store instance. `express-rate-limit` rejects sharing a single store instance between multiple limiters.
+The factory is called once per limiter (12 total), so each limiter gets its own store instance. `express-rate-limit` rejects sharing a single store instance between multiple limiters. The `keyPrefix` values are stable per limiter (`auth`, `login`, `register`, `forgot-password`, `refresh`, `verify-email`, `reset-password`, `logout`, `oauth`, `profile`, `profile-update`, `health`), so Redis keys never collide across limiters.
 
 > **Note:** Rate-limit keys are based on `req.ip`. The router does not set `trust proxy`. If the app runs behind a proxy, set `app.set('trust proxy', ...)` on the host so limits and audit IPs see the client address rather than the proxy address.
 
@@ -1093,7 +1104,7 @@ Verified in this checkout:
 - `pnpm --filter @cred-kit/express build` passes and produces `dist/index.mjs` (about 47 kB) and `dist/index.d.mts` (about 10 kB).
 - `pnpm --filter @cred-kit/express typecheck` passes.
 - `pnpm --filter @cred-kit/express lint` passes.
-- `pnpm --filter @cred-kit/express test` passes: **45 tests across 5 files** (`auth`, `guard`, `health`, `rate-limit`, `router`).
+- `pnpm --filter @cred-kit/express test` passes: **46 tests across 5 files** (`auth`, `guard`, `health`, `rate-limit`, `router`).
 - `pnpm --filter @cred-kit/express pack --dry-run` lists `dist/index.d.mts`, `dist/index.mjs`, `package.json`, and `README.md`.
 
 The tests are HTTP-level characterization tests built with Vitest and Supertest. They mount the real router on an Express app with in-memory core adapter fakes, so no MongoDB or SMTP connection is required. Coverage includes registration and verification, login and cookie attributes, refresh rotation, logout, CSRF enforcement, JSON body limits, `AuthError` and unknown-error mapping, router mounts and 404s, auth rate limiting, OAuth start redirects and state validation, the exported auth guard, authenticated profile access, health route, and rate-limit store factory.

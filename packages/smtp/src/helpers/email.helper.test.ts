@@ -122,7 +122,9 @@ describe('createEmailAdapter', () => {
     ['root slash', '/'],
     ['query string', '/api/auth?tenant=cred'],
     ['fragment', '/api/auth#fragment'],
-    ['inner whitespace', '/api auth']
+    ['inner whitespace', '/api auth'],
+    ['double quote', '/api/"auth'],
+    ['single quote', "/api/'auth"]
   ])('rejects an invalid auth path prefix: %s', (_label, prefix) => {
     const { send } = createCapturingSender();
 

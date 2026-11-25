@@ -14,7 +14,21 @@ const readRequiredEnv = (name: string): string => {
   return value;
 };
 
-const PORT = Number(process.env.PORT ?? 5000);
+const readPort = (): number => {
+  const raw = process.env.PORT;
+
+  if (raw === undefined || raw.trim() === '') return 5000;
+
+  const value = Number(raw);
+
+  if (!Number.isInteger(value) || value <= 0 || value > 65535) {
+    throw new Error(`Invalid PORT: ${raw}. Must be an integer between 1 and 65535.`);
+  }
+
+  return value;
+};
+
+const PORT = readPort();
 const MONGO_URI = readRequiredEnv('MONGO_URI');
 const JWT_SECRET = readRequiredEnv('JWT_SECRET');
 const BACKEND_URL = readRequiredEnv('BACKEND_URL');

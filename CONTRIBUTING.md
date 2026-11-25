@@ -131,8 +131,8 @@ Test runners:
 | ------------------------- | ------------------------------------------------- | ----: | ----: |
 | `@cred-kit/core`          | Vitest with in-memory fakes                       |     7 |   138 |
 | `@cred-kit/mongo-storage` | Vitest with `mongodb-memory-server`               |     9 |   187 |
-| `@cred-kit/smtp`          | Vitest                                            |     5 |    75 |
-| `@cred-kit/express`       | Vitest with Supertest and in-memory adapter fakes |     4 |    38 |
+| `@cred-kit/smtp`          | Vitest                                            |     5 |    77 |
+| `@cred-kit/express`       | Vitest with Supertest and in-memory adapter fakes |     5 |    46 |
 
 The counts above are from the verified run described in the pull request checklist.
 
@@ -214,8 +214,10 @@ Publishing uses the `npm-publish` environment and npm trusted publishing (OIDC),
   `fetch` and transport fakes.
 - There is no shared adapter contract test suite in this repository. If you add an adapter, mirror
   the existing adapter tests instead of looking for a reusable contract suite.
-- `@cred-kit/express` has no test script and no test files. Adding coverage there is a welcome
-  contribution.
+- `@cred-kit/express` has a full Vitest/Supertest suite covering the router, auth guard, rate
+  limits, and error mapping. The suite mounts the real router on an Express app with in-memory
+  core adapter fakes, so no MongoDB or SMTP connection is required. New behaviour belongs in
+  those tests; see the package's `src/__tests__/` directory.
 
 ## Writing a new adapter
 
@@ -294,11 +296,12 @@ and CI pick it up.
 
 ## Reporting bugs and proposing features
 
-- Report bugs with the
-  [bug report form](./.github/ISSUE_TEMPLATE/bug_report.yml). Include the package, version, Node
-  version, OS, adapters in use, reproduction steps, expected and actual behavior, and logs.
-- Propose features with the
-  [feature request form](./.github/ISSUE_TEMPLATE/feature_request.yml).
+- Report bugs by opening an issue with the bug report template:
+  <https://github.com/NehanAhmed/cred/issues/new?template=bug_report.yml>. Include the package,
+  version, Node version, OS, adapters in use, reproduction steps, expected and actual behavior, and
+  logs.
+- Propose features by opening an issue with the feature request template:
+  <https://github.com/NehanAhmed/cred/issues/new?template=feature_request.yml>.
 - Security vulnerabilities go through [SECURITY.md](./SECURITY.md), never a public issue.
 - For usage questions and other support, see [SUPPORT.md](./SUPPORT.md).
 

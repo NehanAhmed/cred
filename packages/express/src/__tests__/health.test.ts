@@ -37,6 +37,7 @@ describe('health route', () => {
     expect(response.body.success).toBe(false);
     expect(response.body.message).toBe('Service Unavailable');
     expect(response.body.error).toBe('Service Unavailable');
+    expect(response.body.data).toMatchObject({ status: 'unavailable' });
   });
 
   it('falls through to 404 when health.enabled is false', async () => {

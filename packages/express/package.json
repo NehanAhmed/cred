@@ -79,7 +79,6 @@
     "nodemailer": "^10.5.0"
   },
   "devDependencies": {
-    "@cred-kit/config": "workspace:*",
     "@cred-kit/core": "workspace:*",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.6",

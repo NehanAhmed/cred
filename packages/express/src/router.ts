@@ -60,6 +60,7 @@ export const createRouter = (config: ResolvedCredExpressConfig, deps: CredCoreDe
     validate(passwordResetSchema),
     auth.resetPassword
   );
+  authRouter.get('/reset-password/:token', limiters.resetPassword, auth.resetPasswordRedirect);
 
   authRouter.get('/google', limiters.oauth, oauth.startGoogle);
   authRouter.get('/google/callback', limiters.oauth, oauth.callbackGoogle);
@@ -93,7 +94,7 @@ export const createRouter = (config: ResolvedCredExpressConfig, deps: CredCoreDe
         sendSuccess(res, { status: 'ok' }, 'Service is healthy');
       } catch (error) {
         config.logger.error(error);
-        sendError(res, 'Service Unavailable', 503);
+        sendError(res, 'Service Unavailable', 503, { status: 'unavailable' });
       }
     });
   }
