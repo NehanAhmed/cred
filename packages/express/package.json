@@ -1,6 +1,6 @@
 {
   "name": "@cred-kit/express",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Express 5 adapter for Cred: mount one router to expose registration, login, OAuth, profile, and audit endpoints backed by @cred-kit/core.",
   "keywords": [
     "cred",
