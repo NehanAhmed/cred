@@ -17,8 +17,8 @@
   },
   "devDependencies": {
     "@cred-kit/config": "workspace:*",
-    "tsup": "^8.4.0",
-    "typescript": "^6.0.3",
+    "tsup": "^9.0.0",
+    "typescript": "^7.0.2",
     "zod": "^4.6.7"
   },
   "peerDependencies": {

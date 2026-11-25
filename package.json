@@ -27,9 +27,9 @@
   "devDependencies": {
     "@changesets/changelog-github": "^1.0.1",
     "@changesets/cli": "^3.0.3",
-    "prettier": "^3.8.4",
+    "prettier": "^3.10.1",
     "prettier-plugin-tailwindcss": "^0.8.1",
-    "turbo": "^2.5.2",
-    "typescript": "^6.0.3"
+    "turbo": "^2.11.13",
+    "typescript": "^7.0.2"
   }
 }
