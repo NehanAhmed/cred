@@ -31,19 +31,19 @@ jobs:
       TURBO_TELEMETRY_DISABLED: 1
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0   
 
-      - uses: pnpm/action-setup@v4   
+      - uses: pnpm/action-setup@v6   
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
           cache: pnpm
 
       - name: Cache MongoDB binary (mongodb-memory-server)
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ env.MONGOMS_DOWNLOAD_DIR }}
           key: mongodb-${{ runner.os }}-${{ matrix.os }}-${{ env.MONGOMS_VERSION }}
@@ -66,9 +66,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
