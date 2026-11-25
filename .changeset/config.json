@@ -12,9 +12,7 @@
   "commit": true,
   "ignore": [
     "cred-testing",
-    "demo",
-    "@cred-kit/shared",
-    "@cred-kit/config"
+    "demo"
   ],
   "fixed": [],
   "linked": [],
