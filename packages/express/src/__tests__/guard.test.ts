@@ -2,6 +2,7 @@ import { generateAccessToken } from '@cred-kit/core';
 import cookieParser from 'cookie-parser';
 import crypto from 'node:crypto';
 import express, { type Express } from 'express';
+import rateLimit from 'express-rate-limit';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { createAuthGuard } from '../middleware/auth.middleware.js';
@@ -29,6 +30,8 @@ const signTestToken = (payload: Record<string, unknown>): string => {
 
 const buildGuardApp = (options: { cookieParser?: boolean } = {}): Express => {
   const app = express();
+
+  app.use(rateLimit({ windowMs: 60_000, limit: 1000 }));
 
   if (options.cookieParser) app.use(cookieParser());
 
@@ -119,6 +122,7 @@ describe('createAuthGuard', () => {
 
   it('honours a custom cookie name', async () => {
     const app = express();
+    app.use(rateLimit({ windowMs: 60_000, limit: 1000 }));
     app.get(
       '/protected',
       createAuthGuard({ jwtSecret: TEST_JWT_SECRET, cookieName: 'access' }),
