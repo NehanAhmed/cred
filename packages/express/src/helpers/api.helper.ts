@@ -21,14 +21,16 @@ export const sendSuccess = <T>(
   } satisfies ApiResponse<T>);
 };
 
-export const sendError = (
+export const sendError = <T = null>(
   res: Response,
   message = 'Something went wrong',
   status = 500,
+  data?: T,
 ): void => {
   res.status(status).json({
     success: false,
     message,
     error: message,
-  } satisfies ApiResponse);
+    ...(data === undefined ? {} : { data }),
+  } satisfies ApiResponse<T>);
 };

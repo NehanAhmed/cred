@@ -21,6 +21,13 @@ export type emailServiceOptions = smtpOptions &
     EMAIL_FROM: string;
     /** Public base URL used to build verification and reset links. */
     BACKEND_URL: string;
+    /**
+     * Public path prefix for the auth routes, used in verification and reset
+     * links. Defaults to `/api/auth`. It must match the path where the host
+     * mounts the router; it is configured independently of the express
+     * adapter's `basePath`.
+     */
+    authPathPrefix?: string;
     /** IANA time zone used for the reset-link expiry. Defaults to `UTC`. */
     timeZone?: string;
     /** Reset-link lifetime in milliseconds. Defaults to one hour. */
@@ -86,7 +93,14 @@ export async function emailService(options: emailServiceOptions): Promise<EmailS
   }
 
   const provider = resolveProvider(options);
-  const { EMAIL_FROM, BACKEND_URL, timeZone, resetTokenTtlMs, verifyOnStart = false } = options;
+  const {
+    EMAIL_FROM,
+    BACKEND_URL,
+    authPathPrefix,
+    timeZone,
+    resetTokenTtlMs,
+    verifyOnStart = false
+  } = options;
 
   let send: EmailSender;
   let verify: () => Promise<void>;
@@ -118,6 +132,7 @@ export async function emailService(options: emailServiceOptions): Promise<EmailS
   const EMAIL = createEmailAdapter(send, {
     EMAIL_FROM,
     BACKEND_URL,
+    authPathPrefix,
     timeZone,
     resetTokenTtlMs
   });

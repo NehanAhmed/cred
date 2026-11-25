@@ -63,7 +63,6 @@
     "nodemailer": "^10.5.0"
   },
   "devDependencies": {
-    "@cred-kit/config": "workspace:*",
     "@cred-kit/core": "workspace:*",
     "@types/node": "^26.6.6",
     "@types/nodemailer": "^8.0.2",

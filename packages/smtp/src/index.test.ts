@@ -65,6 +65,24 @@ describe('emailService', () => {
     expect(() => service.close()).not.toThrow();
   });
 
+  it('passes a custom auth path prefix through to the email links', async () => {
+    const harness = createFetchHarness([jsonResponse({ id: 'message-1' })]);
+    const service = await emailService({
+      ...baseOptions,
+      authPathPrefix: '/auth',
+      RESEND_API_KEY: 're_key',
+      fetchImpl: harness.fetchImpl,
+      sleep: harness.sleep
+    });
+
+    await service.EMAIL.sendEmailVerification('user@example.com', 'raw-token');
+
+    expect((bodyOf(harness.calls[0].init) as { html: string }).html).toContain(
+      `${baseOptions.BACKEND_URL}/auth/verify-email/raw-token`
+    );
+    expect(() => service.close()).not.toThrow();
+  });
+
   it('honours an explicit SMTP provider even when a Resend key is present', async () => {
     await expect(
       emailService({ ...baseOptions, provider: 'smtp', RESEND_API_KEY: 're_key' })

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://ik.imagekit.io/td7wr0ax7o/Gemini_Generated_Image_cwp7cbcwp7cbcwp7.clean.png" alt="Cred banner" width="100%">
+  <img src="https://ik.imagekit.io/td7wr0ax7o/Cred%20Authentication_%20In%20One%20Mount.png" alt="Cred banner" width="100%">
 </p>
 
 <p align="center">
@@ -22,20 +22,19 @@
 ## Status
 
 Cred is pre-1.0. The four public packages are published on npm at `0.1.0`. The authentication
-core, MongoDB storage adapter, and email adapter are covered by Vitest. The Express adapter is
-implemented and mountable, but has no in-repo test suite; its published build was smoke-tested
-end to end against a real MongoDB instance.
+core, MongoDB storage adapter, and email adapter are covered by Vitest, and the Express adapter has
+an HTTP-level Vitest suite that mounts the router with in-memory adapter fakes.
 
-| Package / app | Version | Registry | Tests | Status |
-|---|---:|---|---:|---|
-| `@cred-kit/core` | 0.1.0 | npm | 138 in 7 files | Implemented and tested |
-| `@cred-kit/mongo-storage` | 0.1.0 | npm | 187 in 9 files | Implemented and tested |
-| `@cred-kit/smtp` | 0.1.0 | npm | 65 in 5 files | Implemented and tested |
-| `@cred-kit/express` | 0.1.0 | npm | none in repo | Implemented; test coverage missing |
-| `@cred-kit/shared` | 0.0.0 | private | none | Compatibility re-export shim |
-| `@cred-kit/config` | 0.0.0 | private | n/a | Shared TypeScript configs only |
-| `apps/cred-testing` | 0.0.1 | private | none | Manual Next.js tester; partially aligned |
-| `apps/demo` | 1.0.0 | private | none | Incomplete scratch example |
+| Package / app             | Version | Registry |          Tests | Status                                   |
+| ------------------------- | ------: | -------- | -------------: | ---------------------------------------- |
+| `@cred-kit/core`          |   0.1.0 | npm      | 138 in 7 files | Implemented and tested                   |
+| `@cred-kit/mongo-storage` |   0.1.0 | npm      | 187 in 9 files | Implemented and tested                   |
+| `@cred-kit/smtp`          |   0.1.0 | npm      |  77 in 5 files | Implemented and tested                   |
+| `@cred-kit/express`       |   0.1.0 | npm      |  46 in 5 files | Implemented and tested                   |
+| `@cred-kit/shared`        |   0.0.0 | private  |           none | Compatibility re-export shim             |
+| `@cred-kit/config`        |   0.0.0 | private  |            n/a | Shared TypeScript configs only           |
+| `apps/cred-testing`       |   0.0.1 | private  |           none | Manual Next.js tester; partially aligned |
+| `apps/demo`               |   1.0.0 | private  |           none | Scratch Express host example             |
 
 ## Table of contents
 
@@ -91,6 +90,8 @@ for it.
   HTTP API, selected from configuration.
 - **Typed validators** — Zod 4 schemas for registration, login, password reset, password change,
   and profile updates.
+- **Host-route auth guard** — `createAuthGuard` verifies the access-token cookie and sets a typed
+  `req.user` on your own Express routes.
 - **ESM-only packages** — bundled TypeScript declarations and no CommonJS build.
 
 ## Architecture
@@ -110,25 +111,25 @@ Your Express application
 `@cred-kit/express` builds the bundled MongoDB and email adapters when you pass database and email
 options. You can also pass prebuilt `@cred-kit/core` adapters for another backend.
 
-| Layer | Responsibility |
-|---|---|
-| Host application | HTTP server, TLS, CORS, helmet, `trust proxy`, global middleware, 404 handling |
+| Layer               | Responsibility                                                                                                           |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Host application    | HTTP server, TLS, CORS, helmet, `trust proxy`, global middleware, 404 handling                                           |
 | `@cred-kit/express` | Route table, request parsing, Zod validation, cookies, redirects, CSRF, rate limiters, response envelopes, error mapping |
-| `@cred-kit/core` | Registration, verification, login, refresh rotation, OAuth user creation/linking, profiles, audit operations |
-| Storage adapter | Persistence for users, refresh tokens, and optional audit logs |
-| Email adapter | Verification and reset message delivery |
+| `@cred-kit/core`    | Registration, verification, login, refresh rotation, OAuth user creation/linking, profiles, audit operations             |
+| Storage adapter     | Persistence for users, refresh tokens, and optional audit logs                                                           |
+| Email adapter       | Verification and reset message delivery                                                                                  |
 
 Core never reads environment variables, opens database connections, sends network requests, sets
 cookies, or applies rate limits. Those are host or adapter responsibilities.
 
 ## Packages
 
-| Package | Purpose | Install |
-|---|---|---|
-| `@cred-kit/core` | Framework- and storage-agnostic authentication services and adapter interfaces | `npm install @cred-kit/core` |
-| `@cred-kit/express` | Express 5 router that mounts the authentication, profile, and audit routes | `npm install @cred-kit/express` |
-| `@cred-kit/mongo-storage` | Mongoose models and adapters for users, refresh tokens, and audit logs | `npm install @cred-kit/mongo-storage` |
-| `@cred-kit/smtp` | SMTP (Nodemailer) and Resend email adapters | `npm install @cred-kit/smtp` |
+| Package                   | Purpose                                                                        | Install                               |
+| ------------------------- | ------------------------------------------------------------------------------ | ------------------------------------- |
+| `@cred-kit/core`          | Framework- and storage-agnostic authentication services and adapter interfaces | `npm install @cred-kit/core`          |
+| `@cred-kit/express`       | Express 5 router that mounts the authentication, profile, and audit routes     | `npm install @cred-kit/express`       |
+| `@cred-kit/mongo-storage` | Mongoose models and adapters for users, refresh tokens, and audit logs         | `npm install @cred-kit/mongo-storage` |
+| `@cred-kit/smtp`          | SMTP (Nodemailer) and Resend email adapters                                    | `npm install @cred-kit/smtp`          |
 
 `@cred-kit/express` depends on `@cred-kit/mongo-storage` and `@cred-kit/smtp`, and declares
 `@cred-kit/core`, `cookie-parser`, `express`, `express-rate-limit`, `mongoose`, and `nodemailer` as
@@ -188,11 +189,11 @@ const cred = await credExpress({
     SMTP_HOST: process.env.SMTP_HOST!,
     SMTP_PORT: process.env.SMTP_PORT ?? 587,
     SMTP_USER: process.env.SMTP_USER,
-    SMTP_PASS: process.env.SMTP_PASS,
+    SMTP_PASS: process.env.SMTP_PASS
   },
   jwtSecret: process.env.JWT_SECRET!, // at least 32 characters
   clientUrl: process.env.CLIENT_URL ?? 'http://localhost:5173',
-  backendUrl: process.env.BACKEND_URL ?? 'http://localhost:3000',
+  backendUrl: process.env.BACKEND_URL ?? 'http://localhost:3000'
 });
 
 app.use('/api', cred);
@@ -212,16 +213,16 @@ process.on('SIGINT', () => void shutdown());
 
 Set these environment variables before starting the process:
 
-| Variable | Required | Notes |
-|---|---|---|
-| `MONGO_URI` | Yes | MongoDB connection string, for example `mongodb://127.0.0.1:27017/cred` |
-| `JWT_SECRET` | Yes | At least 32 characters; Cred rejects shorter secrets at startup |
-| `SMTP_HOST` | Yes with the SMTP provider | Hostname of your SMTP server |
-| `SMTP_PORT` | No | Defaults to `587` in the example |
-| `SMTP_USER` / `SMTP_PASS` | No | Set both together if your SMTP server requires authentication |
-| `EMAIL_FROM` | No | Defaults to `no-reply@example.com` in the example |
-| `BACKEND_URL` | No | Defaults to `http://localhost:3000` in the example |
-| `CLIENT_URL` | No | Defaults to `http://localhost:5173` in the example |
+| Variable                  | Required                   | Notes                                                                   |
+| ------------------------- | -------------------------- | ----------------------------------------------------------------------- |
+| `MONGO_URI`               | Yes                        | MongoDB connection string, for example `mongodb://127.0.0.1:27017/cred` |
+| `JWT_SECRET`              | Yes                        | At least 32 characters; Cred rejects shorter secrets at startup         |
+| `SMTP_HOST`               | Yes with the SMTP provider | Hostname of your SMTP server                                            |
+| `SMTP_PORT`               | No                         | Defaults to `587` in the example                                        |
+| `SMTP_USER` / `SMTP_PASS` | No                         | Set both together if your SMTP server requires authentication           |
+| `EMAIL_FROM`              | No                         | Defaults to `no-reply@example.com` in the example                       |
+| `BACKEND_URL`             | No                         | Defaults to `http://localhost:3000` in the example                      |
+| `CLIENT_URL`              | No                         | Defaults to `http://localhost:5173` in the example                      |
 
 Start MongoDB, then run:
 
@@ -259,28 +260,29 @@ request
 
 Routes are relative to the mount point. With the default `basePath: '/api'`, the full paths are:
 
-| Method | Path | Access | Description |
-|---|---|---|---|
-| `POST` | `/api/auth` | Public | Register and send a verification email; `201` |
-| `POST` | `/api/auth/login` | Public | Log in with email or username plus password; sets cookies |
-| `POST` | `/api/auth/logout` | Access cookie | Delete the presented refresh token and clear cookies |
-| `POST` | `/api/auth/refresh` | Refresh cookie | Rotate the refresh token and issue a new access token |
-| `GET` | `/api/auth/csrf-token` | Public | Return the CSRF token and ensure the `csrfToken` cookie is set |
-| `GET` | `/api/auth/verify-email/:token` | Public | Verify an email address; always redirects to the client |
-| `POST` | `/api/auth/forgot-password` | Public | Request a reset link; always returns the same message |
-| `POST` | `/api/auth/reset-password/:token` | Public | Reset a password with a one-time token |
-| `GET` | `/api/auth/google` | Public | Start Google OAuth |
-| `GET` | `/api/auth/google/callback` | Public | Finish Google OAuth |
-| `GET` | `/api/auth/github` | Public | Start GitHub OAuth |
-| `GET` | `/api/auth/github/callback` | Public | Finish GitHub OAuth |
-| `GET` | `/api/profile/me` | Access cookie | Return the current profile without the password |
-| `PUT` | `/api/profile/me` | Access cookie | Partially update username, bio, phone number, or gender |
-| `DELETE` | `/api/profile/me` | Access cookie | Delete the account, revoke refresh tokens, and clear cookies |
-| `POST` | `/api/profile/me/change-password` | Access cookie | Change the password using the current password |
-| `GET` | `/api/profile/me/audit-logs` | Access cookie | Return paginated audit logs, newest first |
+| Method   | Path                              | Access         | Description                                                    |
+| -------- | --------------------------------- | -------------- | -------------------------------------------------------------- |
+| `POST`   | `/api/auth`                       | Public         | Register and send a verification email; `201`                  |
+| `POST`   | `/api/auth/login`                 | Public         | Log in with email or username plus password; sets cookies      |
+| `POST`   | `/api/auth/logout`                | Access cookie  | Delete the presented refresh token and clear cookies           |
+| `POST`   | `/api/auth/refresh`               | Refresh cookie | Rotate the refresh token and issue a new access token          |
+| `GET`    | `/api/auth/csrf-token`            | Public         | Return the CSRF token and ensure the `csrfToken` cookie is set |
+| `GET`    | `/api/auth/verify-email/:token`   | Public         | Verify an email address; always redirects to the client        |
+| `POST`   | `/api/auth/forgot-password`       | Public         | Request a reset link; always returns the same message          |
+| `GET`    | `/api/auth/reset-password/:token` | Public         | Redirect the reset email link to the client reset page         |
+| `POST`   | `/api/auth/reset-password/:token` | Public         | Reset a password with a one-time token                         |
+| `GET`    | `/api/auth/google`                | Public         | Start Google OAuth                                             |
+| `GET`    | `/api/auth/google/callback`       | Public         | Finish Google OAuth                                            |
+| `GET`    | `/api/auth/github`                | Public         | Start GitHub OAuth                                             |
+| `GET`    | `/api/auth/github/callback`       | Public         | Finish GitHub OAuth                                            |
+| `GET`    | `/api/profile/me`                 | Access cookie  | Return the current profile without the password                |
+| `PUT`    | `/api/profile/me`                 | Access cookie  | Partially update username, bio, phone number, or gender        |
+| `DELETE` | `/api/profile/me`                 | Access cookie  | Delete the account, revoke refresh tokens, and clear cookies   |
+| `POST`   | `/api/profile/me/change-password` | Access cookie  | Change the password using the current password                 |
+| `GET`    | `/api/profile/me/audit-logs`      | Access cookie  | Return paginated audit logs, newest first                      |
+| `GET`    | `/api/health`                     | Public         | Check adapter health; does not set CSRF cookies                |
 
-There is no health endpoint in `@cred-kit/express`. Unmatched paths fall through to the host
-application's 404 handler.
+Unmatched paths fall through to the host application's 404 handler.
 
 ### Response format
 
@@ -321,32 +323,40 @@ rather than on the first request.
 
 ### `credExpress` options
 
-| Option | Required | Default | Description |
-|---|---|---|---|
-| `database` | Yes | — | `{ uri }`, `{ connection }`, or prebuilt `{ user, refreshToken, audit? }` adapters |
-| `email` | Yes | — | Email service options or a prebuilt `EmailAdapter` |
-| `jwtSecret` | Yes | — | HS256 signing secret; at least 32 characters |
-| `clientUrl` | Yes | — | Absolute `http`/`https` URL used for verification and OAuth redirects |
-| `backendUrl` | Yes | — | Absolute public API URL used to build OAuth callback URLs; do not include `basePath` |
-| `basePath` | No | `/api` | Public mount path; must match the path passed to `app.use(...)` |
-| `oauth` | No | `{}` | Optional Google and GitHub `clientId` / `clientSecret` pairs |
-| `cookies` | No | see below | Cookie names, paths, lifetimes, `secure`, `sameSite`, and `domain` |
-| `rateLimits` | No | `defaultCredRateLimits` | Partial overrides for any limiter |
-| `core` | No | core defaults | Token lifetimes, bcrypt rounds, lockout policy, audit page sizes |
-| `jsonBodyLimit` | No | `10kb` | JSON body limit for the mounted router |
-| `logger` | No | `console` | Object with an `error(...args)` method for unexpected errors |
+| Option          | Required | Default                 | Description                                                                          |
+| --------------- | -------- | ----------------------- | ------------------------------------------------------------------------------------ |
+| `database`      | Yes      | —                       | `{ uri }`, `{ connection }`, or prebuilt `{ user, refreshToken, audit? }` adapters   |
+| `email`         | Yes      | —                       | Email service options or a prebuilt `EmailAdapter`                                   |
+| `jwtSecret`     | Yes      | —                       | HS256 signing secret; at least 32 characters                                         |
+| `clientUrl`     | Yes      | —                       | Absolute `http`/`https` URL used for verification and OAuth redirects                |
+| `backendUrl`    | Yes      | —                       | Absolute public API URL used to build OAuth callback URLs; do not include `basePath` |
+| `basePath`      | No       | `/api`                  | Public mount path; must match the path passed to `app.use(...)`                      |
+| `oauth`         | No       | `{}`                    | Optional Google and GitHub `clientId` / `clientSecret` pairs                         |
+| `cookies`       | No       | see below               | Cookie names, paths, lifetimes, `secure`, `sameSite`, and `domain`                   |
+| `rateLimits`    | No       | `defaultCredRateLimits` | Partial overrides for any limiter                                                    |
+| `core`          | No       | core defaults           | Token lifetimes, bcrypt rounds, lockout policy, audit page sizes                     |
+| `jsonBodyLimit` | No       | `10kb`                  | JSON body limit for the mounted router                                               |
+| `logger`        | No       | `console`               | Object with an `error(...args)` method for unexpected errors                         |
 
 `database` accepts exactly one shape:
 
 ```ts
 // Build the bundled MongoDB adapter.
-database: { uri: process.env.MONGO_URI! }
+database: {
+  uri: process.env.MONGO_URI!
+}
 
 // Use an existing Mongoose connection.
-database: { connection: existingMongooseConnection }
+database: {
+  connection: existingMongooseConnection
+}
 
 // Supply prebuilt core adapters.
-database: { user, refreshToken, audit }
+database: {
+  user,
+  refreshToken,
+  audit // optional
+}
 ```
 
 `email` accepts either the bundled email service options or a prebuilt core `EmailAdapter`:
@@ -376,38 +386,42 @@ provider is selected automatically when `RESEND_API_KEY` is set, or explicitly w
 `provider: 'resend'`. Set `verifyOnStart: true` if you want startup to fail when the email
 credentials are invalid; it defaults to `false`.
 
+Email verification and reset links are built from `BACKEND_URL` plus `authPathPrefix` (default
+`/api/auth`). If you mount the router at a path other than `/api`, set `authPathPrefix` to
+`${basePath}/auth`; for example, `basePath: '/v1'` pairs with `authPathPrefix: '/v1/auth'`.
+
 ### Core tunables
 
 `core` is a partial override of the defaults below:
 
-| Field | Default | Meaning |
-|---|---:|---|
-| `accessTokenExpiry` | `15m` | Access-token lifetime passed to the JWT signer |
-| `refreshTokenTtlMs` | `604800000` (7 days) | Refresh-token lifetime |
-| `tokenHashRounds` | `10` | bcrypt rounds for refresh, verification, and reset token secrets |
-| `passwordHashRounds` | `10` | bcrypt rounds for passwords |
-| `lockoutThreshold` | `5` | Failed logins before the account locks |
-| `lockoutDurationMs` | `900000` (15 minutes) | Lockout duration |
-| `verificationTokenTtlMs` | `86400000` (24 hours) | Email-verification token lifetime |
-| `resetTokenTtlMs` | `3600000` (1 hour) | Password-reset token lifetime |
-| `auditMaxLimit` | `100` | Maximum audit-log page size |
-| `auditDefaultLimit` | `20` | Default audit-log page size |
+| Field                    |               Default | Meaning                                                          |
+| ------------------------ | --------------------: | ---------------------------------------------------------------- |
+| `accessTokenExpiry`      |                 `15m` | Access-token lifetime passed to the JWT signer                   |
+| `refreshTokenTtlMs`      |  `604800000` (7 days) | Refresh-token lifetime                                           |
+| `tokenHashRounds`        |                  `10` | bcrypt rounds for refresh, verification, and reset token secrets |
+| `passwordHashRounds`     |                  `10` | bcrypt rounds for passwords                                      |
+| `lockoutThreshold`       |                   `5` | Failed logins before the account locks                           |
+| `lockoutDurationMs`      | `900000` (15 minutes) | Lockout duration                                                 |
+| `verificationTokenTtlMs` | `86400000` (24 hours) | Email-verification token lifetime                                |
+| `resetTokenTtlMs`        |    `3600000` (1 hour) | Password-reset token lifetime                                    |
+| `auditMaxLimit`          |                 `100` | Maximum audit-log page size                                      |
+| `auditDefaultLimit`      |                  `20` | Default audit-log page size                                      |
 
 ### Rate limits
 
-| Key | Window | Max | Applies to |
-|---|---:|---:|---|
-| `auth` | 15 min | 20 | Every `/auth/*` request, including OAuth |
-| `login` | 15 min | 5 | `POST /auth/login` |
-| `register` | 60 min | 3 | `POST /auth` |
-| `forgotPassword` | 60 min | 3 | `POST /auth/forgot-password` |
-| `refresh` | 15 min | 10 | `POST /auth/refresh` |
-| `verifyEmail` | 15 min | 10 | `GET /auth/verify-email/:token` |
-| `resetPassword` | 15 min | 5 | `POST /auth/reset-password/:token` |
-| `logout` | 15 min | 20 | `POST /auth/logout` |
-| `oauth` | 15 min | 10 | All OAuth routes |
-| `profile` | 15 min | 50 | Every `/profile/*` request |
-| `profileUpdate` | 15 min | 50 | `PUT /profile/me` and `POST /profile/me/change-password` |
+| Key              | Window | Max | Applies to                                               |
+| ---------------- | -----: | --: | -------------------------------------------------------- |
+| `auth`           | 15 min |  20 | Every `/auth/*` request, including OAuth                 |
+| `login`          | 15 min |   5 | `POST /auth/login`                                       |
+| `register`       | 60 min |   3 | `POST /auth`                                             |
+| `forgotPassword` | 60 min |   3 | `POST /auth/forgot-password`                             |
+| `refresh`        | 15 min |  10 | `POST /auth/refresh`                                     |
+| `verifyEmail`    | 15 min |  10 | `GET /auth/verify-email/:token`                          |
+| `resetPassword`  | 15 min |   5 | `POST /auth/reset-password/:token`                       |
+| `logout`         | 15 min |  20 | `POST /auth/logout`                                      |
+| `oauth`          | 15 min |  10 | All OAuth routes                                         |
+| `profile`        | 15 min |  50 | Every `/profile/*` request                               |
+| `profileUpdate`  | 15 min |  50 | `PUT /profile/me` and `POST /profile/me/change-password` |
 
 Each rule accepts a partial override:
 
@@ -431,32 +445,32 @@ application and passed into `credExpress`.
 
 ## Security model
 
-| Area | Implemented behavior |
-|---|---|
-| Passwords | bcrypt with 10 rounds by default; never returned in API responses |
-| Access token | HS256 JWT, 15 minutes by default, payload `{ id, email, username, tokenType: 'access' }` |
-| JWT secret | Must be a non-empty string of at least 32 characters; checked before signing |
-| Refresh token | Opaque `lookupId.secret`, 7 days by default; only the secret is bcrypt-hashed at rest |
-| Rotation | Every refresh atomically claims the old token and issues a successor in the same family |
-| Replay detection | Presenting a consumed refresh token revokes the entire family |
-| Email verification | Single-use, 24 hours by default, bcrypt-hashed token secret |
-| Password reset | Single-use, 1 hour by default, bcrypt-hashed token secret; all refresh tokens revoked before the password changes |
-| Login lockout | 5 failed attempts trigger a 15-minute lock; an active lock is not extended by further failures |
-| Enumeration | Unknown users and wrong passwords both return `Invalid Credentials`; forgot-password always returns the same message |
-| OAuth state | Random 32-byte state stored in an `httpOnly` cookie and compared on callback |
-| OAuth linking | An email links an existing account only when the provider reports the email as verified |
-| CSRF | Double-submit cookie; unsafe requests require `X-CSRF-Token` |
-| Audit logs | Fire-and-forget writes; failures never break the audited operation; 90-day TTL in MongoDB |
-| Transport | Cookies, CSRF, CORS, HTTPS, and rate limiting are split between the adapter and the host as described below |
+| Area               | Implemented behavior                                                                                                 |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| Passwords          | bcrypt with 10 rounds by default; never returned in API responses                                                    |
+| Access token       | HS256 JWT, 15 minutes by default, payload `{ id, email, username, tokenType: 'access' }`                             |
+| JWT secret         | Must be a non-empty string of at least 32 characters; checked before signing                                         |
+| Refresh token      | Opaque `lookupId.secret`, 7 days by default; only the secret is bcrypt-hashed at rest                                |
+| Rotation           | Every refresh atomically claims the old token and issues a successor in the same family                              |
+| Replay detection   | Presenting a consumed refresh token revokes the entire family                                                        |
+| Email verification | Single-use, 24 hours by default, bcrypt-hashed token secret                                                          |
+| Password reset     | Single-use, 1 hour by default, bcrypt-hashed token secret; all refresh tokens revoked before the password changes    |
+| Login lockout      | 5 failed attempts trigger a 15-minute lock; an active lock is not extended by further failures                       |
+| Enumeration        | Unknown users and wrong passwords both return `Invalid Credentials`; forgot-password always returns the same message |
+| OAuth state        | Random 32-byte state stored in an `httpOnly` cookie and compared on callback                                         |
+| OAuth linking      | An email links an existing account only when the provider reports the email as verified                              |
+| CSRF               | Double-submit cookie; unsafe requests require `X-CSRF-Token`                                                         |
+| Audit logs         | Fire-and-forget writes; failures never break the audited operation; 90-day TTL in MongoDB                            |
+| Transport          | Cookies, CSRF, CORS, HTTPS, and rate limiting are split between the adapter and the host as described below          |
 
 ### Cookies
 
-| Cookie | Default name | Path | Max-Age | Flags |
-|---|---|---|---:|---|
-| Access token | `token` | `/` | 15 min | `httpOnly`, `sameSite=strict` by default, `secure` in production by default |
-| Refresh token | `refreshToken` | `${basePath}/auth` | 7 days | `httpOnly`, `sameSite=strict` by default, `secure` in production by default, AES-256-GCM encrypted value |
-| CSRF token | `csrfToken` | `/` | 7 days | not `httpOnly`, `sameSite=strict` by default, `secure` in production by default |
-| OAuth state | `oauth_state` | `${basePath}/auth` | 10 min | `httpOnly`, `sameSite=lax`, `secure: true` always |
+| Cookie        | Default name   | Path               | Max-Age | Flags                                                                                                    |
+| ------------- | -------------- | ------------------ | ------: | -------------------------------------------------------------------------------------------------------- |
+| Access token  | `token`        | `/`                |  15 min | `httpOnly`, `sameSite=strict` by default, `secure` in production by default                              |
+| Refresh token | `refreshToken` | `${basePath}/auth` |  7 days | `httpOnly`, `sameSite=strict` by default, `secure` in production by default, AES-256-GCM encrypted value |
+| CSRF token    | `csrfToken`    | `/`                |  7 days | not `httpOnly`, `sameSite=strict` by default, `secure` in production by default                          |
+| OAuth state   | `oauth_state`  | `${basePath}/auth` |  10 min | `httpOnly`, `sameSite=lax`, `secure` in production by default                                            |
 
 The refresh-token cookie value is encrypted with AES-256-GCM using a key derived from `jwtSecret`.
 The access token and refresh token lifetimes are configured separately: the JWT expiry comes from
@@ -471,34 +485,22 @@ you do.
 
 ## Known limitations
 
-- **No in-repo tests for `@cred-kit/express`.** The package has no `test` script and no test files.
-  Its published build was smoke-tested by mounting it, fetching a CSRF token, and attempting a
-  login, but that is not a substitute for a test suite.
-- **No health endpoint.** `@cred-kit/express` does not expose `/api/health`. The `apps/cred-testing`
-  health panel and its health rate-limit entry call `/api/health`, which returns 404 against the
-  adapter.
 - **No CORS, helmet, or proxy configuration.** These remain host responsibilities.
-- **No custom rate-limit store.** Counters are in memory and are not shared across processes.
-- **No exported auth guard or `req.user` augmentation.** Protected routes live inside the router;
-  your own routes must verify the access token themselves with `verifyAccessToken` from
-  `@cred-kit/core`.
+- **Rate-limit stores are in-memory by default.** Counters are per process. Pass
+  `rateLimitStoreFactory` to share them across processes; the factory receives a distinct key
+  prefix per limiter.
 - **ESM-only.** The packages publish `dist/index.mjs` and `dist/index.d.mts` with no CommonJS
   `require` condition.
 - **`basePath` must match the mount path.** A mismatch scopes the refresh cookie to the wrong path
-  and builds the wrong OAuth callback URL. Email links also hardcode `/api/auth/...` in
-  `@cred-kit/smtp`, so a non-`/api` base path breaks verification and reset links.
-- **OAuth requires HTTPS or localhost.** The `oauth_state` cookie is always `secure: true`, so
-  browsers will not send it over plain HTTP on a non-localhost origin.
+  and builds the wrong OAuth callback URL. With the bundled SMTP options, also set
+  `email.authPathPrefix` to `${basePath}/auth`; the two values are configured independently.
 - **Linking a local account through OAuth changes its login method.** The account's `provider` is
   set to `google` or `github`, and password login and password change are then rejected.
-- **Root development scripts are incomplete.** `pnpm dev` fails because `apps/demo` runs `tsx`
-  without declaring it. `pnpm start` starts only the Next.js tester, not an API. `pnpm format` and
-  `pnpm format:check` fail because the root Prettier config references a missing
-  `prettier-plugin-tailwindcss`.
-- **`apps/demo` is a scratch example.** It has no build or start script, and its source contains a
-  hardcoded example SMTP credential. Do not deploy it as-is.
-- **Package READMEs advertise Node 20.** The published package manifests declare
-  `engines.node >= 22`; treat the manifests and CI matrix as authoritative.
+- **`pnpm format:check` is not a clean gate.** The command runs, but it reports 136
+  pre-existing unformatted files. Format only the files you change; no repository-wide formatting
+  commit has been made.
+- **`apps/demo` is a scratch example.** It has working build/start scripts and reads credentials
+  from `apps/demo/.env.local`; see `apps/demo/README.md`. Do not deploy it as-is.
 - **Pre-1.0.** Public APIs may change between minor versions.
 
 ## Repository layout
@@ -533,7 +535,14 @@ pnpm build
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm format:check
 ```
+
+`pnpm format:check` runs, but it currently reports pre-existing formatting issues. Format only the
+files you change.
+
+Root `pnpm dev` starts the demo API and the Next.js tester in watch mode. Root `pnpm start` runs
+their built start scripts, so run `pnpm build` first.
 
 Package-scoped commands:
 
@@ -559,17 +568,17 @@ dry-run.
 
 ## Testing
 
-The root `pnpm test` runs the Vitest suites in the three tested packages:
+The root `pnpm test` runs the Vitest suites in the four tested packages:
 
-| Package | Framework | Files | Tests | Coverage focus |
-|---|---|---:|---:|---|
-| `@cred-kit/core` | Vitest with in-memory fakes | 7 | 138 | Registration, verification, login and lockout, refresh rotation and replay, password reset, OAuth linking, profiles, audit pagination, token helpers, validators |
-| `@cred-kit/mongo-storage` | Vitest + `mongodb-memory-server` | 9 | 187 | User, refresh-token, and audit models and adapters, indexes, TTLs, and atomic updates |
-| `@cred-kit/smtp` | Vitest | 5 | 65 | SMTP transport options, Resend HTTP behavior, retries, link construction, and email templates |
-| `@cred-kit/express` | none | 0 | 0 | No in-repo tests |
-| `apps/cred-testing` | none | 0 | 0 | No tests |
+| Package                   | Framework                                         | Files | Tests | Coverage focus                                                                                                                                                   |
+| ------------------------- | ------------------------------------------------- | ----: | ----: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@cred-kit/core`          | Vitest with in-memory fakes                       |     7 |   138 | Registration, verification, login and lockout, refresh rotation and replay, password reset, OAuth linking, profiles, audit pagination, token helpers, validators |
+| `@cred-kit/mongo-storage` | Vitest + `mongodb-memory-server`                  |     9 |   187 | User, refresh-token, and audit models and adapters, indexes, TTLs, and atomic updates                                                                            |
+| `@cred-kit/smtp`          | Vitest                                            |     5 |    77 | SMTP transport options, Resend HTTP behavior, retries, link construction, and email templates                                                                    |
+| `@cred-kit/express`       | Vitest with Supertest and in-memory adapter fakes |     5 |    46 | Registration, login, refresh, logout, CSRF, rate limiting, OAuth start/state, auth guard, rate-limit store, error mapping, and profile access                    |
+| `apps/cred-testing`       | none                                              |     0 |     0 | No tests                                                                                                                                                         |
 
-That is **390 tests across 21 files**. The first DB-backed run downloads a MongoDB binary for
+That is **448 tests across 26 files**. The first DB-backed run downloads a MongoDB binary for
 `mongodb-memory-server`; CI caches it under `.mongodb-binaries`.
 
 ## Roadmap

@@ -5,19 +5,50 @@ import type { CredLocals, CredRequestContext } from '../types.js';
 /** Extracts the audit context forwarded to every core service call. */
 export const getRequestContext = (req: Request): CredRequestContext => ({
   ip: req.ip,
-  userAgent: req.get('user-agent') ?? undefined,
+  userAgent: req.get('user-agent') ?? undefined
 });
 
 /**
  * Reads a cookie as a string. `cookie-parser` types cookies as `any`, so this
  * normalizes missing, empty, and non-string values to `undefined` instead of
  * letting them reach core as malformed tokens.
+ *
+ * When the host has not mounted `cookie-parser`, `req.cookies` is undefined;
+ * the `Cookie` header is parsed directly so the exported auth guard works
+ * without requiring that middleware.
  */
 export const readCookie = (req: Request, name: string): string | undefined => {
   const cookies = req.cookies as Record<string, unknown> | undefined;
-  const value = cookies?.[name];
 
-  return typeof value === 'string' && value !== '' ? value : undefined;
+  if (cookies !== undefined && cookies !== null) {
+    const value = cookies[name];
+
+    return typeof value === 'string' && value !== '' ? value : undefined;
+  }
+
+  return readCookieHeader(req.get('cookie'), name);
+};
+
+const readCookieHeader = (header: string | undefined, name: string): string | undefined => {
+  if (header === undefined || header === '') return undefined;
+
+  for (const part of header.split(';')) {
+    const separator = part.indexOf('=');
+    if (separator === -1) continue;
+
+    if (part.slice(0, separator).trim() !== name) continue;
+
+    const value = part.slice(separator + 1).trim();
+    if (value === '') return undefined;
+
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }
+
+  return undefined;
 };
 
 /**

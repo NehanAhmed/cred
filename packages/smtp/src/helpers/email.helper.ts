@@ -24,11 +24,21 @@ export type emailAdapterOptions = {
   EMAIL_FROM: string;
   /** Public base URL used to build the verification and reset links. */
   BACKEND_URL: string;
+  /**
+   * Public path prefix for the auth routes, used to build the verification and
+   * reset links. Defaults to `/api/auth`. Set this to the prefix your host
+   * mounts the router under (for example `/auth` when the router is mounted at
+   * `/auth` rather than `/api`).
+   */
+  authPathPrefix?: string;
   /** IANA time zone used for the reset-link expiry. Defaults to `UTC`. */
   timeZone?: string;
   /** Lifetime of the reset link shown in the email. Defaults to one hour. */
   resetTokenTtlMs?: number;
 };
+
+/** Default public path prefix for the auth routes. */
+export const DEFAULT_AUTH_PATH_PREFIX = '/api/auth';
 
 const parseFromAddress = (value: string): string => {
   if (typeof value !== 'string' || value.trim() === '') {
@@ -65,6 +75,33 @@ const parseBackendUrl = (value: string): string => {
 const assertPositiveInteger = (name: string, value: number): number => {
   if (!Number.isInteger(value) || value <= 0) {
     throw new Error(`${PREFIX}: "${name}" must be a positive integer, received "${value}"`);
+  }
+
+  return value;
+};
+
+/**
+ * Validates the public auth path prefix used in email links. The prefix is
+ * joined directly onto `BACKEND_URL`, so a missing leading slash, a trailing
+ * slash, or a query/fragment would produce a broken link.
+ */
+const parseAuthPathPrefix = (value: string | undefined): string => {
+  if (value === undefined) return DEFAULT_AUTH_PATH_PREFIX;
+
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new Error(`${PREFIX}: "authPathPrefix" must be a non-empty string`);
+  }
+
+  if (!value.startsWith('/')) {
+    throw new Error(`${PREFIX}: "authPathPrefix" must start with "/", received "${value}"`);
+  }
+
+  if (value === '/' || value.endsWith('/')) {
+    throw new Error(`${PREFIX}: "authPathPrefix" must not end with "/", received "${value}"`);
+  }
+
+  if (value.includes('?') || value.includes('#') || /\s/.test(value) || value.includes('"') || value.includes("'")) {
+    throw new Error(`${PREFIX}: "authPathPrefix" must be a plain URL path, received "${value}"`);
   }
 
   return value;
@@ -112,6 +149,7 @@ export const createEmailAdapter = (
 ): EmailAdapter => {
   const from = parseFromAddress(options.EMAIL_FROM);
   const backendUrl = parseBackendUrl(options.BACKEND_URL);
+  const authPathPrefix = parseAuthPathPrefix(options.authPathPrefix);
   const formatExpiry = createExpiryFormatter(options.timeZone?.trim() || 'UTC');
   const resetTokenTtlMs = assertPositiveInteger(
     'resetTokenTtlMs',
@@ -128,12 +166,12 @@ export const createEmailAdapter = (
 
   return {
     sendEmailVerification: async (email: string, rawToken: string): Promise<void> => {
-      const verificationLink = `${backendUrl}/api/auth/verify-email/${encodeURIComponent(rawToken)}`;
+      const verificationLink = `${backendUrl}${authPathPrefix}/verify-email/${encodeURIComponent(rawToken)}`;
 
       await sendMessage(email, EMAIL_VERIFICATION_SUBJECT, emailVerification(verificationLink));
     },
     sendPasswordReset: async (email: string, rawToken: string): Promise<void> => {
-      const resetLink = `${backendUrl}/api/auth/reset-password/${encodeURIComponent(rawToken)}`;
+      const resetLink = `${backendUrl}${authPathPrefix}/reset-password/${encodeURIComponent(rawToken)}`;
       const expiresAt = formatExpiry(new Date(Date.now() + resetTokenTtlMs));
 
       await sendMessage(email, PASSWORD_RESET_SUBJECT, passwordReset(resetLink, expiresAt));

@@ -16,7 +16,7 @@ const deriveRefreshCookieKey = (config: ResolvedCredExpressConfig): Buffer => {
 
 const encryptRefreshTokenForCookie = (
   rawToken: string,
-  config: ResolvedCredExpressConfig,
+  config: ResolvedCredExpressConfig
 ): string => {
   const iv = crypto.randomBytes(REFRESH_TOKEN_IV_BYTES);
   const key = deriveRefreshCookieKey(config);
@@ -28,7 +28,7 @@ const encryptRefreshTokenForCookie = (
 
 const decryptRefreshTokenFromCookie = (
   encodedValue: string,
-  config: ResolvedCredExpressConfig,
+  config: ResolvedCredExpressConfig
 ): string | null => {
   const parts = encodedValue.split('.');
   if (parts.length !== 3) return null;
@@ -49,12 +49,12 @@ const decryptRefreshTokenFromCookie = (
 
 const commonOptions = (
   config: ResolvedCredExpressConfig,
-  sameSite: CredSameSite,
+  sameSite: CredSameSite
 ): CookieOptions => ({
   httpOnly: true,
   secure: config.cookies.secure,
   sameSite,
-  ...(config.cookies.domain === undefined ? {} : { domain: config.cookies.domain }),
+  ...(config.cookies.domain === undefined ? {} : { domain: config.cookies.domain })
 });
 
 export interface AuthTokens {
@@ -70,12 +70,12 @@ export const setAuthCookies = (
   res: Response,
   tokens: AuthTokens,
   config: ResolvedCredExpressConfig,
-  sameSite: CredSameSite = config.cookies.sameSite,
+  sameSite: CredSameSite = config.cookies.sameSite
 ): void => {
   res.cookie(config.cookies.accessTokenName, tokens.accessToken, {
     ...commonOptions(config, sameSite),
     path: config.cookies.accessTokenPath,
-    maxAge: config.cookies.accessTokenMaxAgeMs,
+    maxAge: config.cookies.accessTokenMaxAgeMs
   });
 
   res.cookie(
@@ -84,58 +84,50 @@ export const setAuthCookies = (
     {
       ...commonOptions(config, sameSite),
       path: authCookiePath(config.basePath),
-      maxAge: config.cookies.refreshTokenMaxAgeMs,
-    },
+      maxAge: config.cookies.refreshTokenMaxAgeMs
+    }
   );
 };
 
 /** Clears both auth cookies using the same paths/domain used when setting them. */
-export const clearAuthCookies = (
-  res: Response,
-  config: ResolvedCredExpressConfig,
-): void => {
+export const clearAuthCookies = (res: Response, config: ResolvedCredExpressConfig): void => {
   const options = commonOptions(config, config.cookies.sameSite);
 
   res.clearCookie(config.cookies.accessTokenName, {
     ...options,
-    path: config.cookies.accessTokenPath,
+    path: config.cookies.accessTokenPath
   });
 
   res.clearCookie(config.cookies.refreshTokenName, {
     ...options,
-    path: authCookiePath(config.basePath),
+    path: authCookiePath(config.basePath)
   });
 };
 
 export const setOAuthStateCookie = (
   res: Response,
   state: string,
-  config: ResolvedCredExpressConfig,
+  config: ResolvedCredExpressConfig
 ): void => {
   res.cookie(OAUTH_STATE_COOKIE, state, {
     ...commonOptions(config, 'lax'),
     httpOnly: true,
-    secure: true,
     path: authCookiePath(config.basePath),
-    maxAge: OAUTH_STATE_TTL_MS,
+    maxAge: OAUTH_STATE_TTL_MS
   });
 };
 
-export const clearOAuthStateCookie = (
-  res: Response,
-  config: ResolvedCredExpressConfig,
-): void => {
+export const clearOAuthStateCookie = (res: Response, config: ResolvedCredExpressConfig): void => {
   res.clearCookie(OAUTH_STATE_COOKIE, {
     ...commonOptions(config, 'lax'),
     httpOnly: true,
-    secure: true,
-    path: authCookiePath(config.basePath),
+    path: authCookiePath(config.basePath)
   });
 };
 
 export const readRefreshTokenCookie = (
   req: Request,
-  config: ResolvedCredExpressConfig,
+  config: ResolvedCredExpressConfig
 ): string | null => {
   const encoded = req.cookies?.[config.cookies.refreshTokenName];
   if (typeof encoded !== 'string' || encoded.length === 0) return null;

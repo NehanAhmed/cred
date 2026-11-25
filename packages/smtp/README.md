@@ -4,7 +4,7 @@ Email delivery for [Cred](https://github.com/NehanAhmed/cred) authentication flo
 implements core's `EmailAdapter` contract over either **SMTP (Nodemailer)** or the **Resend HTTP
 API**, so switching transports is a configuration change rather than a code change.
 
-ESM only · Node.js 20+ · MIT
+ESM only · Node.js 22+ · MIT
 
 ---
 
@@ -172,13 +172,16 @@ Both transports send exactly one HTML part. The copy itself comes from `@cred-ki
 
 | Adapter method | Subject | Link |
 | --- | --- | --- |
-| `sendEmailVerification(email, rawToken)` | `Email Verification` | `${BACKEND_URL}/api/auth/verify-email/${encodeURIComponent(rawToken)}` |
-| `sendPasswordReset(email, rawToken)` | `Password Reset Link` | `${BACKEND_URL}/api/auth/reset-password/${encodeURIComponent(rawToken)}` |
+| `sendEmailVerification(email, rawToken)` | `Email Verification` | `${BACKEND_URL}${authPathPrefix}/verify-email/${encodeURIComponent(rawToken)}` |
+| `sendPasswordReset(email, rawToken)` | `Password Reset Link` | `${BACKEND_URL}${authPathPrefix}/reset-password/${encodeURIComponent(rawToken)}` |
 
 Details:
 
 - `BACKEND_URL` is normalized once: trailing slashes are stripped, so both
   `https://api.example.com` and `https://api.example.com/` produce a single-slash URL.
+- `authPathPrefix` defaults to `/api/auth`. Set it when your host mounts the auth router somewhere else.
+  It must start with `/`, must not end with `/`, and must not contain a query string, fragment, or
+  whitespace.
 - Tokens are URL-encoded before they are embedded.
 - The reset email states when the link expires, formatted in `timeZone` (default `UTC`) with an
   explicit zone suffix, for example `Nov 19, 2026, 9:15 AM UTC`.
@@ -195,6 +198,7 @@ Passed to `emailService(options)`.
 | --- | --- | --- | --- |
 | `EMAIL_FROM` | `string` | **required** | Envelope sender for every message. Used verbatim. |
 | `BACKEND_URL` | `string` | **required** | Absolute `http(s)` URL used to build verification and reset links. Must not contain a query string or fragment. |
+| `authPathPrefix` | `string` | `'/api/auth'` | Public path prefix for the auth routes, used in verification and reset links. Must start with `/`, must not end with `/`, and must not contain a query string, fragment, whitespace, or quote characters. |
 | `provider` | `'smtp' \| 'resend'` | auto-detected | Forces a transport. |
 | `timeZone` | `string` | `'UTC'` | IANA time zone used for the reset-link expiry. Invalid zones throw. |
 | `resetTokenTtlMs` | `number` | `3_600_000` (1 hour) | Lifetime displayed in the reset email. Must be a positive integer. |
@@ -303,6 +307,7 @@ name the offending option, for example:
 @cred-kit/smtp: "SMTP_HOST" is required for the SMTP provider
 @cred-kit/smtp: "SMTP_USER" and "SMTP_PASS" must be configured together for the SMTP provider
 @cred-kit/smtp: "BACKEND_URL" must not contain a query string or fragment
+@cred-kit/smtp: "authPathPrefix" must start with "/", received "api/auth"
 @cred-kit/smtp: invalid "timeZone" "Mars/Olympus"
 ```
 
@@ -362,7 +367,17 @@ const { EMAIL, close } = await emailService({
 Notes:
 
 - `BACKEND_URL` must be the **public base URL of your API**, because the links point at
-  `/api/auth/...` on that origin.
+  `authPathPrefix` (default `/api/auth`) on that origin.
+- `authPathPrefix` is configured on the email adapter, not derived from `@cred-kit/express`'s
+  `basePath`. If you mount the router at a different path, set both values so the emailed links
+  resolve:
+
+  ```ts
+  // Router mounted at /v1, so the email links must use /v1/auth.
+  email: { EMAIL_FROM: '...', BACKEND_URL: 'https://api.example.com', authPathPrefix: '/v1/auth' }
+  ```
+
+  Leaving `authPathPrefix` at its default while mounting at `/v1` produces links that return 404.
 - Because `sendEmailVerification` rejects on transport failure, core can delete a user whose
   verification email could not be delivered. Do not swallow those rejections.
 - The package does not read `process.env` or load dotenv. Read environment variables in your
@@ -450,7 +465,7 @@ pnpm --filter @cred-kit/smtp build
 
 | Script | Command | Description |
 | --- | --- | --- |
-| `build` | `tsdown` | Builds `dist/index.mjs` and `dist/index.d.mts` (ESM + declarations, target `node20.0.0`). |
+| `build` | `tsdown` | Builds `dist/index.mjs` and `dist/index.d.mts` (ESM + declarations, target `node22.0.0`). |
 | `dev` | `tsdown --watch` | Rebuilds on change. |
 | `typecheck` | `tsc --noEmit` | Type-checks the sources. |
 | `lint` | `eslint .` | Lints with `typescript-eslint` and the import-boundary rules. |
@@ -458,12 +473,12 @@ pnpm --filter @cred-kit/smtp build
 | `test` | `vitest run` | Runs the suite once. |
 | `test:watch` | `vitest` | Runs in watch mode. |
 
-The suite currently contains **65 tests across 5 files** (`index`, `email.helper`, `transporter`,
+The suite currently contains **77 tests across 5 files** (`index`, `email.helper`, `transporter`,
 `resend`, `http`). None of them require network access or a real provider: SMTP is exercised
 through transport construction and a mocked `sendMail`, and Resend through an injected `fetch`.
 
 The package builds to a single ESM entry point with `sideEffects: false`, so bundlers can
-tree-shake it. It targets Node.js 20 and newer (`engines.node: ">=20.0.0"`).
+tree-shake it. It targets Node.js 22 and newer (`engines.node: ">=22"`).
 
 ## Troubleshooting
 

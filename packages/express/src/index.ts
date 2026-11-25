@@ -40,9 +40,7 @@ export interface CredExpressRouter extends Router {
  * asynchronous. It awaits the MongoDB connection before returning, so the
  * first request never races adapter initialization.
  */
-export const credExpress = async (
-  userConfig: CredExpressConfig,
-): Promise<CredExpressRouter> => {
+export const credExpress = async (userConfig: CredExpressConfig): Promise<CredExpressRouter> => {
   const config = resolveCredConfig(userConfig);
   const runtime = await createCoreRuntime(config);
 
@@ -57,7 +55,7 @@ export const credExpress = async (
     } catch (closeError) {
       config.logger.error(
         '@cred-kit/express: failed to release adapters after router construction failed',
-        closeError,
+        closeError
       );
     }
 
@@ -69,12 +67,16 @@ export {
   createCoreAuthConfig,
   defaultCredRateLimits,
   resolveCredConfig,
-  resolveCredRateLimits,
+  resolveCredRateLimits
 } from './config.js';
 
 export { createCoreRuntime } from './runtime.js';
 
 export type { CredCoreRuntime } from './runtime.js';
+
+export { createAuthGuard } from './middleware/auth.middleware.js';
+
+export type { CredAuthGuardOptions } from './middleware/auth.middleware.js';
 
 export type {
   CredCookieConfig,
@@ -90,16 +92,12 @@ export type {
   CredRateLimitRule,
   CredRateLimits,
   CredRateLimitsInput,
+  CredRateLimitStoreFactory,
   CredSameSite,
   ResolvedCredCookieConfig,
   ResolvedCredDatabase,
   ResolvedCredEmail,
-  ResolvedCredExpressConfig,
+  ResolvedCredExpressConfig
 } from './config.js';
 
-export type {
-  CredCoreDeps,
-  CredLocals,
-  CredOAuthProvider,
-  CredRequestContext,
-} from './types.js';
+export type { CredCoreDeps, CredLocals, CredOAuthProvider, CredRequestContext } from './types.js';

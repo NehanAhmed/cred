@@ -56,6 +56,7 @@ export interface CredAuthController {
   verifyEmail: RequestHandler;
   forgotPassword: RequestHandler;
   resetPassword: RequestHandler;
+  resetPasswordRedirect: RequestHandler;
 }
 
 export const createAuthController = (
@@ -190,6 +191,14 @@ export const createAuthController = (
       );
 
       sendSuccess(res, null, 'Password reset successfully');
+    },
+
+    resetPasswordRedirect: (req, res) => {
+      // Password-reset emails link to the API route with GET. The reset itself
+      // is a POST that needs the new password, so redirect the browser to the
+      // client page that collects it and posts back to resetPassword.
+      const token = readRouteParam(req.params.token);
+      res.redirect(`${config.clientUrl}/reset-password?token=${encodeURIComponent(token)}`);
     },
   };
 };
