@@ -65,17 +65,17 @@
   },
   "peerDependencies": {
     "@cred-kit/core": "workspace:*",
-    "mongoose": "^9.11.4"
+    "mongoose": "^9.13.0"
   },
   "devDependencies": {
     "@cred-kit/core": "workspace:*",
     "@types/node": "^26.6.6",
     "eslint": "^10.15.0",
-    "mongoose": "^9.11.4",
-    "mongodb-memory-server": "^11.2.0",
+    "mongoose": "^9.13.0",
+    "mongodb-memory-server": "^11.4.0",
     "tsdown": "^0.23.7",
-    "typescript": "^6.0.3",
-    "typescript-eslint": "^8.72.2",
-    "vitest": "^5.1.0"
+    "typescript": "^7.0.2",
+    "typescript-eslint": "^8.74.0",
+    "vitest": "^5.1.1"
   }
 }
