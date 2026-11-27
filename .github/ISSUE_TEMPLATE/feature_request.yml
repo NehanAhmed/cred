@@ -1,5 +1,5 @@
 name: Feature request
-description: Propose a change to Cred, a new adapter, or documentation.
+description: Propose a change to cred-kit, a new adapter, or documentation.
 title: "[Feature]: "
 body:
   - type: markdown

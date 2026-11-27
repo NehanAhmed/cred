@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a bug in a Cred package.
+description: Report a bug in a cred-kit package.
 title: "[Bug]: "
 body:
   - type: markdown

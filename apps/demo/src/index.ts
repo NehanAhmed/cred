@@ -59,5 +59,5 @@ const cred = await credExpress({
 app.use('/api', cred);
 
 app.listen(PORT, () => {
-  console.log(`Cred demo listening on http://localhost:${PORT}/api`);
+  console.log(`cred-kit demo listening on http://localhost:${PORT}/api`);
 });

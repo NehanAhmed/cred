@@ -1,4 +1,4 @@
-# TASK: Resolve the known limitations of the Cred monorepo, in planned phases, with a tracked checklist
+# TASK: Resolve the known limitations of the cred-kit monorepo, in planned phases, with a tracked checklist
 
 ## 1. Objective
 

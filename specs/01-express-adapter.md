@@ -69,7 +69,7 @@ export function createRouter(config: ResolvedConfig, deps: CoreDeps) {
   return router;
 }
 
-Put express.json and cookieParser inside the router, scoped to Cred’s routes, so users don’t have to remember them and Cred doesn’t change parsing for the rest of their app.
+Put express.json and cookieParser inside the router, scoped to cred-kit’s routes, so users don’t have to remember them and cred-kit doesn’t change parsing for the rest of their app.
 
 The entry point resolves config and wires everything:
 

@@ -1,6 +1,6 @@
-# AGENTS.md — Cred
+# AGENTS.md — cred-kit
 
-Cred is a drop-in authentication API adapter: Express 5 + Mongoose 9 + TypeScript, packaged as a
+cred-kit is a drop-in authentication API adapter: Express 5 + Mongoose 9 + TypeScript, packaged as a
 pnpm/Turborepo monorepo. There is no frontend and no CI in this repository. The adapter
 packages (`@cred-kit/express`, `@cred-kit/core`, `@cred-kit/mongo-storage`, `@cred-kit/smtp`)
 are published separately; `apps/cred-testing` and `apps/demo` are private example apps.

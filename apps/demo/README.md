@@ -1,4 +1,4 @@
-# Cred demo
+# cred-kit demo
 
 A scratch Express host for `@cred-kit/express`. It exists to show how the router is mounted; it is
 not a production application.

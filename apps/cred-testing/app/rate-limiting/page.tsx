@@ -21,7 +21,7 @@ export default function RateLimitingPage() {
           Rate Limiting Test Harness
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Observe rate limiter behavior for every Cred API endpoint
+          Observe rate limiter behavior for every cred-kit API endpoint
         </p>
       </div>
       <RateLimitSection />

@@ -81,11 +81,11 @@ export const generateRefreshTokenData = async (
 
 export function assertJwtSecret(secret: unknown): asserts secret is string {
   if (typeof secret !== 'string' || secret.length === 0) {
-    throw new Error('Cred: jwtSecret is required and must be a non-empty string');
+    throw new Error('cred-kit: jwtSecret is required and must be a non-empty string');
   }
   // HS256 keys should carry at least 256 bits of entropy (RFC 7518 §3.2).
   if (secret.length < 32) {
-    throw new Error('Cred: jwtSecret must be at least 32 characters');
+    throw new Error('cred-kit: jwtSecret must be at least 32 characters');
   }
 }
 export const generateAccessToken = (

@@ -1,5 +1,5 @@
 /**
- * Central configuration for every tunable constant in the Cred services.
+ * Central configuration for every tunable constant in the cred-kit services.
  *
  * Values here are the single source of truth; service entry points merge a
  * caller-supplied `Partial<CredConfig>` over `defaultConfig`, so hosts can

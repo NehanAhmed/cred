@@ -4,9 +4,9 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
-# cred-testing — Cred API Testing Application
+# cred-testing — cred-kit API Testing Application
 
-This is a **backend API testing application** for the **Cred** authentication service. Every feature is specified in `PRD.md`. Build features by referencing the PRD section number.
+This is a **backend API testing application** for the **cred-kit** authentication service. Every feature is specified in `PRD.md`. Build features by referencing the PRD section number.
 
 ## Dev commands
 
@@ -77,7 +77,7 @@ You can change how components are arranged, wrapped, spaced, and nested. You can
 ## Env
 
 - `.env*` is gitignored — use `.env.local` for local secrets
-- `NEXT_PUBLIC_API_URL=http://localhost:3000` — the Cred backend URL (used by proxy.ts)
+- `NEXT_PUBLIC_API_URL=http://localhost:3000` — the cred-kit backend URL (used by proxy.ts)
 
 ---
 
@@ -87,7 +87,7 @@ You can change how components are arranged, wrapped, spaced, and nested. You can
 
 ### API Proxy (`proxy.ts`)
 
-Forward `/api/*` to the Cred backend at `NEXT_PUBLIC_API_URL`. This solves the cross-origin httpOnly cookie problem — the browser talks to the Next.js server (same origin), which proxies to Cred. Cookies work naturally, no CORS needed.
+Forward `/api/*` to the cred-kit backend at `NEXT_PUBLIC_API_URL`. This solves the cross-origin httpOnly cookie problem — the browser talks to the Next.js server (same origin), which proxies to cred-kit. Cookies work naturally, no CORS needed.
 
 All API calls go to relative paths like `/api/auth/login`, never to `http://localhost:3000/api/...`.
 
@@ -121,7 +121,7 @@ All return `Promise<ApiResult<T>>`.
 
 ### Zod Schemas — `lib/schemas/*`
 
-Mirror the Cred API validation rules. Key schemas:
+Mirror the cred-kit API validation rules. Key schemas:
 
 | File | Schemas |
 |---|---|

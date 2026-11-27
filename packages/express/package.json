@@ -1,9 +1,9 @@
 {
   "name": "@cred-kit/express",
   "version": "0.2.0",
-  "description": "Express 5 adapter for Cred: mount one router to expose registration, login, OAuth, profile, and audit endpoints backed by @cred-kit/core.",
+  "description": "Express 5 adapter for cred-kit: mount one router to expose registration, login, OAuth, profile, and audit endpoints backed by @cred-kit/core.",
   "keywords": [
-    "cred",
+    "cred-kit",
     "auth",
     "authentication",
     "express",
@@ -24,12 +24,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/NehanAhmed/cred.git",
+    "url": "git+https://github.com/NehanAhmed/cred-kit.git",
     "directory": "packages/express"
   },
-  "homepage": "https://github.com/NehanAhmed/cred/tree/main/packages/express#readme",
+  "homepage": "https://github.com/NehanAhmed/cred-kit/tree/main/packages/express#readme",
   "bugs": {
-    "url": "https://github.com/NehanAhmed/cred/issues"
+    "url": "https://github.com/NehanAhmed/cred-kit/issues"
   },
   "type": "module",
   "main": "./dist/index.mjs",

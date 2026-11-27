@@ -6,7 +6,7 @@
   "changelog": [
     "@changesets/changelog-github",
     {
-      "repo": "NehanAhmed/cred"
+      "repo": "NehanAhmed/cred-kit"
     }
   ],
   "commit": true,

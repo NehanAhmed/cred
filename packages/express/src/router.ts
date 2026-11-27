@@ -21,9 +21,9 @@ import { validate } from './middleware/validate.middleware.js';
 import type { CredCoreDeps, CredLocals } from './types.js';
 
 /**
- * Builds the complete Cred router. The router owns JSON/cookie parsing so the
+ * Builds the complete cred-kit router. The router owns JSON/cookie parsing so the
  * host does not need to mount those globally, and so parsing stays scoped to
- * Cred's own routes.
+ * cred-kit's own routes.
  */
 export const createRouter = (config: ResolvedCredExpressConfig, deps: CredCoreDeps): Router => {
   const auth = createAuthController(config, deps);

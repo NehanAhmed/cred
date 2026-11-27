@@ -36,7 +36,7 @@ function RequestFlowDiagram() {
       color: "border-border bg-muted",
     },
     {
-      label: "Send to Cred API",
+      label: "Send to cred-kit API",
       value: "fetch() with credentials: include",
       color: "border-border bg-muted",
     },
@@ -984,7 +984,7 @@ function EdgeCasesTable() {
   const edgeCases = [
     {
       id: 1,
-      name: "Cred API not running",
+      name: "cred-kit API not running",
       strategy: "fetch throws → network-error card with retry button",
       location: "lib/api-client.ts:195",
       status: "covered" as const,

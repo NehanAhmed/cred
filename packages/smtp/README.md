@@ -1,6 +1,6 @@
 # @cred-kit/smtp
 
-Email delivery for [Cred](https://github.com/NehanAhmed/cred) authentication flows. This package
+Email delivery for [cred-kit](https://github.com/NehanAhmed/cred-kit) authentication flows. This package
 implements core's `EmailAdapter` contract over either **SMTP (Nodemailer)** or the **Resend HTTP
 API**, so switching transports is a configuration change rather than a code change.
 
@@ -35,7 +35,7 @@ ESM only · Node.js 22+ · MIT
 
 ## Why this package
 
-Cred needs to send two transactional emails: address verification and password reset. The
+cred-kit needs to send two transactional emails: address verification and password reset. The
 messages themselves — subjects, HTML, link shape, expiry copy — belong to `@cred-kit/core`. The
 transport that actually delivers them is an operational decision: a self-hosted SMTP relay in one
 deployment, a hosted API in another.
@@ -65,7 +65,7 @@ deployment, a hosted API in another.
 
 ## Installation
 
-`@cred-kit/smtp` is consumed from the Cred monorepo as a workspace package. Both of its runtime
+`@cred-kit/smtp` is consumed from the cred-kit monorepo as a workspace package. Both of its runtime
 requirements are declared as **peer dependencies**, so the host application owns the copies of
 `@cred-kit/core` and `nodemailer`:
 
@@ -495,4 +495,4 @@ tree-shake it. It targets Node.js 22 and newer (`engines.node: ">=22"`).
 
 ## License
 
-MIT © 2026 Nehan Ahmed — Cred. See the repository [LICENSE](https://github.com/NehanAhmed/cred/blob/main/LICENSE).
+MIT © 2026 Nehan Ahmed — cred-kit. See the repository [LICENSE](https://github.com/NehanAhmed/cred-kit/blob/main/LICENSE).

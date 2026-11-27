@@ -1,4 +1,4 @@
-# Cred API — API Reference
+# cred-kit API — API Reference
 
 **Version:** 1.0.0  
 **Base URL:** `http://localhost:3000/api`  
@@ -38,7 +38,7 @@
 
 ## Overview
 
-**Cred** is a drop-in authentication API built with Express 5, Mongoose 9, and TypeScript 6. All authentication is handled via **httpOnly JWT cookies** — no bearer tokens, no `Authorization` headers. The API is stateless beyond the MongoDB user store; session state lives entirely in the signed JWT.
+**cred-kit** is a drop-in authentication API built with Express 5, Mongoose 9, and TypeScript 6. All authentication is handled via **httpOnly JWT cookies** — no bearer tokens, no `Authorization` headers. The API is stateless beyond the MongoDB user store; session state lives entirely in the signed JWT.
 
 ### Key Design Decisions
 
@@ -1081,7 +1081,7 @@ curl http://localhost:3000/api/health
   "success": true,
   "message": "Service is healthy",
   "data": {
-    "name": "cred",
+    "name": "cred-kit",
     "version": "1.0.0",
     "environment": "development",
     "uptime": 3600,
@@ -1107,7 +1107,7 @@ curl http://localhost:3000/api/health
   "message": "Service is degraded — database not connected",
   "error": "Service is degraded — database not connected",
   "data": {
-    "name": "cred",
+    "name": "cred-kit",
     "version": "1.0.0",
     "database": { "status": "disconnected", "latency": null },
     ...

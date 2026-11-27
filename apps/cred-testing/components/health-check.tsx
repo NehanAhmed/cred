@@ -16,7 +16,7 @@ export function HealthCheck() {
   return (
     <EndpointSection
       title="Health Check"
-      description="Verify the Cred API is reachable and responding."
+      description="Verify the cred-kit API is reachable and responding."
       method="GET"
       path="/api/health"
     >

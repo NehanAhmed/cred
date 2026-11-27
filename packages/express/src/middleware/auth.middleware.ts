@@ -45,7 +45,7 @@ export const createRequireAuth = (config: ResolvedCredExpressConfig): RequestHan
   createAuthMiddleware(config.jwtSecret, config.cookies.accessTokenName);
 
 /**
- * Exported auth guard for host routes outside the Cred router.
+ * Exported auth guard for host routes outside the cred-kit router.
  *
  * ```ts
  * app.get('/dashboard', createAuthGuard({ jwtSecret: process.env.JWT_SECRET! }), (req, res) => {

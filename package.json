@@ -1,5 +1,5 @@
 {
-  "name": "cred",
+  "name": "cred-kit",
   "private": true,
   "packageManager": "pnpm@10.33.2",
   "type": "module",

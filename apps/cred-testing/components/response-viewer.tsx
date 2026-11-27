@@ -136,7 +136,7 @@ export function ResponseViewer<T>({
             <p className="text-sm text-destructive">{result.error.message}</p>
             {result.isCorsError && (
               <p className="mt-1 text-xs text-muted-foreground">
-                CORS error detected. Ensure the Cred backend includes this
+                CORS error detected. Ensure the cred-kit backend includes this
                 origin in its{" "}
                 <code className="rounded bg-muted px-1">CORS_ORIGIN</code>{" "}
                 environment variable, or use the API proxy (already set up in{" "}

@@ -217,7 +217,7 @@ const exchangeGitHubCode = async (
 const githubHeaders = (accessToken: string): Record<string, string> => ({
   Accept: 'application/vnd.github+json',
   Authorization: `Bearer ${accessToken}`,
-  'User-Agent': 'cred-express',
+  'User-Agent': 'cred-kit-express',
   'X-GitHub-Api-Version': '2022-11-28',
 });
 

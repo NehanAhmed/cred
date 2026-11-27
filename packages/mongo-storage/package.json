@@ -1,9 +1,9 @@
 {
   "name": "@cred-kit/mongo-storage",
   "version": "0.1.1",
-  "description": "MongoDB/Mongoose storage adapters for Cred authentication data: users, refresh tokens, and audit logs.",
+  "description": "MongoDB/Mongoose storage adapters for cred-kit authentication data: users, refresh tokens, and audit logs.",
   "keywords": [
-    "cred",
+    "cred-kit",
     "auth",
     "authentication",
     "authorization",
@@ -26,12 +26,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/NehanAhmed/cred.git",
+    "url": "git+https://github.com/NehanAhmed/cred-kit.git",
     "directory": "packages/mongo-storage"
   },
-  "homepage": "https://github.com/NehanAhmed/cred/tree/main/packages/mongo-storage#readme",
+  "homepage": "https://github.com/NehanAhmed/cred-kit/tree/main/packages/mongo-storage#readme",
   "bugs": {
-    "url": "https://github.com/NehanAhmed/cred/issues"
+    "url": "https://github.com/NehanAhmed/cred-kit/issues"
   },
   "type": "module",
   "main": "./dist/index.mjs",

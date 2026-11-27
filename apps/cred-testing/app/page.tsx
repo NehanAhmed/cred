@@ -8,10 +8,10 @@ export default function Page() {
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 p-6">
       <div>
         <h1 className="text-2xl font-medium tracking-tight">
-          Cred API Testing
+          cred-kit API Testing
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Interactive manual testing interface for the Cred authentication API
+          Interactive manual testing interface for the cred-kit authentication API
         </p>
       </div>
       <div className="flex flex-wrap gap-2">

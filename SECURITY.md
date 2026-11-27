@@ -20,16 +20,16 @@ This policy covers the published packages:
 The private workspace packages and apps (`@cred-kit/shared`, `@cred-kit/config`,
 `apps/cred-testing`, and `apps/demo`) are not published and are not part of the supported release.
 
-Cred runs inside a host application. The host owns TLS, CORS, security headers, proxy trust,
+cred-kit runs inside a host application. The host owns TLS, CORS, security headers, proxy trust,
 secret storage, and the choice of cookie settings outside production. Vulnerabilities in those
-areas should be reported to the host application, not to Cred. If the problem is in Cred's
+areas should be reported to the host application, not to cred-kit. If the problem is in cred-kit's
 defaults or in code shipped by one of the packages above, report it here.
 
 ## Reporting a vulnerability
 
 Use GitHub private vulnerability reporting:
 
-<https://github.com/NehanAhmed/cred/security/advisories/new>
+<https://github.com/NehanAhmed/cred-kit/security/advisories/new>
 
 The repository's Security page shows the "Report a vulnerability" action, which means private
 reporting is enabled. Do not open a public issue, discussion, or pull request for a vulnerability.

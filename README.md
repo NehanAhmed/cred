@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://ik.imagekit.io/td7wr0ax7o/Cred%20Authentication_%20In%20One%20Mount.png" alt="Cred banner" width="100%">
+  <img src="https://ik.imagekit.io/td7wr0ax7o/Cred%20Authentication_%20In%20One%20Mount.png" alt="cred-kit banner" width="100%">
 </p>
 
 <p align="center">
@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/license-MIT-brightgreen" alt="MIT License">
 </p>
 
-<h1 align="center">Cred</h1>
+<h1 align="center">cred-kit</h1>
 
 <p align="center">
   Adapter-based authentication for Node.js. Mount one Express router to get registration, email
@@ -21,7 +21,7 @@
 
 ## Status
 
-Cred is pre-1.0. The four public packages are published on npm at `0.1.0`. The authentication
+cred-kit is pre-1.0. The four public packages are published on npm at `0.1.0`. The authentication
 core, MongoDB storage adapter, and email adapter are covered by Vitest, and the Express adapter has
 an HTTP-level Vitest suite that mounts the router with in-memory adapter fakes.
 
@@ -56,7 +56,7 @@ an HTTP-level Vitest suite that mounts the router with in-memory adapter fakes.
 
 ## Overview
 
-Cred is not a standalone authentication server. It is a set of packages that you mount inside
+cred-kit is not a standalone authentication server. It is a set of packages that you mount inside
 your own Node.js application. `@cred-kit/core` owns the authentication rules — password hashing,
 verified email flows, token rotation, account lockout, OAuth account linking, profiles, and audit
 events — and talks to storage and email through small adapter interfaces. `@cred-kit/express`
@@ -64,7 +64,7 @@ turns those services into an Express 5 router with cookies, CSRF protection, rat
 redirects, and JSON responses.
 
 The host application still owns the HTTP server, TLS, CORS, security headers, proxy trust, secret
-storage, and the user experience. Cred supplies the authentication domain and an Express transport
+storage, and the user experience. cred-kit supplies the authentication domain and an Express transport
 for it.
 
 ## Features
@@ -164,8 +164,8 @@ Requirements:
 Create a project and install the adapter with its peer dependencies:
 
 ```bash
-mkdir cred-app
-cd cred-app
+mkdir cred-kit-app
+cd cred-kit-app
 npm init -y
 npm install @cred-kit/express @cred-kit/core express cookie-parser express-rate-limit mongoose nodemailer
 npm install -D typescript tsx @types/express @types/node
@@ -199,7 +199,7 @@ const cred = await credExpress({
 app.use('/api', cred);
 
 const server = app.listen(3000, () => {
-  console.log('Cred API listening on http://localhost:3000');
+  console.log('cred-kit API listening on http://localhost:3000');
 });
 
 const shutdown = async (): Promise<void> => {
@@ -215,8 +215,8 @@ Set these environment variables before starting the process:
 
 | Variable                  | Required                   | Notes                                                                   |
 | ------------------------- | -------------------------- | ----------------------------------------------------------------------- |
-| `MONGO_URI`               | Yes                        | MongoDB connection string, for example `mongodb://127.0.0.1:27017/cred` |
-| `JWT_SECRET`              | Yes                        | At least 32 characters; Cred rejects shorter secrets at startup         |
+| `MONGO_URI`               | Yes                        | MongoDB connection string, for example `mongodb://127.0.0.1:27017/cred-kit` |
+| `JWT_SECRET`              | Yes                        | At least 32 characters; cred-kit rejects shorter secrets at startup     |
 | `SMTP_HOST`               | Yes with the SMTP provider | Hostname of your SMTP server                                            |
 | `SMTP_PORT`               | No                         | Defaults to `587` in the example                                        |
 | `SMTP_USER` / `SMTP_PASS` | No                         | Set both together if your SMTP server requires authentication           |
@@ -478,7 +478,7 @@ The access token and refresh token lifetimes are configured separately: the JWT 
 
 ### Host responsibilities
 
-Cred does not add CORS, helmet, HTTPS, or `trust proxy`. Configure those in the host application.
+cred-kit does not add CORS, helmet, HTTPS, or `trust proxy`. Configure those in the host application.
 Set `app.set('trust proxy', ...)` when the API runs behind a proxy so rate limits and audit IPs see
 the client address. Serve the API over HTTPS and set `cookies.secure: true` outside production when
 you do.
@@ -585,11 +585,11 @@ That is **448 tests across 26 files**. The first DB-backed run downloads a Mongo
 
 No roadmap is published in this repository. The packages are pre-1.0, and the only design note in
 the checkout is `specs/01-express-adapter.md`. Track work in the repository's issue tracker:
-[github.com/NehanAhmed/cred/issues](https://github.com/NehanAhmed/cred/issues).
+[github.com/NehanAhmed/cred-kit/issues](https://github.com/NehanAhmed/cred-kit/issues).
 
 ## Contributing
 
-Open an issue or pull request at [github.com/NehanAhmed/cred](https://github.com/NehanAhmed/cred).
+Open an issue or pull request at [github.com/NehanAhmed/cred-kit](https://github.com/NehanAhmed/cred-kit).
 Before submitting, run `pnpm build`, `pnpm lint`, `pnpm typecheck`, and `pnpm test`, and keep
 changes scoped to the affected package.
 
@@ -597,4 +597,4 @@ changes scoped to the affected package.
 
 MIT. See [LICENSE](./LICENSE).
 
-Copyright © 2026 Nehan Ahmed — Cred
+Copyright © 2026 Nehan Ahmed — cred-kit

@@ -13,7 +13,7 @@ export interface CredExpressRouter extends Router {
 }
 
 /**
- * Builds the Cred router and the concrete adapters it needs.
+ * Builds the cred-kit router and the concrete adapters it needs.
  *
  * ```ts
  * const cred = await credExpress({

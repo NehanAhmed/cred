@@ -1,15 +1,15 @@
 # @cred-kit/express
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/NehanAhmed/cred/blob/main/LICENSE)
-[![Node.js >= 22](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)](https://github.com/NehanAhmed/cred/blob/main/packages/express/package.json)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/NehanAhmed/cred-kit/blob/main/LICENSE)
+[![Node.js >= 22](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)](https://github.com/NehanAhmed/cred-kit/blob/main/packages/express/package.json)
 
-Express 5 transport adapter for Cred: one mountable router for registration, login, OAuth, profiles, and audit logs.
+Express 5 transport adapter for cred-kit: one mountable router for registration, login, OAuth, profiles, and audit logs.
 
 > **Pre-1.0:** this package is version `0.1.0`. Its public API may change between minor versions.
 
 ## Overview
 
-`@cred-kit/express` is the Express adapter for Cred. It returns an Express `Router` that implements the HTTP endpoints for authentication, profiles, and audit logs. The router owns routing, JSON and cookie parsing, request validation, cookies, redirects, rate limiting, and HTTP error mapping.
+`@cred-kit/express` is the Express adapter for cred-kit. It returns an Express `Router` that implements the HTTP endpoints for authentication, profiles, and audit logs. The router owns routing, JSON and cookie parsing, request validation, cookies, redirects, rate limiting, and HTTP error mapping.
 
 Authentication logic, token issuance, password and token hashing, refresh-token rotation, and audit writes are delegated to `@cred-kit/core`. When configured with MongoDB and email options, the adapter constructs the official `@cred-kit/mongo-storage` and `@cred-kit/smtp` implementations at startup. It can also accept prebuilt `@cred-kit/core` adapters for another backend.
 
@@ -128,7 +128,7 @@ The mount path must match the configured `basePath` (default `/api`). See [Mount
 
 ```text
 request
-  -> mounted Cred router
+  -> mounted cred-kit router
      -> express.json({ limit }) and cookieParser()
      -> /auth/* or /profile/*
         -> rate limiter(s)
@@ -264,7 +264,7 @@ Common messages:
 | Missing email                     | `@cred-kit/express: "email" is required`                                                                                              |
 | Unrecognized email shape          | `@cred-kit/express: "email" must provide email service options ("EMAIL_FROM" and "BACKEND_URL") or a prebuilt EmailAdapter`           |
 | Missing or non-string secret      | `@cred-kit/express: "jwtSecret" is required and must be a string`                                                                     |
-| Secret shorter than 32 characters | `@cred-kit/express: Cred: jwtSecret must be at least 32 characters`                                                                   |
+| Secret shorter than 32 characters | `@cred-kit/express: cred-kit: jwtSecret must be at least 32 characters`                                                                   |
 | Bad URL                           | `@cred-kit/express: "clientUrl" must be an absolute URL, received "..."`                                                              |
 | Non-HTTP URL                      | `@cred-kit/express: "clientUrl" must use http or https, received "..."`                                                               |
 | URL with query or fragment        | `@cred-kit/express: "clientUrl" must not contain a query string or fragment`                                                          |
@@ -914,7 +914,7 @@ import { credExpress } from '@cred-kit/express';
 
 const app = express();
 
-// Host-level middleware — runs before the Cred router.
+// Host-level middleware — runs before the cred-kit router.
 app.use(helmet());
 app.use(
   cors({
@@ -940,7 +940,7 @@ pnpm add cors helmet
 pnpm add -D @types/cors @types/helmet
 ```
 
-The 10 KB default JSON body limit applies to the whole mounted router. Increase `jsonBodyLimit` only if a Cred request body actually needs it.
+The 10 KB default JSON body limit applies to the whole mounted router. Increase `jsonBodyLimit` only if a cred-kit request body actually needs it.
 
 ## Limitations and known constraints
 
@@ -1062,7 +1062,7 @@ The package augments the global Express request type with `user?: JWTPayload`. U
 
 | Symptom                                                                                  | Cause                                                                 | Fix                                                                    |
 | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `@cred-kit/express: Cred: jwtSecret must be at least 32 characters`                      | Secret is too short                                                   | Use a secret of at least 32 characters                                 |
+| `@cred-kit/express: cred-kit: jwtSecret must be at least 32 characters`                      | Secret is too short                                                   | Use a secret of at least 32 characters                                 |
 | `@cred-kit/express: "jwtSecret" is required and must be a string`                        | Missing or non-string secret                                          | Pass `jwtSecret`                                                       |
 | `@cred-kit/express: "basePath" must start with "/"`                                      | Path does not start with a slash                                      | Use `/api`, `/v1`, or `/`                                              |
 | `@cred-kit/express: "cookieName" must be a non-empty string`                             | `createAuthGuard` received a blank cookie name                        | Omit it to use `token` or pass a real cookie name                      |
@@ -1082,7 +1082,7 @@ The package augments the global Express request type with `user?: JWTPayload`. U
 | `503 Audit logging is not configured`                                                    | Prebuilt database adapters have no `audit`                            | Add an `AuditDatabaseAdapter`                                          |
 | `413 Request body too large`                                                             | Body exceeds `jsonBodyLimit`                                          | Send a smaller body or raise the limit                                 |
 | `400 Invalid JSON body`                                                                  | Malformed JSON                                                        | Send valid JSON                                                        |
-| `404` HTML page under the mount                                                          | Path is not part of the Cred router                                   | Check the route table; the host handles 404s                           |
+| `404` HTML page under the mount                                                          | Path is not part of the cred-kit router                                   | Check the route table; the host handles 404s                           |
 | A CommonJS `require()` cannot load the package                                           | The package is ESM-only and the export map has no `require` condition | Import it from an ES module                                            |
 
 For unexpected errors, pass a `logger` and inspect its output. The router logs unhandled request errors, OAuth provider failures, OAuth callback failures, and adapter cleanup failures.
@@ -1130,10 +1130,10 @@ Package scripts:
 
 ## Contributing
 
-Open an issue or pull request at [github.com/NehanAhmed/cred](https://github.com/NehanAhmed/cred). Keep changes scoped to the package and run the build, typecheck, and lint commands above before submitting.
+Open an issue or pull request at [github.com/NehanAhmed/cred-kit](https://github.com/NehanAhmed/cred-kit). Keep changes scoped to the package and run the build, typecheck, and lint commands above before submitting.
 
 ## License
 
-MIT. See the repository [LICENSE](https://github.com/NehanAhmed/cred/blob/main/LICENSE).
+MIT. See the repository [LICENSE](https://github.com/NehanAhmed/cred-kit/blob/main/LICENSE).
 
-Copyright (c) 2026 Nehan Ahmed — Cred
+Copyright (c) 2026 Nehan Ahmed — cred-kit

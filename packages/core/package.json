@@ -3,7 +3,7 @@
   "version": "0.1.1",
   "description": "Framework-agnostic, storage-agnostic authentication core for Node.js: registration, verified email login, rotating refresh tokens with reuse detection, OAuth account linking, profiles, and audit logging.",
   "keywords": [
-    "cred",
+    "cred-kit",
     "auth",
     "authentication",
     "jwt",
@@ -32,12 +32,12 @@
   "author": "NehanAhmed (https://github.com/NehanAhmed)",
  "repository": {
     "type": "git",
-    "url": "git+https://github.com/NehanAhmed/cred.git",
+    "url": "git+https://github.com/NehanAhmed/cred-kit.git",
     "directory": "packages/core"
   },
-  "homepage": "https://github.com/NehanAhmed/cred/tree/main/packages/core#readme",
+  "homepage": "https://github.com/NehanAhmed/cred-kit/tree/main/packages/core#readme",
   "bugs": {
-    "url": "https://github.com/NehanAhmed/cred/issues"
+    "url": "https://github.com/NehanAhmed/cred-kit/issues"
   },
   "type": "module",
   "main": "dist/index.mjs",

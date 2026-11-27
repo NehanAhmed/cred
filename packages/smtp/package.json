@@ -1,9 +1,9 @@
 {
   "name": "@cred-kit/smtp",
   "version": "0.2.0",
-  "description": "SMTP (Nodemailer) and Resend email adapter for Cred authentication flows.",
+  "description": "SMTP (Nodemailer) and Resend email adapter for cred-kit authentication flows.",
   "keywords": [
-    "cred",
+    "cred-kit",
     "auth",
     "authentication",
     "smtp",
@@ -22,12 +22,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/NehanAhmed/cred.git",
+    "url": "git+https://github.com/NehanAhmed/cred-kit.git",
     "directory": "packages/smtp"
   },
-  "homepage": "https://github.com/NehanAhmed/cred/tree/main/packages/smtp#readme",
+  "homepage": "https://github.com/NehanAhmed/cred-kit/tree/main/packages/smtp#readme",
   "bugs": {
-    "url": "https://github.com/NehanAhmed/cred/issues"
+    "url": "https://github.com/NehanAhmed/cred-kit/issues"
   },
   "type": "module",
   "main": "./dist/index.mjs",

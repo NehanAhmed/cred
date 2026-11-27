@@ -8,13 +8,13 @@ package, version, Node.js version, OS, adapters in use, reproduction steps, expe
 behavior, and any logs. The repository does not have a separate discussion forum, chat channel, or
 mailing list.
 
-<https://github.com/NehanAhmed/cred/issues/new>
+<https://github.com/NehanAhmed/cred-kit/issues/new>
 
 ## Where to report bugs
 
 Report bugs with the bug report form:
 
-<https://github.com/NehanAhmed/cred/issues/new?template=bug_report.yml>
+<https://github.com/NehanAhmed/cred-kit/issues/new?template=bug_report.yml>
 
 Include the package and version, Node.js version, operating system, the database, email, and
 framework adapters in use, reproduction steps, expected versus actual behavior, and any logs.
@@ -24,7 +24,7 @@ framework adapters in use, reproduction steps, expected versus actual behavior, 
 Do not report vulnerabilities in a public issue. Follow SECURITY.md and use GitHub private
 vulnerability reporting:
 
-<https://github.com/NehanAhmed/cred/security/policy>
+<https://github.com/NehanAhmed/cred-kit/security/policy>
 
 ## Before you ask
 

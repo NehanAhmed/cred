@@ -1,4 +1,4 @@
-# Cred API Testing Application — Product Requirements Document
+# cred-kit API Testing Application — Product Requirements Document
 
 **Version:** 1.0.0  
 **Status:** Draft  
@@ -29,11 +29,11 @@
 
 ## 1. Executive Summary
 
-This is a **backend API testing application** for the **Cred** authentication service. Cred is a drop-in auth API (Express 5 / Mongoose 9 / TypeScript 6) that provides registration, login, OAuth (Google + GitHub), email verification, password reset, profile management, session audit logging, and rate limiting.
+This is a **backend API testing application** for the **cred-kit** authentication service. cred-kit is a drop-in auth API (Express 5 / Mongoose 9 / TypeScript 6) that provides registration, login, OAuth (Google + GitHub), email verification, password reset, profile management, session audit logging, and rate limiting.
 
-This testing application validates **every Cred API endpoint** through a structured manual testing interface. It is *not* an automated test suite — it is an interactive tool that lets developers and QA engineers execute real API calls against a running Cred instance, inspect full request/response details, and verify correct behavior across all states (success, validation errors, auth failures, rate limiting, OAuth redirects, token rotation, and edge cases).
+This testing application validates **every cred-kit API endpoint** through a structured manual testing interface. It is *not* an automated test suite — it is an interactive tool that lets developers and QA engineers execute real API calls against a running cred-kit instance, inspect full request/response details, and verify correct behavior across all states (success, validation errors, auth failures, rate limiting, OAuth redirects, token rotation, and edge cases).
 
-The app manages browser-based authentication state entirely via httpOnly cookies (mirroring how a real frontend would interact with Cred), supporting the full JWT lifecycle including refresh token rotation, cookie scoping, same-site policies, and OAuth state parameter CSRF protection.
+The app manages browser-based authentication state entirely via httpOnly cookies (mirroring how a real frontend would interact with cred-kit), supporting the full JWT lifecycle including refresh token rotation, cookie scoping, same-site policies, and OAuth state parameter CSRF protection.
 
 ---
 
@@ -41,8 +41,8 @@ The app manages browser-based authentication state entirely via httpOnly cookies
 
 ### In Scope
 
-- A Next.js 16 application that lives alongside the Cred backend
-- Interactive testing interfaces for every Cred API endpoint
+- A Next.js 16 application that lives alongside the cred-kit backend
+- Interactive testing interfaces for every cred-kit API endpoint
 - Real httpOnly cookie-based authentication management
 - Full OAuth flow simulation (initiate redirect and handle callback)
 - Email verification and password reset flow testing via Ethereal preview URLs
@@ -53,11 +53,11 @@ The app manages browser-based authentication state entirely via httpOnly cookies
 
 ### Out of Scope
 
-- Automated CI/CD test suites (Cred's own Jest/supertest suite covers that)
+- Automated CI/CD test suites (cred-kit's own Jest/supertest suite covers that)
 - Production authentication service
 - User management or CRUD for the testing app itself
 - Performance or load testing
-- The Cred API source code itself
+- The cred-kit API source code itself
 - UI design system or branding
 
 ---
@@ -91,9 +91,9 @@ The app uses the browser's native cookie store for all authenticated requests. I
 
 ### Key Design Decision: Cookie Relay Architecture
 
-Because the testing app runs on a different origin than the Cred API (e.g., `localhost:5173` vs `localhost:3000`), it requires a **CORS-compatible setup**. The testing app must:
+Because the testing app runs on a different origin than the cred-kit API (e.g., `localhost:5173` vs `localhost:3000`), it requires a **CORS-compatible setup**. The testing app must:
 1. Use `credentials: "include"` on all fetch requests
-2. Ensure the Cred backend includes the testing app's origin in its CORS configuration (`CORS_ORIGIN`)
+2. Ensure the cred-kit backend includes the testing app's origin in its CORS configuration (`CORS_ORIGIN`)
 3. Handle the fact that `sameSite: "strict"` cookies won't be sent on cross-origin fetches — the testing app must communicate this requirement to the user or use a proxy
 
 ---
@@ -102,7 +102,7 @@ Because the testing app runs on a different origin than the Cred API (e.g., `loc
 
 ### 4.1 Health Check Module
 
-**Purpose:** Verify the Cred API is reachable and the database connection is healthy.
+**Purpose:** Verify the cred-kit API is reachable and the database connection is healthy.
 
 **Endpoint:** `GET /api/health`
 
@@ -571,7 +571,7 @@ Because the testing app runs on a different origin than the Cred API (e.g., `loc
 ```
 User Input → Testing App UI
   → Construct Request (URL, headers, body, method, credentials: "include")
-  → Send to Cred API (fetch)
+  → Send to cred-kit API (fetch)
   → Receive Response
   → Parse Response
   → Classify Result (success / validation error / API error / rate limit / redirect)
@@ -626,7 +626,7 @@ The testing app must classify every API response into one of these categories an
 
 | Edge Case | Handling |
 |---|---|
-| Cred API is not running | Graceful error message, retry button, configuration check |
+| cred-kit API is not running | Graceful error message, retry button, configuration check |
 | CORS errors | Detect blocked by CORS policy and guide user to configure `CORS_ORIGIN` on the backend |
 | Cookie not set due to sameSite | Detect via post-login auth check failure, show guidance about same-origin requirement |
 | Token expired mid-session | Call refresh automatically or show "Session expired" with re-login prompt |

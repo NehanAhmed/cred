@@ -1,4 +1,4 @@
-# Contributing to Cred
+# Contributing to cred-kit
 
 ## Contents
 
@@ -20,7 +20,7 @@
 
 ## Welcome and scope
 
-Cred is an adapter-based authentication library for Node.js. The repository contains the
+cred-kit is an adapter-based authentication library for Node.js. The repository contains the
 framework-agnostic core, an Express 5 transport adapter, MongoDB storage adapters, and SMTP/Resend
 email adapters. See [README.md](./README.md) for the current package overview.
 
@@ -88,8 +88,8 @@ The repository has no `.nvmrc`; use the `engines.node` value above.
 Fork the repository on GitHub, then clone your fork:
 
 ```bash
-git clone https://github.com/NehanAhmed/cred.git
-cd cred
+git clone https://github.com/NehanAhmed/cred-kit.git
+cd cred-kit
 pnpm install --frozen-lockfile
 pnpm build
 ```
@@ -297,11 +297,11 @@ and CI pick it up.
 ## Reporting bugs and proposing features
 
 - Report bugs by opening an issue with the bug report template:
-  <https://github.com/NehanAhmed/cred/issues/new?template=bug_report.yml>. Include the package,
+  <https://github.com/NehanAhmed/cred-kit/issues/new?template=bug_report.yml>. Include the package,
   version, Node version, OS, adapters in use, reproduction steps, expected and actual behavior, and
   logs.
 - Propose features by opening an issue with the feature request template:
-  <https://github.com/NehanAhmed/cred/issues/new?template=feature_request.yml>.
+  <https://github.com/NehanAhmed/cred-kit/issues/new?template=feature_request.yml>.
 - Security vulnerabilities go through [SECURITY.md](./SECURITY.md), never a public issue.
 - For usage questions and other support, see [SUPPORT.md](./SUPPORT.md).
 
@@ -323,5 +323,5 @@ The same checklist appears in
 
 ## License
 
-Cred is licensed under the MIT License. See [LICENSE](./LICENSE). By contributing, you agree that
+cred-kit is licensed under the MIT License. See [LICENSE](./LICENSE). By contributing, you agree that
 your contributions are licensed under the same terms. There is no CLA or DCO requirement.
