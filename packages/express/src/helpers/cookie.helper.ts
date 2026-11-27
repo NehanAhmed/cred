@@ -112,7 +112,7 @@ export const setOAuthStateCookie = (
   res.cookie(OAUTH_STATE_COOKIE, state, {
     ...commonOptions(config, 'lax'),
     httpOnly: true,
-    secure: true,
+    secure: config.cookies.secure,
     path: authCookiePath(config.basePath),
     maxAge: OAUTH_STATE_TTL_MS
   });
