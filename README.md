@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://ik.imagekit.io/td7wr0ax7o/Cred%20Authentication_%20In%20One%20Mount.png" alt="cred-kit banner" width="100%">
+  <img src="https://ik.imagekit.io/td7wr0ax7o/cred-kit-banner.png" alt="cred-kit banner" width="100%">
 </p>
 
 <p align="center">
